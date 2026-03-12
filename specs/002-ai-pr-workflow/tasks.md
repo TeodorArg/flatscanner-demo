@@ -33,7 +33,7 @@
 - [x] Confirm required checks include `CI`, `PR Guard`, and `AI Review`
 - [x] Confirm at least one human approval is required before merge
 - [x] Open a test pull request and verify sticky review comments plus blocking verdict behavior
-- [ ] Open a test pull request and verify the `Claude Fix PR` workflow can update the same PR branch
+- [x] Open a test pull request and verify the `Claude Fix PR` workflow can update the same PR branch
 
 ## Follow-Up
 
