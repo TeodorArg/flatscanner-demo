@@ -23,6 +23,7 @@
 - [x] Add default repository ownership metadata
 - [x] Add local runner setup and review orchestration scripts
 - [x] Replace the temporary local adapter concept with direct local `codex exec` review execution
+- [x] Add a self-hosted Claude PR fix workflow triggered by label or PR comment
 
 ## Validation
 
@@ -32,6 +33,7 @@
 - [x] Confirm required checks include `CI`, `PR Guard`, and `AI Review`
 - [x] Confirm at least one human approval is required before merge
 - [x] Open a test pull request and verify sticky review comments plus blocking verdict behavior
+- [ ] Open a test pull request and verify the `Claude Fix PR` workflow can update the same PR branch
 
 ## Follow-Up
 

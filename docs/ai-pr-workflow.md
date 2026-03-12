@@ -17,9 +17,10 @@ This document describes the operating loop between Claude Code, Codex review, Gi
 4. Claude opens a pull request using the repository template
 5. GitHub Actions runs `baseline-checks`, `guard`, and `codex-review`
 6. Codex posts or updates a sticky AI review comment in the pull request
-7. Claude reads the review findings, updates the same branch, and pushes follow-up commits if needed
-8. GitHub reruns the checks automatically on the updated branch
-9. A human merges only after required checks are green and the PR is approved
+7. If fixes are needed, trigger Claude on the same PR by either adding the `claude-fix` label or commenting `/claude-fix`
+8. Claude reads the review findings, updates the same branch, and pushes follow-up commits
+9. GitHub reruns the checks automatically on the updated branch
+10. A human merges only after required checks are green and the PR is approved
 
 ## How Claude Should Handle Review Feedback
 
@@ -29,6 +30,15 @@ This document describes the operating loop between Claude Code, Codex review, Gi
 - Resolve the code issue and also resolve missing docs, tests, or spec updates when called out
 - Push the follow-up commits and wait for a fresh `codex-review` run
 - Repeat until the review is clear enough for human approval
+
+## Automated Claude Fix Trigger
+
+You can trigger Claude to work on an existing PR in two ways:
+
+- add the label `claude-fix` to the pull request
+- add an issue comment containing `/claude-fix`
+
+That starts the `Claude Fix PR` workflow on the self-hosted runner running on this computer.
 
 ## How Codex Review Appears
 

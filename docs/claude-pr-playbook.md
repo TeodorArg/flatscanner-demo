@@ -36,6 +36,15 @@ If `codex-review` reports findings or fails:
 7. Re-read the updated sticky review comment
 8. Repeat until the PR is green and no blocking findings remain
 
+## Semi-Automatic Fix Trigger
+
+A maintainer can ask Claude to continue work on an existing PR by either:
+
+- adding the label `claude-fix`
+- adding a PR comment containing `/claude-fix`
+
+That triggers the `Claude Fix PR` workflow on the self-hosted runner. Claude then reads the PR context, the sticky Codex review comment, and the active spec before pushing follow-up commits to the same branch.
+
 ## Rules While Iterating
 
 - Do not open a replacement PR for the same work unless explicitly instructed

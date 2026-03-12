@@ -44,6 +44,7 @@ Claude Code is the primary implementation agent for this repository.
 - In every PR, document what changed, what tests were run, and any remaining risks or follow-up work
 - Wait for `baseline-checks`, `guard`, and `codex-review` to finish before asking for merge
 - If `codex-review` reports findings, update the same PR branch and push follow-up commits until checks pass and review concerns are resolved
+- If a maintainer triggers `claude-fix` or comments `/claude-fix`, continue working on that same PR branch instead of creating a new PR
 - Do not merge pull requests manually; merge happens only after the required checks and human approval
 
 ## Negative Rules
