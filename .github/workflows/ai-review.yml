@@ -1,0 +1,26 @@
+name: AI Review
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  placeholder-review:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Review readiness summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "AI review scaffold is present."
+          echo "Next step: configure Codex authentication and invocation for pull request reviews."
+          echo "Expected inputs:"
+          echo "- repository checkout"
+          echo "- PR diff"
+          echo "- project context from AGENTS.md and specs/"
+          echo
+          echo "This workflow currently passes as a placeholder so it can be added to required checks without blocking early setup."

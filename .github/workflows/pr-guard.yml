@@ -1,0 +1,55 @@
+name: PR Guard
+
+on:
+  pull_request:
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check context coverage for code changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          base_ref="${{ github.event.pull_request.base.sha }}"
+          head_ref="${{ github.sha }}"
+
+          changed_files="$(git diff --name-only "$base_ref" "$head_ref")"
+          echo "$changed_files"
+
+          code_changed=0
+          context_changed=0
+
+          while IFS= read -r file; do
+            [ -z "$file" ] && continue
+            case "$file" in
+              src/*|tests/*|scripts/*)
+                code_changed=1
+                ;;
+              docs/*|specs/*|.specify/*|AGENTS.md|CLAUDE.md)
+                context_changed=1
+                ;;
+            esac
+          done <<< "$changed_files"
+
+          if [ "$code_changed" -eq 1 ] && [ "$context_changed" -ne 1 ]; then
+            echo "Code changed without any docs, spec, or agent-context update."
+            echo "Update docs/, specs/, .specify/, AGENTS.md, or CLAUDE.md when scope, behavior, or architecture changes."
+            exit 1
+          fi
+
+      - name: Require baseline documentation
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f docs/README.md
+          test -f docs/project-idea.md
+          test -f docs/project/frontend/frontend-docs.md
+          test -f docs/project/backend/backend-docs.md
+          test -d tests
