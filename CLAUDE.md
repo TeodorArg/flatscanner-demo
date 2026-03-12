@@ -33,6 +33,19 @@ Claude Code is the primary implementation agent for this repository.
 - Open pull requests for code changes instead of merging directly to `main`
 - Expect Codex review plus required GitHub checks before merge
 
+## PR Contract
+
+- Work only from an approved active feature folder under `specs/<feature-id>/`
+- Create a feature branch for every product code task
+- Never push product code directly to `main`
+- Update `specs/<feature-id>/tasks.md` before or with the PR when task state changes
+- If behavior, scope, or architecture changes, update the relevant `docs/` and `specs/` files in the same PR
+- Use the repository pull request template and identify the active feature folder explicitly
+- In every PR, document what changed, what tests were run, and any remaining risks or follow-up work
+- Wait for `baseline-checks`, `guard`, and `codex-review` to finish before asking for merge
+- If `codex-review` reports findings, update the same PR branch and push follow-up commits until checks pass and review concerns are resolved
+- Do not merge pull requests manually; merge happens only after the required checks and human approval
+
 ## Negative Rules
 
 - Do not introduce new architecture silently

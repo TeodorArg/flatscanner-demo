@@ -11,6 +11,7 @@
 - [x] Update `AGENTS.md` with role boundaries and commit rules
 - [x] Update `CLAUDE.md` with implementation and PR expectations
 - [x] Add a durable ADR for the AI development workflow
+- [x] Add a durable operations guide for the AI PR loop
 
 ## GitHub Workflow
 
@@ -24,12 +25,12 @@
 
 ## Validation
 
-- [ ] Register the Windows self-hosted runner with the `codex` label
-- [ ] Ensure the runner uses the same authenticated Windows user profile as local Codex CLI
-- [ ] Enable branch protection rules for `main`
-- [ ] Confirm required checks include `CI`, `PR Guard`, and `AI Review`
-- [ ] Confirm at least one human approval is required before merge
-- [ ] Open a test pull request and verify sticky review comments plus blocking verdict behavior
+- [x] Register the Windows self-hosted runner with the `codex` label
+- [x] Ensure the runner uses the same authenticated Windows user profile as local Codex CLI
+- [x] Enable branch protection rules for `main`
+- [x] Confirm required checks include `CI`, `PR Guard`, and `AI Review`
+- [x] Confirm at least one human approval is required before merge
+- [x] Open a test pull request and verify sticky review comments plus blocking verdict behavior
 
 ## Follow-Up
 
