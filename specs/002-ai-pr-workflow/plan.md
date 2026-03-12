@@ -20,7 +20,7 @@ Upgrade the repository from a placeholder AI review scaffold to an enforceable p
 1. Claude implements a scoped task from the active spec in a feature branch
 2. Claude opens a pull request using the repository template
 3. GitHub Actions runs CI, PR guard, and Codex review automatically
-4. The self-hosted runner invokes the local Codex review adapter and posts a sticky review comment on the pull request
+4. The self-hosted runner invokes local `codex exec` and posts a sticky review comment on the pull request
 5. A human decides whether to merge after required checks are green
 
 ## Self-Hosted Design
@@ -28,13 +28,13 @@ Upgrade the repository from a placeholder AI review scaffold to an enforceable p
 - Use a Windows self-hosted runner labeled `codex`
 - Keep the runner on the same machine where local Codex CLI access is configured
 - Build the Codex prompt from durable repository context plus pull-request metadata
-- Route the actual Codex CLI invocation through a local adapter script so the repository workflow stays stable even if the local command changes
+- Run local `codex exec` with a JSON schema so review output remains machine-readable
 - Fail the workflow when the review verdict is `request_changes`
 
 ## Risks
 
 - The local runner must remain online for PR review jobs to start
-- Codex CLI accessibility on Windows must be validated on the runner host
+- The runner service must use the same authenticated Windows user profile as local Codex CLI, or an equivalent `CODEX_HOME`
 - Review quality still depends on disciplined specs and up-to-date durable docs
 
 ## Validation
@@ -42,7 +42,7 @@ Upgrade the repository from a placeholder AI review scaffold to an enforceable p
 - Confirm the workflow parses as valid YAML
 - Confirm the prompt and schema files are present in the repository
 - Confirm the PR template guides contributors to the active spec and validation notes
-- Confirm the local review scripts are present and executable on the runner host
+- Confirm local `codex exec` works on the runner host
 - Confirm the runner is registered with the `codex` label
 
 ## Notes

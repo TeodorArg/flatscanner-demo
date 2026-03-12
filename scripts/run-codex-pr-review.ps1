@@ -59,31 +59,16 @@ $runtimeSection = @"
 ### Changed Files
 $changedFilesBlock
 
-Review only the diff introduced by this pull request, but use the repository docs and specs as governing context.
+Review the git diff between $baseSha and $headSha only, but use the repository docs and specs as governing context.
+You may inspect repository files and run read-only git commands if needed.
 "@
 Set-Content -Path $runtimePrompt -Value ($template + $runtimeSection)
 
-$adapterPath = $env:CODEX_REVIEW_ADAPTER
-if (-not $adapterPath) {
-    throw 'CODEX_REVIEW_ADAPTER is not configured on the runner host.'
-}
-
-if (-not (Test-Path $adapterPath)) {
-    throw "Configured CODEX_REVIEW_ADAPTER does not exist: $adapterPath"
-}
-
-Write-Host "Running local Codex adapter: $adapterPath"
-& powershell -ExecutionPolicy Bypass -File $adapterPath `
-    -PromptFile $runtimePrompt `
-    -SchemaFile $schemaPath `
-    -OutputFile $outputPath `
-    -RepositoryRoot $repoRoot `
-    -BaseRef $baseRef `
-    -HeadRef $headRef `
-    -PullRequestNumber $prNumber
+Write-Host 'Running local Codex CLI review'
+Get-Content $runtimePrompt -Raw | codex exec - --output-schema $schemaPath --output-last-message $outputPath --sandbox read-only --color never --ephemeral -C $repoRoot
 
 if (-not (Test-Path $outputPath)) {
-    throw 'Codex adapter did not produce an output file.'
+    throw 'Codex review did not produce an output file.'
 }
 
 $result = Get-Content $outputPath -Raw | ConvertFrom-Json

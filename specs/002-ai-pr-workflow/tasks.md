@@ -20,11 +20,12 @@
 - [x] Add a pull request template for AI-authored work
 - [x] Add default repository ownership metadata
 - [x] Add local runner setup and review orchestration scripts
+- [x] Replace the temporary local adapter concept with direct local `codex exec` review execution
 
 ## Validation
 
 - [ ] Register the Windows self-hosted runner with the `codex` label
-- [ ] Configure the local Codex review adapter on the runner host
+- [ ] Ensure the runner uses the same authenticated Windows user profile as local Codex CLI
 - [ ] Enable branch protection rules for `main`
 - [ ] Confirm required checks include `CI`, `PR Guard`, and `AI Review`
 - [ ] Confirm at least one human approval is required before merge

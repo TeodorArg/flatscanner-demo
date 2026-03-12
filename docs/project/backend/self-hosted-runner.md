@@ -10,20 +10,18 @@ This repository expects automated PR review to run on a Windows self-hosted GitH
    `powershell -ExecutionPolicy Bypass -File .\scripts\setup-self-hosted-runner.ps1 -RepoUrl https://github.com/alexgoodman53/flatscanner -RegistrationToken <token> -AsService`
 4. Confirm the runner appears online in GitHub with labels `self-hosted`, `windows`, and `codex`.
 
-## Local Codex Adapter Setup
+## Local Codex Requirements
 
-1. Copy `scripts\codex-review-adapter-template.ps1` to a machine-local path outside the repository if desired.
-2. Replace the template body with the actual local Codex CLI invocation for your machine.
-3. Set a machine-level environment variable:
-   `CODEX_REVIEW_ADAPTER=<full path to your adapter ps1 file>`
-4. Restart the runner service so the environment variable is picked up.
+- Install the official CLI with `npm install -g @openai/codex`
+- Make sure `codex login status` works for the same Windows user that runs the GitHub runner
+- If the runner is installed as a service, run that service under the same Windows user profile that owns `C:\Users\User\.codex\auth.json`, or configure an equivalent authenticated `CODEX_HOME`
 
 ## Review Flow
 
 - A new pull request triggers `.github/workflows/ai-review.yml`
 - GitHub schedules the job on the self-hosted runner
 - The runner executes `scripts\run-codex-pr-review.ps1`
-- That script builds review context, calls the local adapter, posts a sticky PR comment, and fails the job when verdict is `request_changes`
+- That script builds review context, calls local `codex exec` with the repository review schema, posts a sticky PR comment, and fails the job when verdict is `request_changes`
 
 ## Required GitHub Branch Protection
 
