@@ -18,9 +18,9 @@ class Settings(BaseSettings):
     # Telegram
     telegram_bot_token: str = ""
 
-    # Database
+    # Database – asyncpg driver will be added when storage layer lands
     database_url: str = (
-        "postgresql+asyncpg://postgres:postgres@localhost:5432/flatscanner"
+        "postgresql://postgres:postgres@localhost:5432/flatscanner"
     )
 
     # Redis

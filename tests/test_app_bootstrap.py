@@ -1,5 +1,7 @@
 """Tests for FastAPI application bootstrap and configuration."""
 
+import os
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -14,7 +16,7 @@ def _test_settings(**overrides) -> Settings:
         "telegram_bot_token": "test-token",
         "openrouter_api_key": "test-key",
         "apify_api_token": "test-apify",
-        "database_url": "postgresql+asyncpg://test:test@localhost:5432/test",
+        "database_url": "postgresql://test:test@localhost:5432/test",
         "redis_url": "redis://localhost:6379/1",
     }
     defaults.update(overrides)
@@ -41,6 +43,21 @@ class TestSettings:
         assert hasattr(s, "telegram_bot_token")
         assert hasattr(s, "openrouter_api_key")
         assert hasattr(s, "apify_api_token")
+
+    def test_settings_loaded_from_environment(self, monkeypatch):
+        """Settings should read values injected via environment variables."""
+        monkeypatch.setenv("APP_ENV", "staging")
+        monkeypatch.setenv("DEBUG", "true")
+        monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "env-token")
+        s = Settings()
+        assert s.app_env == "staging"
+        assert s.debug is True
+        assert s.telegram_bot_token == "env-token"
+
+    def test_database_url_default_is_driver_agnostic(self):
+        """Default database_url must not reference a driver that isn't installed."""
+        s = Settings()
+        assert "asyncpg" not in s.database_url
 
 
 class TestCreateApp:
