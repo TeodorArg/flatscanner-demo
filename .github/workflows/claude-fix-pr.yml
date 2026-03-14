@@ -15,6 +15,7 @@ on:
         type: string
 
 permissions:
+  actions: write
   contents: write
   pull-requests: write
   issues: write
@@ -109,3 +110,56 @@ jobs:
           TRIGGER_LABEL: ${{ needs.resolve-pr.outputs.trigger_label }}
         run: |
           .\scripts\run-claude-pr-fix.ps1
+
+      - name: Redispatch required checks
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const prNumber = Number('${{ needs.resolve-pr.outputs.pr_number }}');
+            const headRef = '${{ needs.resolve-pr.outputs.head_ref }}';
+            const baseRef = '${{ needs.resolve-pr.outputs.base_ref }}';
+
+            const { data: pr } = await github.rest.pulls.get({
+              owner,
+              repo,
+              pull_number: prNumber,
+            });
+
+            const dispatches = [
+              {
+                workflow_id: 'ci.yml',
+                ref: headRef,
+                inputs: {
+                  ref: headRef,
+                },
+              },
+              {
+                workflow_id: 'pr-guard.yml',
+                ref: headRef,
+                inputs: {
+                  ref: headRef,
+                  head_ref: headRef,
+                  base_ref: baseRef,
+                },
+              },
+              {
+                workflow_id: 'ai-review.yml',
+                ref: headRef,
+                inputs: {
+                  ref: headRef,
+                  pr_number: String(pr.number),
+                },
+              },
+            ];
+
+            for (const dispatch of dispatches) {
+              await github.rest.actions.createWorkflowDispatch({
+                owner,
+                repo,
+                workflow_id: dispatch.workflow_id,
+                ref: dispatch.ref,
+                inputs: dispatch.inputs,
+              });
+            }

@@ -2,6 +2,20 @@ name: PR Guard
 
 on:
   pull_request:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git ref to validate
+        required: true
+        type: string
+      head_ref:
+        description: PR head branch name
+        required: true
+        type: string
+      base_ref:
+        description: PR base branch name
+        required: true
+        type: string
 
 jobs:
   guard:
@@ -12,13 +26,21 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ inputs.ref || github.ref }}
 
       - name: Check context coverage for code changes
         shell: bash
         run: |
           set -euo pipefail
-          base_ref="${{ github.event.pull_request.base.sha }}"
-          head_ref="${{ github.sha }}"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base_ref="${{ github.event.pull_request.base.sha }}"
+            head_ref="${{ github.sha }}"
+          else
+            git fetch --no-tags origin "${{ inputs.base_ref }}"
+            git fetch --no-tags origin "${{ inputs.head_ref }}"
+            base_ref="origin/${{ inputs.base_ref }}"
+            head_ref="origin/${{ inputs.head_ref }}"
+          fi
 
           changed_files="$(git diff --name-only "$base_ref" "$head_ref")"
           echo "$changed_files"

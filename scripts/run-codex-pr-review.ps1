@@ -20,8 +20,19 @@ if (-not $repository) {
 
 $event = Get-Content $eventPath -Raw | ConvertFrom-Json
 $pullRequest = $event.pull_request
+
+$headers = @{
+    Authorization = "Bearer $githubToken"
+    Accept = 'application/vnd.github+json'
+    'X-GitHub-Api-Version' = '2022-11-28'
+}
+
 if (-not $pullRequest) {
-    throw 'This workflow currently expects a pull_request event.'
+    if (-not $env:PR_NUMBER) {
+        throw 'This workflow expects a pull_request event or PR_NUMBER when dispatched manually.'
+    }
+
+    $pullRequest = Invoke-RestMethod -Headers $headers -Uri "https://api.github.com/repos/$repository/pulls/$($env:PR_NUMBER)"
 }
 
 $prNumber = [string]$pullRequest.number
@@ -116,12 +127,6 @@ $($result.summary)
 ### Findings
 $findingsBlock
 "@
-
-$headers = @{
-    Authorization = "Bearer $githubToken"
-    Accept = 'application/vnd.github+json'
-    'X-GitHub-Api-Version' = '2022-11-28'
-}
 
 $commentsUrl = "https://api.github.com/repos/$repository/issues/$prNumber/comments"
 $comments = Invoke-RestMethod -Headers $headers -Uri $commentsUrl -Method Get
