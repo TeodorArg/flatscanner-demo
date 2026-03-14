@@ -23,5 +23,6 @@ Recommended reading order:
 3. `project/backend/backend-docs.md`
 4. `adr/*.md`
 5. `ai-pr-workflow.md`
-6. `claude-pr-playbook.md`
-7. `glossary.md`
+6. `claude-worker-orchestration.md`
+7. `claude-pr-playbook.md`
+8. `glossary.md`

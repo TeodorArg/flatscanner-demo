@@ -37,6 +37,7 @@ Claude Code is the primary implementation agent for this repository.
 
 - Work only from an approved active feature folder under `specs/<feature-id>/`
 - Create a feature branch for every product code task
+- If Codex launches you in an isolated worktree, treat that worktree and branch as your only allowed workspace
 - Never push product code directly to `main`
 - Update `specs/<feature-id>/tasks.md` before or with the PR when task state changes
 - If behavior, scope, or architecture changes, update the relevant `docs/` and `specs/` files in the same PR
@@ -61,3 +62,4 @@ Claude Code is the primary implementation agent for this repository.
 - Leave concise comments only where intent is not obvious
 - Use pull requests as the unit of review
 - Treat `specs/<feature-id>/tasks.md` as the execution checklist and keep it current
+- Never assume another Claude worker is editing the same files; if the prompt scope suggests overlap, stop and stay within the assigned task

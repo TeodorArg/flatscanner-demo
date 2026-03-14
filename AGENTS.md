@@ -32,6 +32,7 @@ Default expectations:
 - If implementation changes agreed scope or behavior, update the relevant docs and spec artifacts first
 - Review pull requests created by implementation agents before merge
 - Operate automated PR review through the repository self-hosted runner configuration
+- Orchestrate local Claude Code workers when parallel implementation throughput is useful
 
 ## Claude Role
 
@@ -44,12 +45,14 @@ Default expectations:
 - Keep code changes scoped to the assigned task list
 - Update `specs/<feature-id>/tasks.md` as implementation work lands
 - Do not merge pull requests without Codex review and the required GitHub checks
+- When launched locally by Codex, stay inside the assigned branch and isolated worktree
 
 ## Responsibility Boundaries
 
 - Codex does not author product application code except for minimal repository scaffolding, process wiring, or non-product structural glue when explicitly needed
 - Codex may freely edit and commit architecture docs, ADRs, specs, agent instructions, GitHub workflows, templates, and other non-product process files
 - Product code under `src/`, `tests/`, and runtime project setup should normally be implemented through Claude-authored pull requests
+- Multi-agent implementation must use isolated git worktrees; never run multiple coding agents in the same working tree
 
 ## Repository Rules
 
@@ -59,6 +62,7 @@ Default expectations:
 - Prefer pull-request sized changes over broad refactors
 - Keep workflows in `.github/workflows/` green
 - Use `src/` for app code, `tests/` for automated tests, `scripts/` for project utilities
+- Keep one branch and one pull request per Claude worker task
 
 ## Negative Rules
 

@@ -9,18 +9,21 @@ This document describes the operating loop between Claude Code, Codex review, Gi
 - GitHub Actions enforces automated checks
 - A human remains the final merge authority
 
+Codex may also launch Claude workers locally through CLI, but those workers still use the same pull-request and review path described below.
+
 ## Standard Delivery Loop
 
 1. Select the active feature folder under `specs/<feature-id>/`
-2. Claude implements the scoped task in a feature branch
-3. Claude updates `tasks.md` and any required `docs/` or spec files in the same PR
-4. Claude opens a pull request using the repository template
-5. GitHub Actions runs `baseline-checks`, `guard`, and `codex-review`
-6. Codex posts or updates a sticky AI review comment in the pull request
-7. If fixes are needed, trigger Claude on the same PR by either adding the `claude-fix` label or commenting `/claude-fix`
-8. Claude reads the review findings, updates the same branch, and pushes follow-up commits
-9. GitHub reruns the checks automatically on the updated branch
-10. A human merges only after required checks are green and the PR is approved
+2. Either start Claude manually or have Codex launch a local Claude worker in an isolated worktree
+3. Claude implements the scoped task in a feature branch
+4. Claude updates `tasks.md` and any required `docs/` or spec files in the same PR
+5. Claude opens a pull request using the repository template
+6. GitHub Actions runs `baseline-checks`, `guard`, and `codex-review`
+7. Codex posts or updates a sticky AI review comment in the pull request
+8. If fixes are needed, trigger Claude on the same PR by either adding the `claude-fix` label or commenting `/claude-fix`
+9. Claude reads the review findings, updates the same branch, and pushes follow-up commits
+10. GitHub reruns the checks automatically on the updated branch
+11. A human merges only after required checks are green and the PR is approved
 
 ## How Claude Should Handle Review Feedback
 
@@ -39,6 +42,17 @@ You can trigger Claude to work on an existing PR in two ways:
 - add an issue comment containing `/claude-fix`
 
 That starts the `Claude Fix PR` workflow on the self-hosted runner running on this computer.
+
+## Local Claude Worker Launches
+
+For new implementation work, Codex may launch Claude CLI locally with the repository orchestration scripts documented in `docs/claude-worker-orchestration.md`.
+
+Guardrails:
+
+- one task per worker
+- one worktree per worker
+- one PR per worker branch
+- no more than three concurrent workers unless a future ADR changes the limit
 
 ## How Codex Review Appears
 

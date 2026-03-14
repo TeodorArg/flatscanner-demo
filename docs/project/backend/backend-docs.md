@@ -57,6 +57,8 @@ Initial backend direction is chosen and should be treated as the current default
 - Automated PR review runs on a Windows self-hosted GitHub runner labeled `codex`
 - The runner invokes a local Codex adapter script so review can use the machine-local Codex setup
 - Setup instructions live in `docs/project/backend/self-hosted-runner.md`
+- Codex may also launch local Claude CLI workers on the same machine through isolated git worktrees
+- Claude worker orchestration instructions live in `docs/claude-worker-orchestration.md`
 
 ## What Belongs Here
 
