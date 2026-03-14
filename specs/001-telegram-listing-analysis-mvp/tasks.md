@@ -14,7 +14,7 @@
 
 ## Implementation
 
-- [ ] Scaffold the Python backend structure under `src/`
+- [x] Scaffold the Python backend structure under `src/`
 - [ ] Add FastAPI application bootstrap and configuration handling
 - [ ] Add Telegram bot entrypoints and message routing
 - [ ] Define normalized listing schemas and persistence models
