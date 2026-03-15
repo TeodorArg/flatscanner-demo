@@ -16,12 +16,22 @@ def extract_url(text: str) -> str | None:
 
 
 def is_supported_provider(url: str) -> bool:
-    """Return True if *url* belongs to a supported listing provider (Airbnb)."""
+    """Return True if *url* belongs to a supported listing provider (Airbnb).
+
+    Recognised Airbnb hostnames:
+    - airbnb.com / *.airbnb.com
+    - abnb.me / *.abnb.me  (Airbnb short/share links)
+    """
     try:
         host = urlparse(url).hostname or ""
     except Exception:
         return False
-    return host == "airbnb.com" or host.endswith(".airbnb.com")
+    return (
+        host == "airbnb.com"
+        or host.endswith(".airbnb.com")
+        or host == "abnb.me"
+        or host.endswith(".abnb.me")
+    )
 
 
 class IgnoreDecision(TypedDict):

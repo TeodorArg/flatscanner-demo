@@ -101,6 +101,15 @@ class TestIsSupportedProvider:
         # hostname doesn't end with .airbnb.com and isn't airbnb.com
         assert is_supported_provider("https://notairbnb.com/rooms/1") is False
 
+    def test_abnb_me_short_link_is_supported(self):
+        assert is_supported_provider("https://abnb.me/abc123") is True
+
+    def test_abnb_me_subdomain_is_supported(self):
+        assert is_supported_provider("https://www.abnb.me/abc123") is True
+
+    def test_abnb_me_look_alike_is_not_supported(self):
+        assert is_supported_provider("https://notabnb.me/abc123") is False
+
 
 # ---------------------------------------------------------------------------
 # route_update
@@ -114,6 +123,13 @@ class TestRouteUpdate:
         assert decision["action"] == "analyse"
         assert decision["url"] == "https://www.airbnb.com/rooms/999"
         assert decision["chat_id"] == 5
+
+    def test_analyse_when_abnb_me_short_link(self):
+        update = _make_update("https://abnb.me/abc123", chat_id=6)
+        decision = route_update(update)
+        assert decision["action"] == "analyse"
+        assert decision["url"] == "https://abnb.me/abc123"
+        assert decision["chat_id"] == 6
 
     def test_unsupported_when_non_airbnb_url(self):
         update = _make_update("https://www.booking.com/hotel/xyz", chat_id=9)
