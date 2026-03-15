@@ -202,6 +202,10 @@ class TestIsSupportedProvider:
         # https://abnb.me with no path at all must not trigger analysis
         assert is_supported_provider("https://abnb.me") is False
 
+    def test_airbnb_rooms_path_with_extra_segment_is_not_supported(self):
+        # /rooms/123/photos is not a canonical listing URL — extra segments must be rejected
+        assert is_supported_provider("https://www.airbnb.com/rooms/123/photos") is False
+
 
 # ---------------------------------------------------------------------------
 # route_update

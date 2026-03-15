@@ -20,8 +20,9 @@ _AIRBNB_HOST_RE = re.compile(
     re.IGNORECASE,
 )
 
-# Requires at least one non-separator character after /rooms/ — rejects bare /rooms/
-_AIRBNB_LISTING_PATH_RE = re.compile(r"^/rooms/[^/?#\s]+", re.IGNORECASE)
+# Requires exactly /rooms/<id> with an optional trailing slash — rejects bare /rooms/
+# and any extra path segments like /rooms/123/photos.
+_AIRBNB_LISTING_PATH_RE = re.compile(r"^/rooms/[^/?#\s]+/?$", re.IGNORECASE)
 
 
 def extract_url(text: str) -> str | None:
