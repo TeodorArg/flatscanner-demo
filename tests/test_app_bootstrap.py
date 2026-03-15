@@ -32,8 +32,59 @@ class TestSettings:
         assert s.database_url.startswith("postgresql")
         assert s.redis_url.startswith("redis://")
 
+    def test_non_dev_env_without_webhook_secret_raises(self):
+        """telegram_webhook_secret must be set outside development/testing."""
+        with pytest.raises(Exception, match="telegram_webhook_secret"):
+            Settings(app_env="production", telegram_bot_token="tok", telegram_webhook_secret="")
+
+    def test_non_dev_env_with_webhook_secret_ok(self):
+        """Settings with a non-dev app_env and a webhook secret must not raise."""
+        s = Settings(app_env="production", telegram_bot_token="tok", telegram_webhook_secret="mysecret")
+        assert s.telegram_webhook_secret == "mysecret"
+
+    def test_staging_without_webhook_secret_raises(self):
+        """Staging is also a non-dev env — secret must be required."""
+        with pytest.raises(Exception, match="telegram_webhook_secret"):
+            Settings(app_env="staging", telegram_bot_token="tok", telegram_webhook_secret="")
+
+    def test_development_without_webhook_secret_allowed(self):
+        """Development env may omit the webhook secret."""
+        s = Settings(app_env="development", telegram_webhook_secret="")
+        assert s.telegram_webhook_secret == ""
+
+    def test_testing_without_webhook_secret_allowed(self):
+        """Testing env may omit the webhook secret."""
+        s = Settings(app_env="testing", telegram_webhook_secret="")
+        assert s.telegram_webhook_secret == ""
+
+    def test_non_dev_env_without_bot_token_raises(self):
+        """telegram_bot_token must be set outside development/testing."""
+        with pytest.raises(Exception, match="telegram_bot_token"):
+            Settings(app_env="production", telegram_bot_token="", telegram_webhook_secret="mysecret")
+
+    def test_staging_without_bot_token_raises(self):
+        """Staging is also a non-dev env — bot token must be required."""
+        with pytest.raises(Exception, match="telegram_bot_token"):
+            Settings(app_env="staging", telegram_bot_token="", telegram_webhook_secret="mysecret")
+
+    def test_development_without_bot_token_allowed(self):
+        """Development env may omit the bot token."""
+        s = Settings(app_env="development", telegram_bot_token="")
+        assert s.telegram_bot_token == ""
+
+    def test_testing_without_bot_token_allowed(self):
+        """Testing env may omit the bot token."""
+        s = Settings(app_env="testing", telegram_bot_token="")
+        assert s.telegram_bot_token == ""
+
+    def test_non_dev_env_with_both_required_fields_ok(self):
+        """Production with both token and secret must not raise."""
+        s = Settings(app_env="production", telegram_bot_token="real-token", telegram_webhook_secret="real-secret")
+        assert s.telegram_bot_token == "real-token"
+        assert s.telegram_webhook_secret == "real-secret"
+
     def test_override_via_kwargs(self):
-        s = Settings(app_env="production", debug=True)
+        s = Settings(app_env="production", debug=True, telegram_bot_token="tok", telegram_webhook_secret="required-in-prod")
         assert s.app_env == "production"
         assert s.debug is True
 
@@ -49,6 +100,7 @@ class TestSettings:
         monkeypatch.setenv("APP_ENV", "staging")
         monkeypatch.setenv("DEBUG", "true")
         monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "env-token")
+        monkeypatch.setenv("TELEGRAM_WEBHOOK_SECRET", "staging-secret")
         s = Settings()
         assert s.app_env == "staging"
         assert s.debug is True
@@ -92,6 +144,8 @@ class TestCreateAppFreshSettings:
 
     def test_create_app_produces_independent_instances(self, monkeypatch):
         """Two create_app() calls with different env vars must yield independent apps."""
+        monkeypatch.setenv("TELEGRAM_WEBHOOK_SECRET", "required-secret")
+        monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "required-token")
         monkeypatch.setenv("APP_ENV", "first")
         app1 = create_app()
         monkeypatch.setenv("APP_ENV", "second")

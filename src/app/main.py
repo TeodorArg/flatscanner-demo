@@ -4,6 +4,7 @@ from typing import AsyncIterator
 from fastapi import FastAPI
 
 from src.app.config import Settings
+from src.telegram.router import router as telegram_router
 
 
 @asynccontextmanager
@@ -30,6 +31,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/health", tags=["meta"])
     async def health() -> dict:
         return {"status": "ok"}
+
+    app.include_router(telegram_router)
 
     return app
 

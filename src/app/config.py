@@ -1,6 +1,9 @@
 from functools import lru_cache
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_DEV_ENVS = frozenset({"development", "testing"})
 
 
 class Settings(BaseSettings):
@@ -17,6 +20,24 @@ class Settings(BaseSettings):
 
     # Telegram
     telegram_bot_token: str = ""
+    # Shared secret for webhook authentication (X-Telegram-Bot-Api-Secret-Token).
+    # Required in all environments except 'development' and 'testing'.
+    telegram_webhook_secret: str = ""
+
+    @model_validator(mode="after")
+    def _require_telegram_fields_outside_dev(self) -> "Settings":
+        if self.app_env not in _DEV_ENVS:
+            if not self.telegram_webhook_secret:
+                raise ValueError(
+                    "telegram_webhook_secret must be set when app_env is not "
+                    "'development' or 'testing'"
+                )
+            if not self.telegram_bot_token:
+                raise ValueError(
+                    "telegram_bot_token must be set when app_env is not "
+                    "'development' or 'testing'"
+                )
+        return self
 
     # Database – asyncpg driver will be added when storage layer lands
     database_url: str = (
