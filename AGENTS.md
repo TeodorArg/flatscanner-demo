@@ -33,6 +33,7 @@ Default expectations:
 - Review pull requests created by implementation agents before merge
 - Operate automated PR review through the repository self-hosted runner configuration
 - Orchestrate local Claude Code workers when parallel implementation throughput is useful
+- Stay with an orchestrated implementation loop until the resulting pull request is either merge-ready or explicitly paused by the user
 
 ## Claude Role
 

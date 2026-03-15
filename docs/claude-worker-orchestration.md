@@ -45,6 +45,7 @@ Bad candidates for parallel workers:
 4. Claude implements the task and may call `scripts/publish-claude-branch.ps1`
 5. GitHub runs `baseline-checks`, `guard`, and `codex-review`
 6. If needed, Codex triggers follow-up fixes through the existing `claude-fix` PR workflow
+7. Codex keeps following that same PR until it is merge-ready or the user explicitly pauses the loop
 
 ## Scripts
 
@@ -122,3 +123,10 @@ For now, the cleanest operating pattern is:
 5. Merge before launching the next overlapping product task
 
 That is slightly more conservative than the theoretical three-worker limit, but it matches the current maturity of the pipeline better.
+
+For Codex specifically, launching the worker is not the end of the job. The loop remains active until the PR has:
+
+- no merge conflicts
+- green required checks on the current head SHA
+- a clear Codex review result
+- human approval pending final merge
