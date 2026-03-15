@@ -2,6 +2,7 @@
 
 import logging
 
+import httpx
 from fastapi import APIRouter, HTTPException, Request
 
 from src.telegram.dispatcher import route_update
@@ -61,7 +62,21 @@ async def webhook(request: Request) -> dict:
 
     try:
         await send_message(settings.telegram_bot_token, decision["chat_id"], text)
+    except httpx.HTTPStatusError as exc:
+        if exc.response.status_code < 500:
+            # Permanent 4xx failure (e.g. bad token, blocked chat): Telegram will
+            # not retry on its own for these, so acknowledge to avoid retry loops.
+            logger.error(
+                "send_message permanent failure for chat_id=%s: %s",
+                decision["chat_id"],
+                exc,
+            )
+            return {"ok": True}
+        # 5xx — transient server error; signal Telegram to retry.
+        logger.exception("send_message server error for chat_id=%s", decision["chat_id"])
+        raise HTTPException(status_code=502, detail="Failed to deliver reply to Telegram")
     except Exception:
+        # Network / timeout / unexpected errors — transient; let Telegram retry.
         logger.exception("send_message failed for chat_id=%s", decision["chat_id"])
         raise HTTPException(status_code=502, detail="Failed to deliver reply to Telegram")
     return {"ok": True}

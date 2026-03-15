@@ -8,6 +8,18 @@ from src.telegram.models import TelegramUpdate
 
 _URL_RE = re.compile(r"https?://\S+", re.IGNORECASE)
 
+# Matches any Airbnb host across all localized domains, e.g.:
+#   airbnb.com, www.airbnb.com, airbnb.co.uk, www.airbnb.co.uk,
+#   airbnb.com.au, airbnb.de, fr.airbnb.com
+# The TLD portion is restricted to:
+#   - a single word (com, de, fr, …) OR
+#   - a compound ccTLD in the form co.<cc> or com.<cc>
+# This prevents subdomain-based look-alikes like airbnb.evil.com from matching.
+_AIRBNB_HOST_RE = re.compile(
+    r"^(?:[\w-]+\.)*airbnb\.(?:com|[a-z]{2}|(?:co|com)\.[a-z]{2})$",
+    re.IGNORECASE,
+)
+
 
 def extract_url(text: str) -> str | None:
     """Return the first HTTP/HTTPS URL found in *text*, or None."""
@@ -25,6 +37,7 @@ def is_supported_provider(url: str) -> bool:
 
     Recognised patterns:
     - airbnb.com/rooms/<id> and *.airbnb.com/rooms/<id>  (listing pages only)
+    - Localized Airbnb domains, e.g. airbnb.co.uk/rooms/<id>, www.airbnb.de/rooms/<id>
     - abnb.me/<code> and *.abnb.me/<code>  (Airbnb short/share links — always listings)
 
     Non-listing Airbnb pages (help, search, profiles, etc.) are not supported.
@@ -39,7 +52,7 @@ def is_supported_provider(url: str) -> bool:
     if host == "abnb.me" or host.endswith(".abnb.me"):
         return True
 
-    if host == "airbnb.com" or host.endswith(".airbnb.com"):
+    if _AIRBNB_HOST_RE.match(host):
         return path.startswith("/rooms/")
 
     return False

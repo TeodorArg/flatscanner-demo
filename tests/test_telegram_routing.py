@@ -114,7 +114,23 @@ class TestIsSupportedProvider:
         assert is_supported_provider("https://airbnb.com/rooms/123") is True
 
     def test_airbnb_country_subdomain_is_supported(self):
-        assert is_supported_provider("https://www.airbnb.co.uk/rooms/123") is False
+        assert is_supported_provider("https://www.airbnb.co.uk/rooms/123") is True
+
+    def test_airbnb_localized_apex_domain_is_supported(self):
+        assert is_supported_provider("https://airbnb.co.uk/rooms/456") is True
+
+    def test_airbnb_ccTLD_is_supported(self):
+        assert is_supported_provider("https://www.airbnb.de/rooms/789") is True
+
+    def test_airbnb_compound_ccTLD_com_au_is_supported(self):
+        assert is_supported_provider("https://www.airbnb.com.au/rooms/1") is True
+
+    def test_airbnb_localized_non_listing_page_is_not_supported(self):
+        assert is_supported_provider("https://www.airbnb.co.uk/help/article/1") is False
+
+    def test_airbnb_lookalike_with_extra_segment_not_supported(self):
+        # airbnb.evil.com — airbnb is a subdomain of evil.com, not the SLD
+        assert is_supported_provider("https://airbnb.evil.com/rooms/1") is False
 
     def test_booking_com_is_not_supported(self):
         assert is_supported_provider("https://www.booking.com/hotel/1") is False
@@ -352,12 +368,52 @@ class TestWebhookEndpoint:
 
     @patch("src.telegram.router.send_message", new_callable=AsyncMock)
     def test_webhook_returns_non_2xx_when_send_message_raises(self, mock_send):
-        """A failed outbound send must cause the webhook to return non-2xx so Telegram retries."""
+        """Network / unexpected failures must return non-2xx so Telegram retries."""
         mock_send.side_effect = Exception("network failure")
         client = self._client()
         payload = self._update_payload("https://airbnb.com/rooms/1")
         response = client.post("/telegram/webhook", json=payload)
         assert response.status_code >= 400
+
+    @patch("src.telegram.router.send_message", new_callable=AsyncMock)
+    def test_webhook_returns_502_on_5xx_telegram_error(self, mock_send):
+        """5xx Telegram errors are transient — webhook must return 502 to trigger retry."""
+        mock_send.side_effect = httpx.HTTPStatusError(
+            "503 Service Unavailable",
+            request=httpx.Request("POST", "https://api.telegram.org/bottoken/sendMessage"),
+            response=httpx.Response(503),
+        )
+        client = self._client()
+        payload = self._update_payload("https://airbnb.com/rooms/1")
+        response = client.post("/telegram/webhook", json=payload)
+        assert response.status_code == 502
+
+    @patch("src.telegram.router.send_message", new_callable=AsyncMock)
+    def test_webhook_returns_200_on_4xx_telegram_error(self, mock_send):
+        """Permanent 4xx Telegram errors must be acknowledged (200) to avoid retry loops."""
+        mock_send.side_effect = httpx.HTTPStatusError(
+            "400 Bad Request",
+            request=httpx.Request("POST", "https://api.telegram.org/bottoken/sendMessage"),
+            response=httpx.Response(400),
+        )
+        client = self._client()
+        payload = self._update_payload("https://airbnb.com/rooms/1")
+        response = client.post("/telegram/webhook", json=payload)
+        assert response.status_code == 200
+        assert response.json() == {"ok": True}
+
+    @patch("src.telegram.router.send_message", new_callable=AsyncMock)
+    def test_webhook_returns_200_on_403_telegram_error(self, mock_send):
+        """403 from Telegram (bot blocked) is permanent — must acknowledge and not retry."""
+        mock_send.side_effect = httpx.HTTPStatusError(
+            "403 Forbidden",
+            request=httpx.Request("POST", "https://api.telegram.org/bottoken/sendMessage"),
+            response=httpx.Response(403),
+        )
+        client = self._client()
+        payload = self._update_payload("https://airbnb.com/rooms/1")
+        response = client.post("/telegram/webhook", json=payload)
+        assert response.status_code == 200
 
 
 # ---------------------------------------------------------------------------
