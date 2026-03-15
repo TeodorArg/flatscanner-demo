@@ -99,3 +99,26 @@ All worker output still goes through:
 - human approval
 
 Codex keeps review authority even when Codex also launched the worker.
+
+## Lessons Learned
+
+The first live end-to-end loop on `PR #4` confirmed that the worker model is viable, but it also exposed a few operational rules worth keeping durable.
+
+- Keep one active product PR at a time while the orchestration layer is still young
+- Expect workflow conflicts when a product PR also edits `.github/workflows/*` and `main` advances with process fixes
+- Prefer merging `main` into the worker branch quickly when the orchestration layer changes underneath an open PR
+- Treat the worker worktree as disposable execution state and do not commit `.codex/` artifacts
+- Assume a Claude fix run may commit and push from inside the CLI session before the wrapper script inspects the worktree
+- Use the sticky PR comments and GitHub checks as the source of truth rather than local assumptions about whether a fix actually landed
+
+## Current Operator Guidance
+
+For now, the cleanest operating pattern is:
+
+1. Run one implementation worker
+2. Let it open one PR
+3. Let GitHub and Codex review finish
+4. Use `claude-fix` on the same branch if needed
+5. Merge before launching the next overlapping product task
+
+That is slightly more conservative than the theoretical three-worker limit, but it matches the current maturity of the pipeline better.

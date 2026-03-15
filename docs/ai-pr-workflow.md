@@ -72,3 +72,25 @@ Guardrails:
 ## Merge Rule
 
 Do not merge to `main` unless all required checks are green and at least one human approval is present.
+
+## Lessons Learned
+
+The first full live loop through worker launch, PR creation, review, automated fixes, and conflict resolution established these additional rules:
+
+- A push authored by a GitHub workflow with `GITHUB_TOKEN` is not a reliable way to trigger the normal downstream PR checks
+- The `Claude Fix PR` workflow should push with the self-hosted runner's local git credentials so the update behaves like a normal user-authenticated branch push
+- A PR can look stale if the branch changed but a new check cascade never started; in that case, inspect the branch SHA before assuming Claude failed
+- Sticky AI comments are authoritative summaries, but they can lag or describe the wrapper view of the run rather than every internal Claude action
+- If an open PR and `main` both modify the same workflow files, resolve that conflict directly in the PR branch and rerun the normal checks on the merged result
+- When the workflow definition itself changes on `main`, runs that were already started may still execute the older version of that workflow
+
+## Current Practical Rule
+
+Use automation for review and for follow-up fixes, but treat merge readiness as a combination of:
+
+- the current PR head SHA
+- the current required check results on that SHA
+- the latest sticky Codex review comment
+- human approval
+
+That keeps the process resilient even when the automation layer itself is being improved in parallel with product work.

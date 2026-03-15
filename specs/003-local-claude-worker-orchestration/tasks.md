@@ -26,6 +26,9 @@
 - [x] Validate temporary worktree creation through the new script
 - [x] Validate worker prompt generation with `-PromptOnly`
 - [x] Validate publish script dry-run behavior with `-WhatIf`
+- [x] Validate end-to-end worker loop from local launch to pull request creation
+- [x] Validate automated Codex review and `claude-fix` follow-up on the same PR branch
+- [x] Validate conflict recovery by merging updated `main` back into an active worker PR branch
 
 ## Follow-Up
 
