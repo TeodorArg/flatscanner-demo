@@ -19,6 +19,8 @@
   - [x] Add Python CI step (install + pytest) to enforce the new tests in CI
   - [x] Fix `create_app()` to instantiate fresh `Settings()` on each call instead of relying on the cached `get_settings()`
 - [x] Add Telegram bot entrypoints and message routing
+  - [x] Add webhook secret-token authentication (PR-5-fix-2)
+  - [x] Raise on non-2xx Telegram API responses in send_message (PR-5-fix-2)
 - [ ] Define normalized listing schemas and persistence models
 - [ ] Add provider detection and the Airbnb adapter interface
 - [ ] Integrate Apify-backed Airbnb extraction
