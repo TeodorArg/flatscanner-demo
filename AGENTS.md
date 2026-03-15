@@ -34,6 +34,8 @@ Default expectations:
 - Operate automated PR review through the repository self-hosted runner configuration
 - Orchestrate local Claude Code workers when parallel implementation throughput is useful
 - Stay with an orchestrated implementation loop until the resulting pull request is either merge-ready or explicitly paused by the user
+- Treat CI/CD, review automation, and workflow-health fixes as part of the same task when they block merge readiness
+- Never treat "checks queued", "checks in progress", "last fix pushed", or "only workflow issues remain" as a valid completion point
 
 ## Claude Role
 
@@ -80,3 +82,12 @@ When a task is finished:
 2. Mark completed items clearly
 3. Record durable decisions in `docs/` or `docs/adr/` if they affect future work
 4. Note any follow-up work in the same file or a new spec if scope changed
+
+For orchestrated PR loops, "finished" means all of the following are true on the current PR head SHA:
+
+1. No blocking review findings remain
+2. All required GitHub checks are green
+3. The PR is mergeable without conflicts
+4. Only human approval / final merge remains
+
+If any one of those is false, the task is still in progress unless the user explicitly pauses it.

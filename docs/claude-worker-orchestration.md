@@ -47,6 +47,13 @@ Bad candidates for parallel workers:
 6. If needed, Codex triggers follow-up fixes through the existing `claude-fix` PR workflow
 7. Codex keeps following that same PR until it is merge-ready or the user explicitly pauses the loop
 
+The loop is still active while any of these are true:
+
+- required checks are queued or running
+- `codex-review` has not finished on the current head SHA
+- the PR has merge conflicts
+- a required check is red for either product code or workflow reasons
+
 ## Scripts
 
 - `scripts/new-claude-worktree.ps1`
@@ -130,3 +137,5 @@ For Codex specifically, launching the worker is not the end of the job. The loop
 - green required checks on the current head SHA
 - a clear Codex review result
 - human approval pending final merge
+
+Codex must not treat "latest fix pushed" or "only CI/workflow cleanup remains" as enough to stop. Those are still active loop states.

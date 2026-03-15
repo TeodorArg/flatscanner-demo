@@ -25,6 +25,24 @@ Codex may also launch Claude workers locally through CLI, but those workers stil
 10. GitHub reruns the checks automatically on the updated branch
 11. A human merges only after required checks are green and the PR is approved
 
+## Stop Condition
+
+Codex must treat the PR loop as still active until the pull request is genuinely merge-ready.
+
+That means Codex must not stop when:
+
+- a fix was pushed but checks have not finished
+- required checks are queued or in progress
+- the sticky review comment is green but a required check is still red
+- only CI/CD or workflow issues remain
+- the PR "looks done" but is still blocked in GitHub
+
+Codex may stop only when one of these is true:
+
+- the current PR head SHA has green required checks, no blocking review findings, and no merge conflicts
+- the user explicitly says to pause, defer, or stop
+- there is an external blocker that cannot be resolved from the repository or local runner, and Codex has clearly reported that blocker
+
 ## How Claude Should Handle Review Feedback
 
 - Treat the Codex review comment as the authoritative machine-review summary for the PR iteration
@@ -94,3 +112,5 @@ Use automation for review and for follow-up fixes, but treat merge readiness as 
 - human approval
 
 That keeps the process resilient even when the automation layer itself is being improved in parallel with product work.
+
+In other words, "last code fix submitted" is not a completion condition. "Merge-ready on the current head SHA" is the completion condition.
