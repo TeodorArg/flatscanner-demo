@@ -4,7 +4,8 @@ param(
     [string]$Repository = 'alexgoodman53/flatscanner'
 )
 
-$ghPath = Join-Path $env:ProgramFiles 'GitHub CLI\gh.exe'
+$ghCommand = Get-Command gh -ErrorAction SilentlyContinue
+$ghPath = if ($ghCommand) { $ghCommand.Source } else { Join-Path $env:ProgramFiles 'GitHub CLI\gh.exe' }
 if (-not (Test-Path $ghPath)) {
     throw "GitHub CLI not found at $ghPath"
 }

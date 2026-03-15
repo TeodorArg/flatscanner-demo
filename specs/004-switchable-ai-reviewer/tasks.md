@@ -29,6 +29,7 @@
 - [x] Validate reviewer selection for `claude`
 - [x] Validate reviewer selection for `codex`
 - [x] Validate fallback reviewer selection for invalid or missing values
+- [x] Add lightweight repository-local validation scripts for reviewer selection and Claude no-tools CLI smoke testing
 
 ## Follow-Up
 

@@ -109,7 +109,7 @@ try {
     )
 
     $adrFiles = Get-ChildItem (Join-Path $repoRoot 'docs\adr') -Filter '*.md' | Sort-Object Name | ForEach-Object {
-        Resolve-Path -Relative $_.FullName
+        $_.FullName.Substring($repoRoot.Length + 1)
     }
 
     $specFiles = @()
@@ -260,8 +260,9 @@ $findingsBlock
 "@
 
     $commentsUrl = "https://api.github.com/repos/$repository/issues/$prNumber/comments"
+    $legacyMarker = '<!-- codex-ai-review -->'
     $comments = Invoke-RestMethod -Headers $headers -Uri $commentsUrl -Method Get
-    $existing = $comments | Where-Object { $_.body -like "*$marker*" } | Select-Object -First 1
+    $existing = $comments | Where-Object { $_.body -like "*$marker*" -or $_.body -like "*$legacyMarker*" } | Select-Object -First 1
     $payload = @{ body = $body } | ConvertTo-Json
 
     if ($existing) {
