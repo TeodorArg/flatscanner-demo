@@ -25,7 +25,7 @@ async def send_message(
         client: Optional injected ``httpx.AsyncClient`` (for tests).
     """
     url = _TELEGRAM_API.format(token=token)
-    payload = {"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
+    payload = {"chat_id": chat_id, "text": text}
 
     if client is not None:
         await client.post(url, json=payload)

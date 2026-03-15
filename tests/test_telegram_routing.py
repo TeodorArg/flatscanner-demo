@@ -206,3 +206,26 @@ class TestWebhookEndpoint:
         client = self._client()
         response = client.post("/telegram/webhook", json={"bad": "data"})
         assert response.status_code == 422
+
+    @patch("src.telegram.router.send_message", new_callable=AsyncMock)
+    def test_webhook_url_with_query_params_echoed_correctly(self, mock_send):
+        """URLs containing & query params must be echoed verbatim (no HTML escaping)."""
+        url_with_params = "https://www.airbnb.com/rooms/123?check_in=2024-01-01&check_out=2024-01-05&guests=2"
+        client = self._client()
+        payload = self._update_payload(url_with_params, chat_id=1001)
+        response = client.post("/telegram/webhook", json=payload)
+        assert response.status_code == 200
+        assert response.json() == {"ok": True}
+        call_args = mock_send.call_args[0]
+        # Full URL including query string must appear verbatim in the reply text
+        assert url_with_params in call_args[2]
+
+    @patch("src.telegram.router.send_message", new_callable=AsyncMock)
+    def test_webhook_returns_ok_when_send_message_raises(self, mock_send):
+        """A failed outbound send must not cause the webhook to return non-2xx."""
+        mock_send.side_effect = Exception("network failure")
+        client = self._client()
+        payload = self._update_payload("https://airbnb.com/rooms/1")
+        response = client.post("/telegram/webhook", json=payload)
+        assert response.status_code == 200
+        assert response.json() == {"ok": True}

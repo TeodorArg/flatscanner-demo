@@ -1,10 +1,14 @@
 """FastAPI router for Telegram webhook ingress."""
 
+import logging
+
 from fastapi import APIRouter, Request
 
 from src.telegram.dispatcher import route_update
 from src.telegram.models import TelegramUpdate
 from src.telegram.sender import send_message
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/telegram", tags=["telegram"])
 
@@ -33,5 +37,8 @@ async def webhook(request: Request, update: TelegramUpdate) -> dict:
     else:
         text = _MSG_HELP
 
-    await send_message(settings.telegram_bot_token, decision["chat_id"], text)
+    try:
+        await send_message(settings.telegram_bot_token, decision["chat_id"], text)
+    except Exception:
+        logger.exception("send_message failed for chat_id=%s", decision["chat_id"])
     return {"ok": True}
