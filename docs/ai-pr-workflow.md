@@ -80,6 +80,9 @@ Guardrails:
 - The workflow posts a sticky comment marked with `<!-- codex-ai-review -->`
 - The same comment is updated on subsequent pushes, so the PR keeps one current review summary instead of accumulating many stale comments
 - If the review verdict is `request_changes`, the `codex-review` check fails and blocks merge
+- The review step must be launched through an explicit `powershell -File` invocation rather than relying on inline shell execution
+- The workflow must always print the review diagnostic and transcript logs after the review step so false-negative job failures can be traced from the GitHub run itself
+- Those diagnostic files must be recreated per run on the self-hosted runner so operators never read stale output from an earlier PR or an earlier retry
 
 ## Current Required Checks
 
@@ -101,6 +104,8 @@ The first full live loop through worker launch, PR creation, review, automated f
 - Sticky AI comments are authoritative summaries, but they can lag or describe the wrapper view of the run rather than every internal Claude action
 - If an open PR and `main` both modify the same workflow files, resolve that conflict directly in the PR branch and rerun the normal checks on the merged result
 - When the workflow definition itself changes on `main`, runs that were already started may still execute the older version of that workflow
+- A green sticky review comment is not enough by itself; if the job still exits red, inspect the diagnostic and transcript logs printed by `ai-review.yml` before assuming the PR still has review findings
+- For self-hosted PowerShell jobs, prefer an explicit `try/catch/finally` exit path that records the intended verdict and the final process exit code in a durable diagnostic log
 
 ## Current Practical Rule
 

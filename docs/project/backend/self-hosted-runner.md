@@ -22,6 +22,9 @@ This repository expects automated PR review to run on a Windows self-hosted GitH
 - GitHub schedules the job on the self-hosted runner
 - The runner executes `scripts\run-codex-pr-review.ps1`
 - That script builds review context, calls local `codex exec` with the repository review schema, posts a sticky PR comment, and fails the job when verdict is `request_changes`
+- The workflow invokes the script with `powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ...` to avoid inline shell exit-code ambiguity
+- After every run, the workflow prints `codex-review-diagnostics.log` and `codex-review-transcript.log` from the runner temp directory so success-path and failure-path behavior are visible in the GitHub job logs
+- The review script recreates those temp files on each run so the printed diagnostics always match the current PR attempt
 
 ## Required GitHub Branch Protection
 

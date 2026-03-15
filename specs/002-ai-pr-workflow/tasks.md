@@ -34,6 +34,7 @@
 - [x] Confirm at least one human approval is required before merge
 - [x] Open a test pull request and verify sticky review comments plus blocking verdict behavior
 - [x] Open a test pull request and verify the `Claude Fix PR` workflow can update the same PR branch
+- [x] Eliminate false `codex-review` exit `1` failures on approve paths and print durable diagnostics in the GitHub run logs
 
 ## Follow-Up
 

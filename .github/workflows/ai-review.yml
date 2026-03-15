@@ -43,9 +43,31 @@ jobs:
           ref: ${{ inputs.ref || github.ref }}
 
       - name: Run local Codex review
-        shell: powershell
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ inputs.pr_number }}
+        run: powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File .\scripts\run-codex-pr-review.ps1
+
+      - name: Print review diagnostics
+        if: always()
+        shell: powershell
         run: |
-          .\scripts\run-codex-pr-review.ps1
+          $tempRoot = if ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } else { $env:TEMP }
+          $diagnosticPath = Join-Path $tempRoot 'codex-review-diagnostics.log'
+          $transcriptPath = Join-Path $tempRoot 'codex-review-transcript.log'
+
+          if (Test-Path $diagnosticPath) {
+            Write-Host '--- codex-review-diagnostics.log ---'
+            Get-Content $diagnosticPath
+          }
+          else {
+            Write-Host 'No diagnostic log produced.'
+          }
+
+          if (Test-Path $transcriptPath) {
+            Write-Host '--- codex-review-transcript.log ---'
+            Get-Content $transcriptPath
+          }
+          else {
+            Write-Host 'No transcript log produced.'
+          }
