@@ -21,7 +21,7 @@ async def send_message(
     Args:
         token: Telegram bot token from ``Settings.telegram_bot_token``.
         chat_id: Target chat identifier.
-        text: Message body (HTML parse mode enabled).
+        text: Message body (plain text).
         client: Optional injected ``httpx.AsyncClient`` (for tests).
     """
     url = _TELEGRAM_API.format(token=token)
