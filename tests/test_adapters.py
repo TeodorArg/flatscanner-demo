@@ -4,7 +4,8 @@ Covers:
 - AirbnbAdapter.supports_url — full matrix of positive and negative cases
 - detect_provider — maps URLs to ListingProvider enum values
 - resolve_adapter — returns the correct adapter instance or None
-- AirbnbAdapter.fetch — raises NotImplementedError (Apify not yet wired)
+
+Apify-backed fetch and normalization tests live in test_airbnb_extraction.py.
 """
 
 import pytest
@@ -36,12 +37,6 @@ class TestAirbnbAdapterContract:
 
     def test_provider_is_airbnb(self, airbnb_adapter):
         assert airbnb_adapter.provider == ListingProvider.AIRBNB
-
-    @pytest.mark.asyncio
-    async def test_fetch_raises_not_implemented(self, airbnb_adapter):
-        with pytest.raises(NotImplementedError):
-            await airbnb_adapter.fetch("https://www.airbnb.com/rooms/123")
-
 
 # ---------------------------------------------------------------------------
 # AirbnbAdapter.supports_url — positive cases

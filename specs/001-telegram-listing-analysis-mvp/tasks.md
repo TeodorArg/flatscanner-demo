@@ -39,7 +39,11 @@
   - [x] Replace broad localized-Airbnb regex with explicit supported-domain TLD allowlist; reject non-http/https schemes inside is_supported_provider() (PR-5-fix-13)
 - [x] Define normalized listing schemas and persistence models
 - [x] Add provider detection and the Airbnb adapter interface
-- [ ] Integrate Apify-backed Airbnb extraction
+- [x] Integrate Apify-backed Airbnb extraction
+  - [x] Require apify_api_token outside development/testing environments (pr-15-followup-apify-config)
+  - [x] Switch Apify client to header-based auth (Authorization: Bearer) instead of query-param token (pr-15-followup-apify-config)
+  - [x] Document default Airbnb actor dependency and token requirement in backend docs (pr-15-followup-apify-config)
+  - [x] Remove wraps=ApifyClient from test_fetch_uses_settings_actor_id to prevent real-client path exercise (pr-15-followup-apify-test-mock)
 - [ ] Add background job orchestration using Redis
 - [ ] Add initial AI analysis flow through OpenRouter
 - [ ] Format Telegram output for summary, risks, and price fairness

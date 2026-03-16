@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     telegram_webhook_secret: str = ""
 
     @model_validator(mode="after")
-    def _require_telegram_fields_outside_dev(self) -> "Settings":
+    def _require_credentials_outside_dev(self) -> "Settings":
         if self.app_env not in _DEV_ENVS:
             if not self.telegram_webhook_secret:
                 raise ValueError(
@@ -35,6 +35,11 @@ class Settings(BaseSettings):
             if not self.telegram_bot_token:
                 raise ValueError(
                     "telegram_bot_token must be set when app_env is not "
+                    "'development' or 'testing'"
+                )
+            if not self.apify_api_token:
+                raise ValueError(
+                    "apify_api_token must be set when app_env is not "
                     "'development' or 'testing'"
                 )
         return self
@@ -53,6 +58,9 @@ class Settings(BaseSettings):
 
     # Apify
     apify_api_token: str = ""
+    # Actor used to scrape Airbnb listings.  Override to switch to a different
+    # actor version without changing application code.
+    apify_airbnb_actor_id: str = "dtrungtin~airbnb-scraper"
 
 
 @lru_cache(maxsize=1)

@@ -22,6 +22,9 @@
 
 - Airbnb is the first provider, but parsing must stay adapter-based.
 - Apify is the default extraction source where supported.
+  - Default Airbnb actor: `dtrungtin~airbnb-scraper` (overridable via `APIFY_AIRBNB_ACTOR_ID`).
+  - `APIFY_API_TOKEN` is required in all non-development/testing environments and validated at startup.
+  - The client authenticates using an `Authorization: Bearer <token>` header (not a query parameter).
 - OpenRouter is the model gateway.
 - Enrichment sources may vary by geography and must tolerate partial availability.
 
