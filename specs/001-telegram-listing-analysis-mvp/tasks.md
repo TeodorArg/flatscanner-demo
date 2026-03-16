@@ -38,7 +38,7 @@
   - [x] Anchor /rooms/<id> path matcher to reject extra segments like /rooms/123/photos (PR-5-fix-12)
   - [x] Replace broad localized-Airbnb regex with explicit supported-domain TLD allowlist; reject non-http/https schemes inside is_supported_provider() (PR-5-fix-13)
 - [x] Define normalized listing schemas and persistence models
-- [ ] Add provider detection and the Airbnb adapter interface
+- [x] Add provider detection and the Airbnb adapter interface
 - [ ] Integrate Apify-backed Airbnb extraction
 - [ ] Add background job orchestration using Redis
 - [ ] Add initial AI analysis flow through OpenRouter
