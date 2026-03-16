@@ -40,4 +40,4 @@
 ## Follow-Up
 
 - [ ] Decide whether Claude PR creation should later be triggered from issues or slash commands
-- [ ] Decide whether low-severity review findings should remain non-blocking forever
+- [x] Keep low-severity review findings non-blocking by policy unless a future feature explicitly changes that rule

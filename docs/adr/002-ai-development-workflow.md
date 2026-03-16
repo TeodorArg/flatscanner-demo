@@ -20,6 +20,7 @@ Adopt the following AI development workflow:
 - A human remains the final merge authority through GitHub branch protection and pull request approval rules
 - Automated AI review runs on a self-hosted Windows GitHub runner with a local Claude or Codex CLI adapter selected only from the repository variable `AI_REVIEW_AGENT`
 - Supported `AI_REVIEW_AGENT` values are `claude` and `codex`, and the fallback default is `claude`
+- Low-severity-only AI review findings remain advisory and must not fail the required `AI Review` check
 
 ## Workflow Shape
 

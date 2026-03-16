@@ -17,6 +17,8 @@ Output rules:
 - Keep the summary short and high-signal
 - Use `approve` only when there are no material findings
 - Use `comment` for minor risks or follow-ups that should not block merge
+- Treat `low` severity findings as advisory and non-blocking
 - Use `request_changes` when you find correctness, regression, architectural, or testing gaps that should be addressed before merge
+- Only use `request_changes` when at least one finding should block merge; blocking findings should be `medium` or `high`
 - Each finding object must contain `severity`, `file`, `line`, `title`, and `body`
 - Findings should reference the changed file path and line number when practical

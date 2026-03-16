@@ -5,6 +5,8 @@ $script:tempRoot = if ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } else { $env:TEMP }
 $script:diagnosticPath = Join-Path $script:tempRoot 'ai-review-diagnostics.log'
 $script:transcriptPath = Join-Path $script:tempRoot 'ai-review-transcript.log'
 
+. (Join-Path $PSScriptRoot 'ai-review-policy.ps1')
+
 function Write-Diagnostic {
     param(
         [Parameter(Mandatory = $true)]
@@ -155,14 +157,16 @@ You may inspect repository files and run read-only git commands if needed.
         throw 'AI review output is missing required fields.'
     }
 
-    $findings = @()
-    if ($result.findings) {
-        $findings = @($result.findings)
+    $outcome = Resolve-AiReviewOutcome -Result $result
+    $findings = $outcome.Findings
+
+    if ($outcome.PolicyNote) {
+        Write-Diagnostic $outcome.PolicyNote
     }
 
-    Write-Diagnostic "Review verdict=$($result.verdict); findings=$($findings.Count)"
+    Write-Diagnostic "Review verdict=$($result.verdict); effectiveVerdict=$($outcome.EffectiveVerdict); findings=$($findings.Count)"
 
-    $verdictLabel = switch ($result.verdict) {
+    $verdictLabel = switch ($outcome.EffectiveVerdict) {
         'approve' { 'Approve' }
         'comment' { 'Comment' }
         'request_changes' { 'Request changes' }
@@ -191,6 +195,11 @@ $marker
 
 Agent: **$agentLabel**
 Verdict: **$verdictLabel**
+$(
+    if ($outcome.PolicyNote) {
+        "`r`n$($outcome.PolicyNote)"
+    }
+)
 
 ### Summary
 $($result.summary)
@@ -214,7 +223,7 @@ $findingsBlock
         Invoke-RestMethod -Headers $headers -Uri $commentsUrl -Method Post -Body $payload | Out-Null
     }
 
-    if ($result.verdict -eq 'request_changes') {
+    if ($outcome.EffectiveVerdict -eq 'request_changes') {
         throw 'AI review requested changes.'
     }
 

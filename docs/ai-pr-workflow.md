@@ -84,7 +84,8 @@ Guardrails:
 - The workflow posts a sticky comment marked with `<!-- ai-review -->`
 - The same comment is updated on subsequent pushes, so the PR keeps one current review summary instead of accumulating many stale comments
 - `Claude Fix PR` is intentionally different: each fix run posts a fresh comment instead of overwriting the prior one, so maintainers can audit the iteration history in the PR thread
-- If the review verdict is `request_changes`, the `AI Review` check fails and blocks merge
+- Low-severity-only findings remain advisory; if a reviewer returns `request_changes` with only `low` findings, the effective verdict is normalized to `comment`
+- If the effective review verdict is `request_changes`, the `AI Review` check fails and blocks merge
 - The self-hosted workflows target the neutral runner label `ai-runner`
 - The review step must be launched through an explicit `powershell -File` invocation rather than relying on inline shell execution
 - The workflow must always print the review diagnostic and transcript logs after the review step so false-negative job failures can be traced from the GitHub run itself
