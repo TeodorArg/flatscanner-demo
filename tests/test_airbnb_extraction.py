@@ -95,7 +95,7 @@ class TestApifyClientSuccess:
         assert result == items
 
     @pytest.mark.asyncio
-    async def test_passes_token_as_query_param(self):
+    async def test_passes_token_as_auth_header(self):
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = []
@@ -110,7 +110,7 @@ class TestApifyClientSuccess:
             await client.run_and_get_items({})
 
         call_kwargs = mock_client.post.call_args
-        assert call_kwargs.kwargs["params"]["token"] == "my-token"
+        assert call_kwargs.kwargs["headers"]["Authorization"] == "Bearer my-token"
 
     @pytest.mark.asyncio
     async def test_actor_id_in_url(self):

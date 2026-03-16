@@ -40,6 +40,9 @@
 - [x] Define normalized listing schemas and persistence models
 - [x] Add provider detection and the Airbnb adapter interface
 - [x] Integrate Apify-backed Airbnb extraction
+  - [x] Require apify_api_token outside development/testing environments (pr-15-followup-apify-config)
+  - [x] Switch Apify client to header-based auth (Authorization: Bearer) instead of query-param token (pr-15-followup-apify-config)
+  - [x] Document default Airbnb actor dependency and token requirement in backend docs (pr-15-followup-apify-config)
 - [ ] Add background job orchestration using Redis
 - [ ] Add initial AI analysis flow through OpenRouter
 - [ ] Format Telegram output for summary, risks, and price fairness

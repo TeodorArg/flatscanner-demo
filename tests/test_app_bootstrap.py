@@ -38,8 +38,13 @@ class TestSettings:
             Settings(app_env="production", telegram_bot_token="tok", telegram_webhook_secret="")
 
     def test_non_dev_env_with_webhook_secret_ok(self):
-        """Settings with a non-dev app_env and a webhook secret must not raise."""
-        s = Settings(app_env="production", telegram_bot_token="tok", telegram_webhook_secret="mysecret")
+        """Settings with a non-dev app_env and all required credentials must not raise."""
+        s = Settings(
+            app_env="production",
+            telegram_bot_token="tok",
+            telegram_webhook_secret="mysecret",
+            apify_api_token="apify-tok",
+        )
         assert s.telegram_webhook_secret == "mysecret"
 
     def test_staging_without_webhook_secret_raises(self):
@@ -77,14 +82,56 @@ class TestSettings:
         s = Settings(app_env="testing", telegram_bot_token="")
         assert s.telegram_bot_token == ""
 
+    def test_non_dev_env_without_apify_token_raises(self):
+        """apify_api_token must be set outside development/testing."""
+        with pytest.raises(Exception, match="apify_api_token"):
+            Settings(
+                app_env="production",
+                telegram_bot_token="tok",
+                telegram_webhook_secret="mysecret",
+                apify_api_token="",
+            )
+
+    def test_staging_without_apify_token_raises(self):
+        """Staging is also a non-dev env — apify token must be required."""
+        with pytest.raises(Exception, match="apify_api_token"):
+            Settings(
+                app_env="staging",
+                telegram_bot_token="tok",
+                telegram_webhook_secret="mysecret",
+                apify_api_token="",
+            )
+
+    def test_development_without_apify_token_allowed(self):
+        """Development env may omit the apify token."""
+        s = Settings(app_env="development", apify_api_token="")
+        assert s.apify_api_token == ""
+
+    def test_testing_without_apify_token_allowed(self):
+        """Testing env may omit the apify token."""
+        s = Settings(app_env="testing", apify_api_token="")
+        assert s.apify_api_token == ""
+
     def test_non_dev_env_with_both_required_fields_ok(self):
-        """Production with both token and secret must not raise."""
-        s = Settings(app_env="production", telegram_bot_token="real-token", telegram_webhook_secret="real-secret")
+        """Production with all required credentials must not raise."""
+        s = Settings(
+            app_env="production",
+            telegram_bot_token="real-token",
+            telegram_webhook_secret="real-secret",
+            apify_api_token="real-apify-token",
+        )
         assert s.telegram_bot_token == "real-token"
         assert s.telegram_webhook_secret == "real-secret"
+        assert s.apify_api_token == "real-apify-token"
 
     def test_override_via_kwargs(self):
-        s = Settings(app_env="production", debug=True, telegram_bot_token="tok", telegram_webhook_secret="required-in-prod")
+        s = Settings(
+            app_env="production",
+            debug=True,
+            telegram_bot_token="tok",
+            telegram_webhook_secret="required-in-prod",
+            apify_api_token="required-in-prod-apify",
+        )
         assert s.app_env == "production"
         assert s.debug is True
 
@@ -101,6 +148,7 @@ class TestSettings:
         monkeypatch.setenv("DEBUG", "true")
         monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "env-token")
         monkeypatch.setenv("TELEGRAM_WEBHOOK_SECRET", "staging-secret")
+        monkeypatch.setenv("APIFY_API_TOKEN", "staging-apify")
         s = Settings()
         assert s.app_env == "staging"
         assert s.debug is True
@@ -146,6 +194,7 @@ class TestCreateAppFreshSettings:
         """Two create_app() calls with different env vars must yield independent apps."""
         monkeypatch.setenv("TELEGRAM_WEBHOOK_SECRET", "required-secret")
         monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "required-token")
+        monkeypatch.setenv("APIFY_API_TOKEN", "required-apify")
         monkeypatch.setenv("APP_ENV", "first")
         app1 = create_app()
         monkeypatch.setenv("APP_ENV", "second")

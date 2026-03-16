@@ -80,10 +80,10 @@ class ApifyClient:
             f"{APIFY_BASE_URL}/acts/{self._actor_id}"
             f"/run-sync-get-dataset-items"
         )
-        params = {"token": self._api_token}
+        headers = {"Authorization": f"Bearer {self._api_token}"}
 
         async with httpx.AsyncClient(timeout=self._timeout) as client:
-            response = await client.post(url, params=params, json=input_data)
+            response = await client.post(url, headers=headers, json=input_data)
 
         if response.status_code != 200:
             raise ApifyError(
