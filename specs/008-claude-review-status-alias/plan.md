@@ -2,17 +2,15 @@
 
 ## Summary
 
-Extend the Claude review output parser to normalize another observed status alias, `review_status`, into the shared `verdict` field. This keeps the hardening fix aligned with live Claude output without weakening the review contract.
+Extend the shared Claude parser so observed `review_status` payloads normalize cleanly into the existing verdict contract.
 
-## Files And Areas
+## Touched Areas
 
-- `scripts/claude-review-output.ps1` for alias normalization
-- `scripts/test-claude-review-output-parsing.ps1` for regression coverage
-- `docs/project/backend/self-hosted-runner.md` for operator-facing note about compatible status aliases
-- `specs/008-claude-review-status-alias/` for execution tracking
+- `scripts/claude-review-output.ps1`
+- parser regression tests
+- runner docs
 
-## Validation
+## Validation Completed
 
-- Parse the updated PowerShell scripts successfully
-- Run the Claude review output parsing validation script successfully
-- Confirm the observed `review_status` payload shape normalizes to a valid verdict
+- PowerShell parser checks
+- local parsing validation for `review_status`

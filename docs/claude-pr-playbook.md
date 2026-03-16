@@ -1,71 +1,22 @@
 # Claude PR Response Playbook
 
-Use this playbook when Claude Code is asked to create, update, or finish a pull request.
+Use this as the short Claude-facing checklist; the full process lives in `docs/ai-pr-workflow.md`.
 
-## Opening A PR
+## Checklist
 
-1. Start from the active feature folder in `specs/<feature-id>/`
-2. Implement only the scoped task in a feature branch
-3. Update `spec.md`, `plan.md`, `tasks.md`, and relevant `docs/` files if the change affects behavior, scope, architecture, or validation state
-4. Run the relevant tests
-5. Open a pull request using the repository template
-6. In the PR body, include:
-   - active feature folder
-   - summary of changes
-   - tests run
-   - remaining risks or follow-up work
+1. Read the active `spec.md`, `plan.md`, and `tasks.md`.
+2. Implement only the scoped task on the assigned branch.
+3. Update tests, specs, and docs when behavior or scope changes.
+4. Open or update the same PR and include summary, tests run, and remaining risks.
+5. Watch `baseline-checks`, `guard`, and `AI Review`.
+6. Treat the sticky `<!-- ai-review -->` comment as the current machine-review summary.
+7. If findings remain, fix them on the same PR branch and rerun the loop.
+8. Do not ask for merge until checks are green and a human approval is the only gate left.
 
-## Monitoring The PR
+## Fix Trigger
 
-After opening or updating the PR, check:
+Maintainers can continue the same PR with either `claude-fix` or `/claude-fix`.
 
-- required checks: `baseline-checks`, `guard`, `AI Review`
-- the sticky AI review comment marked with `<!-- ai-review -->`
-- any human review comments in the PR thread
+## Suggested Prompt
 
-## Handling AI Review Findings
-
-If `AI Review` reports findings or fails:
-
-1. Read the current sticky AI review comment fully
-2. Treat the listed findings as the authoritative machine-review issues for this PR iteration
-3. Fix the findings in the same PR branch
-4. Add or update tests, docs, and spec artifacts when called out by the review
-5. Push follow-up commits to the same branch
-6. Wait for a fresh run of `baseline-checks`, `guard`, and `AI Review`
-7. Re-read the updated sticky review comment
-8. Repeat until the PR is green and no blocking findings remain
-
-## Semi-Automatic Fix Trigger
-
-A maintainer can ask Claude to continue work on an existing PR by either:
-
-- adding the label `claude-fix`
-- adding a PR comment containing `/claude-fix`
-
-That triggers the `Claude Fix PR` workflow on the self-hosted runner. Claude then reads the PR context, the sticky AI review comment, and the active spec before pushing follow-up commits to the same branch.
-
-Each `Claude Fix PR` run leaves its own PR comment, so you can inspect the sequence of fix attempts instead of only seeing the latest run.
-
-## Rules While Iterating
-
-- Do not open a replacement PR for the same work unless explicitly instructed
-- Do not ask for merge while `AI Review` is red
-- Do not ignore missing spec or docs updates when they are part of the review findings
-- Keep the PR scoped; if the work grows, update the spec first instead of silently expanding the implementation
-
-## Ready For Merge
-
-A PR is ready for merge only when:
-
-- `baseline-checks` is green
-- `guard` is green
-- `AI Review` is green
-- the PR has at least one human approval
-- the active spec artifacts are up to date
-
-## Suggested Prompt To Claude
-
-Use this when handing Claude an existing PR to finish:
-
-`Review PR #<number>. Read the active feature spec, the current PR diff, all required check results, and the sticky AI review comment. Fix the blocking findings in the same branch, update tests/docs/specs as needed, and push follow-up commits until the PR is ready for human approval.`
+`Review PR #<number>. Read the active feature spec, the PR diff, current check results, and the sticky AI review comment. Fix blocking findings in the same branch, update tests/docs/specs as needed, and push follow-up commits until only human approval remains.`

@@ -1,10 +1,11 @@
 # AGENTS.md
 
-This repository uses a spec-driven workflow built on `github/spec-kit` and a small durable `docs/` layer for cross-feature context.
+This repository uses `github/spec-kit` with two memory layers:
+
+- `docs/` for durable product and architecture context
+- `specs/<feature-id>/` for feature intent, plan, and execution state
 
 ## Read Order
-
-Before planning, reviewing, or proposing architecture changes, read files in this order:
 
 1. `.specify/memory/constitution.md`
 2. `docs/README.md`
@@ -15,81 +16,42 @@ Before planning, reviewing, or proposing architecture changes, read files in thi
 7. `specs/*/spec.md`
 8. `specs/*/plan.md`
 9. `specs/*/tasks.md`
-10. Only then inspect implementation files
+10. Relevant implementation files
 
-## Codex Role
+## Roles
 
-Codex is the repository architect, reviewer, and CI/CD owner.
+- Codex owns architecture, review quality, CI/CD health, and local Claude orchestration.
+- Claude Code is the primary implementation agent for product code.
 
-Default expectations:
+## Boundaries
 
-- Start from durable context in `docs/` and active work in `specs/<feature-id>/`
-- Own architecture direction, review quality, and GitHub workflow health
-- Do not change unrelated files
-- Do not change architecture silently; record notable decisions in `docs/adr/` or the active spec
-- Suggest or add tests for every feature and bug fix
-- Keep pull requests small and reviewable
-- If implementation changes agreed scope or behavior, update the relevant docs and spec artifacts first
-- Review pull requests created by implementation agents before merge
-- Operate automated PR review through the repository self-hosted runner configuration, with the active reviewer selected only through the repository variable `AI_REVIEW_AGENT`
-- Orchestrate local Claude Code workers when parallel implementation throughput is useful
-- Stay with an orchestrated implementation loop until the resulting pull request is either merge-ready or explicitly paused by the user
-- Treat CI/CD, review automation, and workflow-health fixes as part of the same task when they block merge readiness
-- Never treat "checks queued", "checks in progress", "last fix pushed", or "only workflow issues remain" as a valid completion point
-- Start every new task from the current `main` branch state before creating a new task branch or worker worktree
+- Codex may directly edit docs, ADRs, specs, prompts, workflows, templates, and other process files.
+- Product code in `src/`, `tests/`, and runtime setup should normally land through Claude-authored pull requests.
+- Multi-agent work must use isolated git worktrees; never run multiple coding agents in one working tree.
 
-## Claude Role
+## Working Rules
 
-Claude Code is the primary implementation agent for application code.
+- Start every task from current `main`.
+- Keep changes scoped and avoid unrelated refactors.
+- Update docs or specs before code when behavior or architecture changes.
+- Keep one branch and one PR per Claude worker task.
+- Treat `docs/`, `specs/`, and `.specify/` as repository memory, not session memory.
+- Keep `.github/workflows/` green.
+- Automated PR review is selected only through the repo variable `AI_REVIEW_AGENT`.
 
-Default expectations:
+## Completion
 
-- Implement approved work from the active spec and plan
-- Open pull requests for code changes instead of pushing directly to `main`
-- Keep code changes scoped to the assigned task list
-- Update `specs/<feature-id>/tasks.md` as implementation work lands
-- Do not merge pull requests without the required AI review and GitHub checks
-- When launched locally by Codex, stay inside the assigned branch and isolated worktree
+At task completion:
 
-## Responsibility Boundaries
+1. Update `specs/<feature-id>/tasks.md`.
+2. Record durable decisions in `docs/` or `docs/adr/` when needed.
+3. Capture follow-up work in the same feature folder or a new spec.
 
-- Codex does not author product application code except for minimal repository scaffolding, process wiring, or non-product structural glue when explicitly needed
-- Codex may freely edit and commit architecture docs, ADRs, specs, agent instructions, GitHub workflows, templates, and other non-product process files
-- Product code under `src/`, `tests/`, and runtime project setup should normally be implemented through Claude-authored pull requests
-- Multi-agent implementation must use isolated git worktrees; never run multiple coding agents in the same working tree
+An orchestrated PR loop is finished only when the current PR head SHA has:
 
-## Repository Rules
+- no blocking review findings
+- green required checks
+- no merge conflicts
+- only human approval or final merge remaining
 
-- Treat `docs/`, `specs/`, and `.specify/` as repository memory
-- Use `docs/` for stable product, architecture, and terminology context
-- Use `specs/` for feature-level execution artifacts
-- Prefer pull-request sized changes over broad refactors
-- Keep workflows in `.github/workflows/` green
-- Use `src/` for app code, `tests/` for automated tests, `scripts/` for project utilities
-- Keep one branch and one pull request per Claude worker task
-- Branch new work from current `main`; do not begin a fresh task from an older feature or process branch
-
-## Negative Rules
-
-- Do not invent architecture that is not documented or requested
-- Do not perform broad refactors while implementing a single feature
-- Do not modify agent instructions unless the workflow itself is being updated
-- Do not skip updating docs when a decision materially changes implementation
-
-## Completion Rules
-
-When a task is finished:
-
-1. Update `specs/<feature-id>/tasks.md`
-2. Mark completed items clearly
-3. Record durable decisions in `docs/` or `docs/adr/` if they affect future work
-4. Note any follow-up work in the same file or a new spec if scope changed
-
-For orchestrated PR loops, "finished" means all of the following are true on the current PR head SHA:
-
-1. No blocking review findings remain
-2. All required GitHub checks are green
-3. The PR is mergeable without conflicts
-4. Only human approval / final merge remains
-
-If any one of those is false, the task is still in progress unless the user explicitly pauses it.
+If any of those are false, the task is still in progress unless the user explicitly pauses it.
