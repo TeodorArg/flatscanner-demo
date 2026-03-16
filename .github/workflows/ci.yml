@@ -71,3 +71,7 @@ jobs:
       - name: Run Claude review parser validation
         shell: pwsh
         run: ./scripts/test-claude-review-output-parsing.ps1
+
+      - name: Run AI review comment payload validation
+        shell: pwsh
+        run: ./scripts/test-ai-review-comment-payload.ps1
