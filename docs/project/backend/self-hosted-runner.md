@@ -36,7 +36,7 @@ Use `-RemoveLegacyCodexLabel` only after all workflows have moved off the old la
 - The adapter posts one sticky `<!-- ai-review -->` PR comment and fails only on effective `request_changes`.
 - Review comments are sanitized, UTF-8 encoded, and truncated before posting so unusual model output does not fail the GitHub comment API path.
 - The workflow always prints per-run diagnostics, transcript, and raw-output logs.
-- The Claude parser accepts the observed compatible aliases `action` and `review_status` for `verdict`, but still rejects invalid payloads.
+- The Claude parser accepts the observed compatible aliases `action`, `review_status`, and `review_action` for `verdict`, but still rejects invalid payloads.
 
 ## Required GitHub Settings
 
