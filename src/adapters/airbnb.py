@@ -105,6 +105,21 @@ def _extract_listing_id_from_url(url: str) -> str:
     return ""
 
 
+def _first_non_none(mapping: dict[str, Any], *keys: str) -> Any:
+    """Return the value of the first *key* in *mapping* whose value is not ``None``.
+
+    Unlike ``mapping.get(k1) or mapping.get(k2)``, this correctly handles
+    zero-valued numeric fields: a key whose value is ``0`` or ``0.0`` is
+    returned rather than falling through to the next candidate key.
+    Returns ``None`` if all keys are absent or all present values are ``None``.
+    """
+    for key in keys:
+        val = mapping.get(key)
+        if val is not None:
+            return val
+    return None
+
+
 def _normalize(url: str, raw: dict[str, Any]) -> NormalizedListing:
     """Map a raw Apify Airbnb actor item to a ``NormalizedListing``.
 
@@ -149,9 +164,11 @@ def _normalize(url: str, raw: dict[str, Any]) -> NormalizedListing:
         except (TypeError, ValueError):
             return None
 
+    # Use _first_non_none so that zero-valued coordinates (e.g. lat=0, lng=0)
+    # are preserved rather than treated as falsy and silently dropped.
     location = ListingLocation(
-        latitude=_float_or_none(raw.get("lat") or raw.get("latitude")),
-        longitude=_float_or_none(raw.get("lng") or raw.get("longitude")),
+        latitude=_float_or_none(_first_non_none(raw, "lat", "latitude")),
+        longitude=_float_or_none(_first_non_none(raw, "lng", "longitude")),
         address=raw.get("address") or None,
         city=raw.get("city") or None,
         country=raw.get("country") or raw.get("countryCode") or None,
@@ -197,13 +214,16 @@ def _normalize(url: str, raw: dict[str, Any]) -> NormalizedListing:
         price=price,
         bedrooms=_int_or_none(raw.get("bedrooms")),
         bathrooms=_rating_or_none(raw.get("bathrooms")),
+        # _first_non_none preserves zero (e.g. personCapacity=0 on a listing
+        # pending capacity configuration) instead of falling through.
         max_guests=_int_or_none(
-            raw.get("personCapacity") or raw.get("maxGuests")
+            _first_non_none(raw, "personCapacity", "maxGuests")
         ),
         amenities=amenities,
-        rating=_rating_or_none(raw.get("starRating") or raw.get("rating")),
+        rating=_rating_or_none(_first_non_none(raw, "starRating", "rating")),
+        # review_count=0 is valid for newly-listed properties.
         review_count=_int_or_none(
-            raw.get("reviewsCount") or raw.get("reviewCount")
+            _first_non_none(raw, "reviewsCount", "reviewCount")
         ),
         host_name=host_name,
         host_is_superhost=host_is_superhost,

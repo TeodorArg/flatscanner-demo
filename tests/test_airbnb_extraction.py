@@ -369,3 +369,45 @@ class TestNormalize:
         payload = {"name": "Test", "maxGuests": 6}
         listing = _normalize(self._URL, payload)
         assert listing.max_guests == 6
+
+    # ------------------------------------------------------------------
+    # Zero-value preservation (regression for or-based fallback bug)
+    # ------------------------------------------------------------------
+
+    def test_zero_lat_lng_preserved(self):
+        """lat=0/lng=0 are valid coordinates and must not fall through to None."""
+        payload = {"name": "Test", "lat": 0.0, "lng": 0.0}
+        listing = _normalize(self._URL, payload)
+        assert listing.location.latitude == 0.0
+        assert listing.location.longitude == 0.0
+
+    def test_zero_lat_lng_alt_fields_preserved(self):
+        """latitude=0/longitude=0 alternate field names are also preserved."""
+        payload = {"name": "Test", "latitude": 0.0, "longitude": 0.0}
+        listing = _normalize(self._URL, payload)
+        assert listing.location.latitude == 0.0
+        assert listing.location.longitude == 0.0
+
+    def test_zero_review_count_preserved(self):
+        """review_count=0 is valid for new listings and must not be dropped."""
+        payload = {**_full_airbnb_payload(), "reviewsCount": 0, "reviewCount": 99}
+        listing = _normalize(self._URL, payload)
+        assert listing.review_count == 0
+
+    def test_zero_review_count_alt_field_preserved(self):
+        payload = {"name": "Test", "reviewsCount": None, "reviewCount": 0}
+        listing = _normalize(self._URL, payload)
+        # reviewsCount is None → skipped; reviewCount=0 is valid and preserved
+        assert listing.review_count == 0
+
+    def test_zero_max_guests_preserved(self):
+        """personCapacity=0 must be preserved rather than falling to maxGuests."""
+        payload = {"name": "Test", "personCapacity": 0, "maxGuests": 4}
+        listing = _normalize(self._URL, payload)
+        assert listing.max_guests == 0
+
+    def test_zero_rating_preserved(self):
+        """starRating=0 must be preserved rather than falling to rating."""
+        payload = {"name": "Test", "starRating": 0.0, "rating": 4.5}
+        listing = _normalize(self._URL, payload)
+        assert listing.rating == pytest.approx(0.0)
