@@ -4,8 +4,10 @@ $script:transcriptStarted = $false
 $script:tempRoot = if ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } else { $env:TEMP }
 $script:diagnosticPath = Join-Path $script:tempRoot 'ai-review-diagnostics.log'
 $script:transcriptPath = Join-Path $script:tempRoot 'ai-review-transcript.log'
+$script:rawOutputPath = Join-Path $script:tempRoot 'ai-review-raw-output.log'
 
 . (Join-Path $PSScriptRoot 'ai-review-policy.ps1')
+. (Join-Path $PSScriptRoot 'claude-review-output.ps1')
 
 function Write-Diagnostic {
     param(
@@ -25,6 +27,9 @@ try {
     }
     if (Test-Path $script:transcriptPath) {
         Remove-Item $script:transcriptPath -Force
+    }
+    if (Test-Path $script:rawOutputPath) {
+        Remove-Item $script:rawOutputPath -Force
     }
 
     New-Item -ItemType File -Path $script:diagnosticPath -Force | Out-Null
@@ -174,51 +179,21 @@ $diffBlock
         throw "Claude CLI review failed with exit code $claudeExitCode."
     }
 
-    $resultText = $resultText.Trim()
-    if (-not $resultText) {
-        throw 'Claude review output was empty.'
+    Set-Content -Path $script:rawOutputPath -Value $resultText
+    Write-Diagnostic "Raw Claude output saved to $script:rawOutputPath"
+    Write-Diagnostic ("Claude output preview: " + (Get-ClaudeReviewOutputPreview -Text $resultText))
+
+    $parsedOutput = ConvertFrom-ClaudeReviewOutput -RawText $resultText
+    $result = $parsedOutput.Result
+
+    foreach ($note in @($parsedOutput.NormalizationNotes)) {
+        Write-Diagnostic $note
     }
 
-    if ($resultText.StartsWith('```')) {
-        $resultText = ($resultText -replace '^```[a-zA-Z0-9_-]*\s*', '' -replace '\s*```$', '').Trim()
-    }
-
-    if (-not $resultText.StartsWith('{')) {
-        $jsonStart = $resultText.IndexOf('{')
-        $jsonEnd = $resultText.LastIndexOf('}')
-        if ($jsonStart -ge 0 -and $jsonEnd -gt $jsonStart) {
-            $resultText = $resultText.Substring($jsonStart, ($jsonEnd - $jsonStart + 1)).Trim()
-        }
-    }
-
-    try {
-        $result = $resultText | ConvertFrom-Json
-    }
-    catch {
-        throw "Claude review output was not valid JSON: $resultText"
-    }
-
-    if (-not $result.summary -or -not $result.verdict) {
-        throw 'Claude review output is missing required fields.'
-    }
-
-    # Keep the Claude adapter aligned with the shared review schema contract.
-    if (@('approve', 'comment', 'request_changes') -notcontains [string]$result.verdict) {
-        throw "Claude review output contains an invalid verdict: $($result.verdict)"
-    }
+    Assert-ClaudeReviewResultContract -Result $result
 
     $outcome = Resolve-AiReviewOutcome -Result $result
     $findings = $outcome.Findings
-
-    foreach ($finding in $findings) {
-        if (-not $finding.severity -or -not $finding.file -or $null -eq $finding.line -or -not $finding.title -or -not $finding.body) {
-            throw 'Claude review output contains a finding with missing required fields.'
-        }
-        $lineNumber = $finding.line -as [int]
-        if ($null -ne $lineNumber -and $lineNumber -lt 1) {
-            throw 'Claude review output contains a finding with an invalid line number.'
-        }
-    }
 
     if ($outcome.PolicyNote) {
         Write-Diagnostic $outcome.PolicyNote

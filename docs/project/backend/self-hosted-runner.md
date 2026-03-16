@@ -49,7 +49,8 @@ This repository expects automated PR review to run on a Windows self-hosted GitH
 - That selector script chooses `scripts\run-claude-pr-review.ps1` or `scripts\run-codex-pr-review.ps1`
 - The selected adapter builds review context, calls the local CLI, posts one sticky PR comment marked `<!-- ai-review -->`, and fails the job when verdict is `request_changes`
 - The workflow invokes the script with `powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ...` to avoid inline shell exit-code ambiguity
-- After every run, the workflow prints `ai-review-diagnostics.log` and `ai-review-transcript.log` from the runner temp directory so success-path and failure-path behavior are visible in the GitHub job logs
+- After every run, the workflow prints `ai-review-diagnostics.log`, `ai-review-transcript.log`, and `ai-review-raw-output.log` from the runner temp directory so success-path and failure-path behavior are visible in the GitHub job logs
+- The Claude adapter normalizes compatible response shapes such as `action` -> `verdict`, but still fails the check on genuinely invalid or incomplete review payloads
 - The review script recreates those temp files on each run so the printed diagnostics always match the current PR attempt
 
 ## Required GitHub Branch Protection

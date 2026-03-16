@@ -1,4 +1,10 @@
 $ErrorActionPreference = 'Stop'
+$tempRoot = if ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } else { $env:TEMP }
+$rawOutputPath = Join-Path $tempRoot 'ai-review-raw-output.log'
+
+if (Test-Path $rawOutputPath) {
+    Remove-Item $rawOutputPath -Force
+}
 
 $requestedAgent = ''
 if ($env:AI_REVIEW_AGENT) {

@@ -67,3 +67,7 @@ jobs:
 
       - name: Run tests
         run: pytest
+
+      - name: Run Claude review parser validation
+        shell: pwsh
+        run: ./scripts/test-claude-review-output-parsing.ps1

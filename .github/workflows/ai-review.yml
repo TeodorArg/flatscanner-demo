@@ -58,6 +58,7 @@ jobs:
           $tempRoot = if ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } else { $env:TEMP }
           $diagnosticPath = Join-Path $tempRoot 'ai-review-diagnostics.log'
           $transcriptPath = Join-Path $tempRoot 'ai-review-transcript.log'
+          $rawOutputPath = Join-Path $tempRoot 'ai-review-raw-output.log'
 
           if (Test-Path $diagnosticPath) {
             Write-Host '--- ai-review-diagnostics.log ---'
@@ -73,4 +74,20 @@ jobs:
           }
           else {
             Write-Host 'No transcript log produced.'
+          }
+
+          if (Test-Path $rawOutputPath) {
+            Write-Host '--- ai-review-raw-output.log ---'
+            $stopToken = [guid]::NewGuid().ToString('N')
+            $rawOutputText = Get-Content $rawOutputPath -Raw
+            $maxChars = 16000
+            if ($rawOutputText.Length -gt $maxChars) {
+              $rawOutputText = $rawOutputText.Substring(0, $maxChars) + "`n[truncated raw Claude output log]"
+            }
+            Write-Host "::stop-commands::$stopToken"
+            Write-Host $rawOutputText
+            Write-Host "::$stopToken::"
+          }
+          else {
+            Write-Host 'No raw output log produced.'
           }

@@ -88,7 +88,7 @@ Guardrails:
 - If the effective review verdict is `request_changes`, the `AI Review` check fails and blocks merge
 - The self-hosted workflows target the neutral runner label `ai-runner`
 - The review step must be launched through an explicit `powershell -File` invocation rather than relying on inline shell execution
-- The workflow must always print the review diagnostic and transcript logs after the review step so false-negative job failures can be traced from the GitHub run itself
+- The workflow must always print the review diagnostic, transcript, and raw Claude output logs after the review step so false-negative job failures can be traced from the GitHub run itself
 - Those diagnostic files must be recreated per run on the self-hosted runner so operators never read stale output from an earlier PR or an earlier retry
 
 ## Current Required Checks
