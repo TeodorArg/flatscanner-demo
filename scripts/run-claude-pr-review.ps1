@@ -7,6 +7,7 @@ $script:transcriptPath = Join-Path $script:tempRoot 'ai-review-transcript.log'
 $script:rawOutputPath = Join-Path $script:tempRoot 'ai-review-raw-output.log'
 
 . (Join-Path $PSScriptRoot 'ai-review-policy.ps1')
+. (Join-Path $PSScriptRoot 'ai-review-comment.ps1')
 . (Join-Path $PSScriptRoot 'claude-review-output.ps1')
 
 function Write-Diagnostic {
@@ -247,16 +248,17 @@ $findingsBlock
     $legacyMarker = '<!-- codex-ai-review -->'
     $comments = Invoke-RestMethod -Headers $headers -Uri $commentsUrl -Method Get
     $existing = $comments | Where-Object { $_.body -like "*$marker*" -or $_.body -like "*$legacyMarker*" } | Select-Object -First 1
-    $payload = @{ body = $body } | ConvertTo-Json
+    $commentPayload = ConvertTo-GitHubIssueCommentPayload -Body $body
+    Write-Diagnostic "Review comment body length=$($commentPayload.Body.Length); truncated=$($commentPayload.WasTruncated)"
 
     if ($existing) {
         $updateUrl = "https://api.github.com/repos/$repository/issues/comments/$($existing.id)"
         Write-Diagnostic "Updating existing sticky review comment $($existing.id)"
-        Invoke-RestMethod -Headers $headers -Uri $updateUrl -Method Patch -Body $payload | Out-Null
+        Invoke-RestMethod -Headers $headers -Uri $updateUrl -Method Patch -Body $commentPayload.Payload -ContentType 'application/json; charset=utf-8' | Out-Null
     }
     else {
         Write-Diagnostic 'Creating new sticky review comment'
-        Invoke-RestMethod -Headers $headers -Uri $commentsUrl -Method Post -Body $payload | Out-Null
+        Invoke-RestMethod -Headers $headers -Uri $commentsUrl -Method Post -Body $commentPayload.Payload -ContentType 'application/json; charset=utf-8' | Out-Null
     }
 
     if ($outcome.EffectiveVerdict -eq 'request_changes') {
