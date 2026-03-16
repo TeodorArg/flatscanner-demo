@@ -7,6 +7,12 @@ $unicodePayload = ConvertTo-GitHubIssueCommentPayload -Body $unicodeBody
 if ($unicodePayload.Body -ne $unicodeBody) {
     throw 'Unicode characters should be preserved in the sanitized comment body.'
 }
+if ($unicodePayload.WasTruncated) {
+    throw 'Short comment bodies should not be marked as truncated.'
+}
+if (-not (ConvertFrom-Json $unicodePayload.Payload).body) {
+    throw 'Comment payload JSON should remain parseable.'
+}
 
 $controlBody = "ok$([char]0)still ok$([char]7)`nnext line"
 $controlPayload = ConvertTo-GitHubIssueCommentPayload -Body $controlBody
@@ -27,6 +33,9 @@ if ($longPayload.Body.Length -gt 60000) {
 }
 if (-not $longPayload.Body.EndsWith('[truncated to fit GitHub comment limits]')) {
     throw 'Truncated comment bodies should end with the truncation note.'
+}
+if (-not (ConvertFrom-Json $longPayload.Payload).body) {
+    throw 'Truncated comment payload JSON should remain parseable.'
 }
 
 Write-Host 'AI review comment payload validation passed.'
