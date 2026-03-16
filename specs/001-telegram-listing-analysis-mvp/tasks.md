@@ -39,7 +39,7 @@
   - [x] Replace broad localized-Airbnb regex with explicit supported-domain TLD allowlist; reject non-http/https schemes inside is_supported_provider() (PR-5-fix-13)
 - [x] Define normalized listing schemas and persistence models
 - [x] Add provider detection and the Airbnb adapter interface
-- [ ] Integrate Apify-backed Airbnb extraction
+- [x] Integrate Apify-backed Airbnb extraction
 - [ ] Add background job orchestration using Redis
 - [ ] Add initial AI analysis flow through OpenRouter
 - [ ] Format Telegram output for summary, risks, and price fairness

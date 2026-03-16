@@ -53,6 +53,9 @@ class Settings(BaseSettings):
 
     # Apify
     apify_api_token: str = ""
+    # Actor used to scrape Airbnb listings.  Override to switch to a different
+    # actor version without changing application code.
+    apify_airbnb_actor_id: str = "dtrungtin~airbnb-scraper"
 
 
 @lru_cache(maxsize=1)
