@@ -51,11 +51,14 @@ function ConvertFrom-ClaudeReviewOutput {
     }
 
     $normalizationNotes = @()
-    if (-not $result.PSObject.Properties['verdict'] -and $result.PSObject.Properties['action']) {
-        $action = [string]$result.action
-        if (@('approve', 'comment', 'request_changes') -contains $action) {
-            $result | Add-Member -NotePropertyName verdict -NotePropertyValue $action
-            $normalizationNotes += "Normalized Claude review field 'action' to 'verdict'."
+    $verdictAliases = @('action', 'review_status')
+    foreach ($alias in $verdictAliases) {
+        if (-not $result.PSObject.Properties['verdict'] -and $result.PSObject.Properties[$alias]) {
+            $aliasValue = [string]$result.$alias
+            if (@('approve', 'comment', 'request_changes') -contains $aliasValue) {
+                $result | Add-Member -NotePropertyName verdict -NotePropertyValue $aliasValue
+                $normalizationNotes += "Normalized Claude review field '$alias' to 'verdict'."
+            }
         }
     }
 

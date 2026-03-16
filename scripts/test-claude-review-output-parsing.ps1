@@ -16,6 +16,12 @@ $cases = @(
         ExpectedNotes = 1
     },
     @{
+        Name = 'review_status field is normalized to verdict'
+        RawText = '{"review_status":"comment","summary":"ok","findings":[]}'
+        ExpectedVerdict = 'comment'
+        ExpectedNotes = 1
+    },
+    @{
         Name = 'fenced json with action is normalized'
         RawText = @'
 ```json
