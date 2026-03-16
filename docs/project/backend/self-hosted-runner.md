@@ -34,6 +34,7 @@ Use `-RemoveLegacyCodexLabel` only after all workflows have moved off the old la
 - `.github/workflows/ai-review.yml` passes `AI_REVIEW_AGENT` to `scripts/run-ai-pr-review.ps1`.
 - The selector calls either the Claude or Codex adapter.
 - The adapter posts one sticky `<!-- ai-review -->` PR comment and fails only on effective `request_changes`.
+- Review comments are sanitized, UTF-8 encoded, and truncated before posting so unusual model output does not fail the GitHub comment API path.
 - The workflow always prints per-run diagnostics, transcript, and raw-output logs.
 - The Claude parser accepts the observed compatible aliases `action` and `review_status` for `verdict`, but still rejects invalid payloads.
 
