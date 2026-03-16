@@ -33,5 +33,5 @@
 
 ## Follow-Up
 
-- [ ] Decide whether to rename the self-hosted runner label from `codex` to a neutral label later
+- [x] Decide whether to rename the self-hosted runner label from `codex` to a neutral label later
 - [ ] Decide whether to add an optional shadow reviewer mode in a future workflow iteration

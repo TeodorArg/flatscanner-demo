@@ -25,7 +25,7 @@ Upgrade the repository from a placeholder AI review scaffold to an enforceable p
 
 ## Self-Hosted Design
 
-- Use a Windows self-hosted runner labeled `codex`
+- Use a Windows self-hosted runner labeled `ai-runner`
 - Keep the runner on the same machine where local Codex CLI access is configured
 - Build the Codex prompt from durable repository context plus pull-request metadata
 - Run local `codex exec` with a JSON schema so review output remains machine-readable
@@ -43,7 +43,7 @@ Upgrade the repository from a placeholder AI review scaffold to an enforceable p
 - Confirm the prompt and schema files are present in the repository
 - Confirm the PR template guides contributors to the active spec and validation notes
 - Confirm local `codex exec` works on the runner host
-- Confirm the runner is registered with the `codex` label
+- Confirm the runner is registered with the `ai-runner` label
 
 ## Notes
 

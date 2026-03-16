@@ -27,10 +27,10 @@
 
 ## Validation
 
-- [x] Register the Windows self-hosted runner with the `codex` label
+- [x] Register the Windows self-hosted runner with the `ai-runner` label
 - [x] Ensure the runner uses the same authenticated Windows user profile as local Codex CLI
 - [x] Enable branch protection rules for `main`
-- [x] Confirm required checks include `CI`, `PR Guard`, and `AI Review`
+- [x] Confirm required checks include `baseline-checks`, `guard`, and `AI Review`
 - [x] Confirm at least one human approval is required before merge
 - [x] Open a test pull request and verify sticky review comments plus blocking verdict behavior
 - [x] Open a test pull request and verify the `Claude Fix PR` workflow can update the same PR branch

@@ -1,6 +1,6 @@
 # Self-Hosted AI Review Setup
 
-This repository expects automated PR review to run on a Windows self-hosted GitHub Actions runner labeled `codex`.
+This repository expects automated PR review to run on a Windows self-hosted GitHub Actions runner labeled `ai-runner`.
 
 ## One-Time Runner Setup
 
@@ -8,7 +8,16 @@ This repository expects automated PR review to run on a Windows self-hosted GitH
 2. Copy the registration token shown by GitHub.
 3. Run:
    `powershell -ExecutionPolicy Bypass -File .\scripts\setup-self-hosted-runner.ps1 -RepoUrl https://github.com/alexgoodman53/flatscanner -RegistrationToken <token> -AsService`
-4. Confirm the runner appears online in GitHub with labels `self-hosted`, `windows`, and `codex`.
+4. Confirm the runner appears online in GitHub with labels `self-hosted`, `windows`, and `ai-runner`.
+
+## Runner Label Migration
+
+- Existing runners created before the neutral-label migration may still have the historical `codex` label
+- Apply the repository-local migration helper before switching workflow `runs-on` targets:
+  `powershell -ExecutionPolicy Bypass -File .\scripts\add-ai-runner-label.ps1`
+- The helper defaults `-RunnerName` to the current Windows hostname; pass `-RunnerName <github-runner-name>` if the registered GitHub runner uses a different name
+- By default the helper keeps the legacy `codex` label during the transition window
+- Use `-RemoveLegacyCodexLabel` only when you are ready for the runner to stop satisfying legacy `codex` workflow labels
 
 ## Reviewer Selection
 
@@ -52,8 +61,10 @@ This repository expects automated PR review to run on a Windows self-hosted GitH
   with body `{"strict":true,"contexts":["baseline-checks","guard","AI Review"]}`
 - Repository helper:
   `powershell -ExecutionPolicy Bypass -File .\scripts\set-required-ai-review-check.ps1`
+- Runner-label helper:
+  `powershell -ExecutionPolicy Bypass -File .\scripts\add-ai-runner-label.ps1`
 - Protect `main`
 - Require pull requests before merge
-- Require status checks `CI`, `PR Guard`, and `AI Review`
+- Require status checks `baseline-checks`, `guard`, and `AI Review`
 - Require at least one human approval
 - Restrict direct pushes to `main`

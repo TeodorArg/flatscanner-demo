@@ -30,7 +30,7 @@ Generalize the self-hosted PR review pipeline so one `AI Review` workflow can ru
 
 - Claude CLI review output must stay machine-readable enough to preserve blocking review behavior
 - Review comment marker changes can break downstream automation if not updated consistently
-- The runner still uses the historical `codex` label even when Claude is the selected reviewer
+- The runner-label migration must stay coordinated with live GitHub runner labels so workflow routing does not break during rollout
 
 ## Validation
 

@@ -3,7 +3,7 @@ param(
     [Parameter(Mandatory = $true)][string]$RepoUrl,
     [Parameter(Mandatory = $true)][string]$RegistrationToken,
     [string]$RunnerName = $env:COMPUTERNAME,
-    [string]$Labels = 'codex,windows',
+    [string]$Labels = 'ai-runner,windows',
     [string]$InstallPath = 'C:\actions-runner',
     [switch]$AsService
 )

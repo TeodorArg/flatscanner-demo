@@ -35,11 +35,11 @@ Configure the repository with these settings in GitHub:
 
 - Protect the `main` branch
 - Require a pull request before merging
-- Require status checks: `CI`, `PR Guard`, and `AI Review`
+- Require status checks: `baseline-checks`, `guard`, and `AI Review`
 - Require at least one human approval before merge
 - Dismiss stale approvals when new commits are pushed
 - Restrict direct pushes to `main`
-- Register a self-hosted Windows runner with the `codex` label for this repository
+- Register a self-hosted Windows runner with the `ai-runner` label for this repository
 
 ## Consequences
 

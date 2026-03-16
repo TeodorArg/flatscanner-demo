@@ -8,6 +8,8 @@ Accepted
 
 The repository already supports Claude-authored pull requests and automated AI review through a self-hosted runner. The team wants Codex to act as an orchestrator that can launch Claude Code locally for scoped implementation tasks and, when useful, run more than one implementation worker in parallel.
 
+The self-hosted runner label should stay agent-neutral so the orchestration layer remains valid even when the active reviewer changes.
+
 Running several coding agents in the same working tree is unsafe. It causes branch confusion, index conflicts, and hidden file overlap. The orchestration layer therefore needs a simple isolation model that stays compatible with the current PR workflow.
 
 ## Decision

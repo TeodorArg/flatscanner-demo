@@ -40,5 +40,4 @@ The repository already has a self-hosted AI review workflow, but the active revi
 
 ## Open Questions
 
-- Whether the self-hosted runner label should eventually be renamed from `codex` to something agent-neutral
 - Whether a future enhancement should allow a non-blocking shadow reviewer alongside the selected blocking reviewer
