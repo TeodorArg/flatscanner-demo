@@ -242,15 +242,12 @@ class TestAirbnbAdapterFetch:
         settings = _make_settings(apify_airbnb_actor_id="custom~actor")
         adapter = AirbnbAdapter(settings=settings)
 
-        with patch(
-            "src.adapters.airbnb.ApifyClient", wraps=ApifyClient
-        ) as mock_cls:
-            mock_instance = AsyncMock()
-            mock_instance.run_and_get_items = AsyncMock(
-                return_value=[_full_airbnb_payload()]
-            )
-            mock_cls.return_value = mock_instance
+        mock_instance = MagicMock()
+        mock_instance.run_and_get_items = AsyncMock(
+            return_value=[_full_airbnb_payload()]
+        )
 
+        with patch("src.adapters.airbnb.ApifyClient", return_value=mock_instance) as mock_cls:
             await adapter.fetch(self._URL)
 
         _, init_kwargs = mock_cls.call_args
