@@ -51,7 +51,7 @@ function ConvertFrom-ClaudeReviewOutput {
     }
 
     $normalizationNotes = @()
-    $verdictAliases = @('action', 'review_status')
+    $verdictAliases = @('action', 'review_status', 'review_action')
     foreach ($alias in $verdictAliases) {
         if (-not $result.PSObject.Properties['verdict'] -and $result.PSObject.Properties[$alias]) {
             $aliasValue = [string]$result.$alias
