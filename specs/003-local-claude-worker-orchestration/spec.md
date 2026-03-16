@@ -1,40 +1,21 @@
 # Feature Spec: Local Claude Worker Orchestration
 
-## Context
+## Status
 
-The repository already supports Claude-authored pull requests and automated AI review. The next step is to let Codex launch Claude CLI locally for scoped implementation tasks, including limited parallel workers, without breaking branch discipline or repository memory.
+Completed
 
-## Scope
+## Goal
 
-- Add a durable orchestration model for Codex-launched Claude workers
-- Document isolation rules for multi-worker execution
-- Add repository-local scripts for creating worktrees, launching Claude workers, and publishing worker branches
-- Keep the existing PR review and merge gates as the only integration path
+Let Codex launch local Claude workers safely without creating a second merge path.
 
-## Out Of Scope
+## Resolution
 
-- Full autonomous merge
-- Dynamic task decomposition from issues
-- Cloud-hosted worker pools
-- Product application code changes
+- Each worker uses one branch, one worktree, and one PR.
+- Codex remains dispatcher and reviewer.
+- Default mode is one worker; parallel workers are allowed only for independent tasks.
+- Repository-local scripts handle worktree creation, worker launch, and PR publication.
 
-## Requirements
+## Follow-Up
 
-- Every Claude worker must use an isolated git worktree and a dedicated branch
-- The orchestration model must preserve the existing PR flow and AI review loop
-- The repository must provide a repeatable local script for starting a Claude worker from a scoped task
-- The repository must provide a repeatable local script for publishing or reusing a PR from a worker branch
-- Durable docs must explain when parallel workers are allowed and when they are not
-
-## Acceptance Criteria
-
-- An ADR records the local worker orchestration decision
-- Durable workflow docs explain the worker model and its guardrails
-- Repository scripts exist for worktree creation and worker launch
-- Agent instructions reflect worktree isolation and Codex orchestration authority
-- The scripts pass static PowerShell parsing and a prompt-generation validation path
-
-## Open Questions
-
-- Whether a future queue should limit workers automatically instead of relying on operator discipline
-- Whether PR creation should later move from a local script into a dedicated GitHub workflow trigger
+- Decide whether to automate worker queueing and concurrency caps.
+- Decide whether PR creation should later move into a dedicated workflow trigger.

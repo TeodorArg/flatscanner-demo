@@ -1,22 +1,17 @@
 # Project Docs
 
-This folder stores durable context that changes more slowly than feature work.
+`docs/` stores durable repository memory that should outlive any single feature.
 
 Use `docs/` for:
 
-- product intent and project vision
+- product direction
 - stable architecture and stack decisions
-- shared terminology
-- architecture decision records
-- durable workflow and collaboration guidance
+- ADRs
+- durable workflow and operations guidance
 
-Use `specs/` for:
+Use `specs/` for feature-specific requirements, plans, validation, and task state.
 
-- feature-specific requirements
-- implementation plans
-- task tracking and validation
-
-Recommended reading order:
+Recommended order:
 
 1. `project-idea.md`
 2. `project/frontend/frontend-docs.md`
@@ -24,5 +19,4 @@ Recommended reading order:
 4. `adr/*.md`
 5. `ai-pr-workflow.md`
 6. `claude-worker-orchestration.md`
-7. `claude-pr-playbook.md`
-8. `glossary.md`
+7. `glossary.md`

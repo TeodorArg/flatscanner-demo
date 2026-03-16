@@ -1,81 +1,47 @@
 # Backend Docs
 
-## Status
-
-Initial backend direction is chosen and should be treated as the current default unless replaced by a newer ADR.
-
-## Runtime And Framework
+## Current Default
 
 - Language: Python
-- API framework: FastAPI
-- Primary interface in the first release: Telegram bot backed by FastAPI services
-- Validation and settings: Pydantic
-
-## Core Services
-
-- Telegram interface layer for receiving listing URLs and returning analysis results
-- Listing ingestion layer with platform adapters
-- Enrichment layer for geospatial and public-context signals
-- AI analysis layer using OpenRouter-backed models
-- Scoring layer for listing quality and price fairness
-- Background job workers for long-running parsing and enrichment flows
-
-## Storage And Jobs
-
-- Primary database: PostgreSQL
+- API: FastAPI
+- Primary interface: Telegram backed by FastAPI services
+- Validation/settings: Pydantic
+- Database: PostgreSQL
 - Queue/cache: Redis
-- Background processing: Redis-backed worker system to be finalized in implementation planning
+
+## Core Backend Shape
+
+- `src/telegram/`: message intake and response formatting
+- `src/adapters/`: provider detection and source adapters
+- `src/domain/`: normalized listing models
+- `src/enrichment/`: external context providers
+- `src/analysis/`: AI summarization and price-fairness logic
+- `src/jobs/` and `src/storage/`: async execution and persistence
 
 ## Integration Direction
 
-- Listing parsing starts with Airbnb but must use an adapter pattern so other aggregators can be added without rewriting the rest of the pipeline
-- Apify is the default source for listing extraction where supported
-- OpenRouter is the model gateway for AI summarization and reasoning
-- External enrichments may include Street View, nearby places, transport access, and public safety data depending on regional availability
-
-## Suggested Domain Flow
-
-1. Accept listing URL from Telegram
-2. Detect platform and enqueue an analysis job
-3. Fetch raw listing data through the matching adapter
-4. Normalize listing data into a shared schema
-5. Run enrichment providers against coordinates or inferred location
-6. Build an explainable AI summary and scoring package
-7. Persist the job, inputs, derived signals, and final result
-8. Return a concise and structured report to Telegram
+- Airbnb is the first provider, but parsing must stay adapter-based.
+- Apify is the default extraction source where supported.
+- OpenRouter is the model gateway.
+- Enrichment sources may vary by geography and must tolerate partial availability.
 
 ## Design Constraints
 
-- Keep source-specific parsing logic separate from normalized domain logic
-- Treat external data availability as unreliable and support partial results
-- Prefer explainable scoring over LLM-only judgment
-- Keep cost controls visible because Apify, Google, and OpenRouter usage can scale quickly
-- Record notable architecture changes in `docs/adr/`
+- Keep provider-specific parsing separate from normalized domain logic.
+- Prefer explainable scoring over LLM-only judgment.
+- Keep cost-sensitive dependencies visible.
+- Record durable backend changes in `docs/adr/`.
 
 ## Delivery Infrastructure
 
-- Automated PR review runs on a Windows self-hosted GitHub runner labeled `ai-runner`
-- The `AI Review` workflow selects the local review adapter only from the repository variable `AI_REVIEW_AGENT`
-- Supported `AI_REVIEW_AGENT` values are `claude` and `codex`; missing or invalid values fall back to `claude`
-- The runner host must therefore support the selected local reviewer CLI
-- Setup instructions live in `docs/project/backend/self-hosted-runner.md`
-- Codex may also launch local Claude CLI workers on the same machine through isolated git worktrees
-- Claude worker orchestration instructions live in `docs/claude-worker-orchestration.md`
-
-## What Belongs Here
-
-Record stable backend decisions when they are made:
-
-- runtime and framework
-- database choice
-- authentication model
-- API conventions
-- background jobs
-- commands for local development and testing
+- Automated review runs on a Windows self-hosted runner labeled `ai-runner`.
+- Reviewer selection comes only from `AI_REVIEW_AGENT` and supports `claude` or `codex`, with `claude` as fallback.
+- Runner setup lives in `docs/project/backend/self-hosted-runner.md`.
+- Local Claude worker launches live in `docs/claude-worker-orchestration.md`.
 
 ## Open Decisions
 
-- Which Redis-backed worker library to standardize on
-- Which safety/crime data sources are reliable enough by region
-- Whether comparable listings for price fairness will come from the same source platform, a separate dataset, or both
-- Whether raw source payloads and derived media metadata should be stored long term or pruned
+- Redis worker library
+- regional safety and public-context providers
+- long-term source payload retention
+- comparable-listing strategy for price fairness
