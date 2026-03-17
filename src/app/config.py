@@ -42,6 +42,11 @@ class Settings(BaseSettings):
                     "apify_api_token must be set when app_env is not "
                     "'development' or 'testing'"
                 )
+            if not self.openrouter_api_key:
+                raise ValueError(
+                    "openrouter_api_key must be set when app_env is not "
+                    "'development' or 'testing'"
+                )
         return self
 
     # Database – asyncpg driver will be added when storage layer lands
