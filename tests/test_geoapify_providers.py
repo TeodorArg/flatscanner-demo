@@ -243,6 +243,7 @@ class TestGeoapifyTransportProviderError:
 
         error_resp = MagicMock()
         error_resp.status_code = 401
+        error_resp.is_success = False
         error_resp.text = "Unauthorized"
 
         with patch("httpx.AsyncClient") as mock_cls:
@@ -417,6 +418,7 @@ class TestGeoapifyNearbyPlacesProviderError:
 
         error_resp = MagicMock()
         error_resp.status_code = 403
+        error_resp.is_success = False
         error_resp.text = "Forbidden"
 
         with patch("httpx.AsyncClient") as mock_cls:

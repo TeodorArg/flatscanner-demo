@@ -72,7 +72,7 @@ class GeoapifyTransportProvider:
         async with httpx.AsyncClient(timeout=8.0) as client:
             response = await client.get(_GEOAPIFY_PLACES_URL, params=params)
 
-        if response.status_code != 200:
+        if not response.is_success:
             raise RuntimeError(
                 f"Geoapify Places API returned {response.status_code}: "
                 f"{response.text[:200]}"

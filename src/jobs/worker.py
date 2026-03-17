@@ -61,7 +61,7 @@ async def process_once(redis: "Redis", settings: "Settings") -> bool:
     job = await dequeue_analysis_job(redis, timeout=1)
     if job is None:
         return False
-    providers = build_default_providers(settings) or None
+    providers = build_default_providers(settings)
     await process_job(job, settings, enrichment_providers=providers)
     return True
 
@@ -81,7 +81,7 @@ async def run_worker(redis: "Redis", settings: "Settings") -> None:
     The loop exits cleanly when ``asyncio.CancelledError`` is raised (e.g.
     from an OS signal or test cancellation).
     """
-    providers = build_default_providers(settings) or None
+    providers = build_default_providers(settings)
     logger.info("Worker started - waiting for jobs on queue")
     while True:
         raw_payload: bytes | None = None
