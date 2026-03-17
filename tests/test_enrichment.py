@@ -382,7 +382,8 @@ class TestProcessJobEnrichmentIntegration:
                 enrichment_providers=providers,
             )
 
-        mock_service.analyse.assert_awaited_once_with(listing)
+        mock_service.analyse.assert_awaited_once()
+        assert mock_service.analyse.call_args.args[0] is listing
 
     @pytest.mark.asyncio
     async def test_process_job_continues_when_enrichments_time_out(self):
@@ -415,7 +416,8 @@ class TestProcessJobEnrichmentIntegration:
                 enrichment_providers=providers,
             )
 
-        mock_service.analyse.assert_awaited_once_with(listing)
+        mock_service.analyse.assert_awaited_once()
+        assert mock_service.analyse.call_args.args[0] is listing
 
     @pytest.mark.asyncio
     async def test_process_job_calls_run_enrichments_with_providers(self):

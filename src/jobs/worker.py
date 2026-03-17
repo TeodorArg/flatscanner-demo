@@ -24,6 +24,7 @@ from typing import TYPE_CHECKING
 from pydantic import ValidationError
 
 from src.domain.listing import AnalysisJob
+from src.enrichment.providers import build_default_providers
 from src.jobs.processor import UnsupportedProviderError, process_job
 from src.jobs.queue import QUEUE_KEY, dequeue_analysis_job, requeue_raw_payload
 
@@ -60,7 +61,8 @@ async def process_once(redis: "Redis", settings: "Settings") -> bool:
     job = await dequeue_analysis_job(redis, timeout=1)
     if job is None:
         return False
-    await process_job(job, settings)
+    providers = build_default_providers(settings) or None
+    await process_job(job, settings, enrichment_providers=providers)
     return True
 
 
@@ -88,7 +90,8 @@ async def run_worker(redis: "Redis", settings: "Settings") -> None:
                 continue
             _, raw_payload = result
             job = AnalysisJob.model_validate_json(raw_payload)
-            await process_job(job, settings)
+            providers = build_default_providers(settings) or None
+            await process_job(job, settings, enrichment_providers=providers)
         except asyncio.CancelledError:
             logger.info("Worker cancelled — shutting down")
             break

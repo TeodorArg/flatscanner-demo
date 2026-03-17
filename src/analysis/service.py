@@ -12,11 +12,15 @@ from __future__ import annotations
 
 import json
 import logging
+from typing import TYPE_CHECKING
 
 from src.analysis.openrouter_client import OpenRouterClient, OpenRouterError
 from src.analysis.result import AnalysisResult, PriceVerdict
 from src.app.config import Settings
 from src.domain.listing import NormalizedListing
+
+if TYPE_CHECKING:
+    from src.enrichment.runner import EnrichmentOutcome
 
 logger = logging.getLogger(__name__)
 
@@ -40,12 +44,24 @@ _JSON_SCHEMA_HINT = """\
 }"""
 
 
-def build_prompt(listing: NormalizedListing) -> str:
+def build_prompt(
+    listing: NormalizedListing,
+    enrichment: "EnrichmentOutcome | None" = None,
+) -> str:
     """Return a user-turn prompt for the given listing.
 
     Includes all available structured fields so the model has maximum
     context.  Description is capped at 600 characters to control token
     cost.
+
+    Parameters
+    ----------
+    listing:
+        Normalized listing to analyse.
+    enrichment:
+        Optional enrichment outcome.  Successful provider results are
+        appended as a structured "Nearby context" section so the model
+        can factor in transport access and local amenities.
     """
     lines: list[str] = ["Analyse this rental listing.\n"]
 
@@ -94,6 +110,26 @@ def build_prompt(listing: NormalizedListing) -> str:
         if listing.host_is_superhost:
             host_line += " (Superhost)"
         lines.append(host_line)
+
+    if enrichment and enrichment.successes:
+        lines.append("\nNearby context (from enrichment):")
+        for result in enrichment.successes:
+            data = result.data or {}
+            if result.name == "transport":
+                count = data.get("count", 0)
+                parts = [f"{count} public transport stop(s) within 500 m"]
+                nearest = data.get("nearest_name")
+                if nearest:
+                    parts.append(f"nearest: {nearest!r}")
+                lines.append(f"  Transport: {', '.join(parts)}")
+            elif result.name == "nearby_places":
+                count = data.get("count", 0)
+                by_cat = data.get("by_category", {})
+                cat_str = ", ".join(f"{k}: {v}" for k, v in by_cat.items())
+                line = f"  Nearby places: {count} total within 500 m"
+                if cat_str:
+                    line += f" ({cat_str})"
+                lines.append(line)
 
     lines.append(f"\nRespond ONLY with JSON matching this schema:\n{_JSON_SCHEMA_HINT}")
 
@@ -214,13 +250,20 @@ class AnalysisService:
             model=settings.openrouter_model,
         )
 
-    async def analyse(self, listing: NormalizedListing) -> AnalysisResult:
+    async def analyse(
+        self,
+        listing: NormalizedListing,
+        enrichment: "EnrichmentOutcome | None" = None,
+    ) -> AnalysisResult:
         """Run AI analysis on *listing* and return a structured result.
 
         Parameters
         ----------
         listing:
             Provider-agnostic normalized listing data.
+        enrichment:
+            Optional enrichment outcome.  Successful provider results are
+            included in the prompt so the model can factor in nearby context.
 
         Returns
         -------
@@ -234,7 +277,7 @@ class AnalysisService:
             If the model's response cannot be parsed as a valid
             ``AnalysisResult``.
         """
-        prompt = build_prompt(listing)
+        prompt = build_prompt(listing, enrichment)
         messages = [
             {"role": "system", "content": _SYSTEM_PROMPT},
             {"role": "user", "content": prompt},

@@ -72,6 +72,9 @@ class Settings(BaseSettings):
     # actor version without changing application code.
     apify_airbnb_actor_id: str = "dtrungtin~airbnb-scraper"
 
+    # Geoapify – optional; enrichment is skipped gracefully when absent.
+    geoapify_api_key: str = ""
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:

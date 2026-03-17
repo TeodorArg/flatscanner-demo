@@ -78,7 +78,8 @@
 
 ## Follow-Up
 
-- [ ] Thread enrichment outcome data into analysis input once the first real enrichment providers are selected
-- [ ] Decide the first enrichment provider set for safety, transport, and nearby places
+- [x] Decide the first enrichment provider set for transport and nearby places (Geoapify Places API — transport and nearby-places providers; safety deferred)
+- [x] Thread enrichment outcome data into analysis input (`build_prompt` now accepts `EnrichmentOutcome`; processor passes it through)
 - [ ] Decide the long-term worker library choice on top of Redis
 - [ ] Define how price fairness will use comparables versus heuristic signals
+- [ ] Decide regional safety enrichment provider (deferred from MVP)
