@@ -52,6 +52,11 @@ class Settings(BaseSettings):
                     "openrouter_model must be set when app_env is not "
                     "'development' or 'testing'"
                 )
+            if not self.geoapify_api_key:
+                raise ValueError(
+                    "geoapify_api_key must be set when app_env is not "
+                    "'development' or 'testing'"
+                )
         return self
 
     # Database – asyncpg driver will be added when storage layer lands

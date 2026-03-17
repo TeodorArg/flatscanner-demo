@@ -612,6 +612,7 @@ class TestSettingsOpenRouterValidation:
             apify_api_token="apify",
             openrouter_api_key="or-key",
             openrouter_model="anthropic/claude-3-haiku",
+            geoapify_api_key="geo-key",
         )
         assert s.openrouter_api_key == "or-key"
         assert s.openrouter_model == "anthropic/claude-3-haiku"

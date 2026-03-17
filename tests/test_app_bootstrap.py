@@ -45,6 +45,7 @@ class TestSettings:
             telegram_webhook_secret="mysecret",
             apify_api_token="apify-tok",
             openrouter_api_key="or-key",
+            geoapify_api_key="geo-key",
         )
         assert s.telegram_webhook_secret == "mysecret"
 
@@ -113,6 +114,40 @@ class TestSettings:
         s = Settings(app_env="testing", apify_api_token="")
         assert s.apify_api_token == ""
 
+    def test_non_dev_env_without_geoapify_key_raises(self):
+        """geoapify_api_key must be set outside development/testing."""
+        with pytest.raises(Exception, match="geoapify_api_key"):
+            Settings(
+                app_env="production",
+                telegram_bot_token="tok",
+                telegram_webhook_secret="mysecret",
+                apify_api_token="apify-tok",
+                openrouter_api_key="or-key",
+                geoapify_api_key="",
+            )
+
+    def test_staging_without_geoapify_key_raises(self):
+        """Staging is also a non-dev env — geoapify key must be required."""
+        with pytest.raises(Exception, match="geoapify_api_key"):
+            Settings(
+                app_env="staging",
+                telegram_bot_token="tok",
+                telegram_webhook_secret="mysecret",
+                apify_api_token="apify-tok",
+                openrouter_api_key="or-key",
+                geoapify_api_key="",
+            )
+
+    def test_development_without_geoapify_key_allowed(self):
+        """Development env may omit the geoapify key."""
+        s = Settings(app_env="development", geoapify_api_key="")
+        assert s.geoapify_api_key == ""
+
+    def test_testing_without_geoapify_key_allowed(self):
+        """Testing env may omit the geoapify key."""
+        s = Settings(app_env="testing", geoapify_api_key="")
+        assert s.geoapify_api_key == ""
+
     def test_non_dev_env_with_both_required_fields_ok(self):
         """Production with all required credentials must not raise."""
         s = Settings(
@@ -121,6 +156,7 @@ class TestSettings:
             telegram_webhook_secret="real-secret",
             apify_api_token="real-apify-token",
             openrouter_api_key="real-or-key",
+            geoapify_api_key="real-geo-key",
         )
         assert s.telegram_bot_token == "real-token"
         assert s.telegram_webhook_secret == "real-secret"
@@ -134,6 +170,7 @@ class TestSettings:
             telegram_webhook_secret="required-in-prod",
             apify_api_token="required-in-prod-apify",
             openrouter_api_key="required-in-prod-or",
+            geoapify_api_key="required-in-prod-geo",
         )
         assert s.app_env == "production"
         assert s.debug is True
@@ -153,6 +190,7 @@ class TestSettings:
         monkeypatch.setenv("TELEGRAM_WEBHOOK_SECRET", "staging-secret")
         monkeypatch.setenv("APIFY_API_TOKEN", "staging-apify")
         monkeypatch.setenv("OPENROUTER_API_KEY", "staging-or")
+        monkeypatch.setenv("GEOAPIFY_API_KEY", "staging-geo")
         s = Settings()
         assert s.app_env == "staging"
         assert s.debug is True
@@ -200,6 +238,7 @@ class TestCreateAppFreshSettings:
         monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "required-token")
         monkeypatch.setenv("APIFY_API_TOKEN", "required-apify")
         monkeypatch.setenv("OPENROUTER_API_KEY", "required-or")
+        monkeypatch.setenv("GEOAPIFY_API_KEY", "required-geo")
         monkeypatch.setenv("APP_ENV", "first")
         app1 = create_app()
         monkeypatch.setenv("APP_ENV", "second")

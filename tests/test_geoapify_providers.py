@@ -380,6 +380,29 @@ class TestGeoapifyNearbyPlacesProviderSuccess:
         call_kwargs = mock_client.get.call_args.kwargs
         assert call_kwargs["params"]["apiKey"] == "places-key"
 
+    @pytest.mark.asyncio
+    async def test_classifies_by_known_category_regardless_of_position(self):
+        """Regression: known category not at categories[0] must still be classified."""
+        provider = GeoapifyNearbyPlacesProvider(api_key="key")
+        listing = _make_listing()
+        # The known category "commercial.supermarket" appears second; "building.retail"
+        # is first.  The provider must scan past the unknown top-level and classify
+        # the feature as "shops".
+        features = [
+            _place_feature(["building.retail", "commercial.supermarket"]),
+        ]
+        resp = _geoapify_response(features)
+
+        with patch("httpx.AsyncClient") as mock_cls:
+            mock_client = AsyncMock()
+            mock_client.get = AsyncMock(return_value=resp)
+            mock_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+
+            result = await provider.enrich(listing)
+
+        assert result["by_category"].get("shops") == 1
+
 
 # ---------------------------------------------------------------------------
 # GeoapifyNearbyPlacesProvider — API error

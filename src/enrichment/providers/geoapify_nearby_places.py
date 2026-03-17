@@ -92,9 +92,17 @@ class GeoapifyNearbyPlacesProvider:
         counts: Counter[str] = Counter()
         for feat in features:
             cats = feat.get("properties", {}).get("categories", [])
-            if cats:
-                top = cats[0].split(".")[0] if "." in cats[0] else cats[0]
-                label = _CATEGORY_LABELS.get(top, top)
+            label: str | None = None
+            for cat in cats:
+                top = cat.split(".")[0] if "." in cat else cat
+                if top in _CATEGORY_LABELS:
+                    label = _CATEGORY_LABELS[top]
+                    break
+            if label is None and cats:
+                # Fallback: use top-level of first category as-is
+                first = cats[0]
+                label = first.split(".")[0] if "." in first else first
+            if label is not None:
                 counts[label] += 1
 
         return {
