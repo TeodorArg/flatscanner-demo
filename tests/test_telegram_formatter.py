@@ -1,36 +1,14 @@
-"""Tests for the Telegram analysis message formatter.
-
-Covers:
-- Message structure: title, summary, strengths, risks, price sections
-- Verdict label wording for all PriceVerdict values
-- Empty strengths/risks list omission
-- Price section without explanation fallback
-- Message length guard and truncation notice
-"""
+"""Tests for the Telegram analysis message formatter."""
 
 from __future__ import annotations
 
-from decimal import Decimal
-
-import pytest
-
 from src.analysis.result import AnalysisResult, PriceVerdict
-from src.domain.listing import (
-    ListingLocation,
-    ListingProvider,
-    NormalizedListing,
-    PriceInfo,
-)
+from src.domain.listing import ListingProvider, NormalizedListing
 from src.telegram.formatter import (
     _TELEGRAM_MAX_CHARS,
     _TRUNCATION_SUFFIX,
     format_analysis_message,
 )
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 
 def _listing(**overrides) -> NormalizedListing:
@@ -56,11 +34,6 @@ def _result(**overrides) -> AnalysisResult:
     return AnalysisResult(**base)
 
 
-# ---------------------------------------------------------------------------
-# Structure tests
-# ---------------------------------------------------------------------------
-
-
 class TestMessageStructure:
     def test_title_appears_at_start(self):
         msg = format_analysis_message(_listing(), _result())
@@ -73,28 +46,22 @@ class TestMessageStructure:
     def test_strengths_section_present(self):
         msg = format_analysis_message(_listing(), _result())
         assert "Strengths:" in msg
-        assert "• Great location" in msg
-        assert "• Superhost" in msg
+        assert "- Great location" in msg
+        assert "- Superhost" in msg
 
     def test_risks_section_present(self):
         msg = format_analysis_message(_listing(), _result())
         assert "Risks:" in msg
-        assert "• Small space" in msg
-        assert "• Steep cleaning fee" in msg
+        assert "- Small space" in msg
+        assert "- Steep cleaning fee" in msg
 
     def test_price_section_with_explanation(self):
         msg = format_analysis_message(_listing(), _result())
-        assert "Price: Fair — Price is in line with similar studios." in msg
+        assert "Price: Fair - Price is in line with similar studios." in msg
 
     def test_sections_separated_by_blank_lines(self):
         msg = format_analysis_message(_listing(), _result())
-        # Double newline between every major section
         assert "\n\n" in msg
-
-
-# ---------------------------------------------------------------------------
-# Verdict wording
-# ---------------------------------------------------------------------------
 
 
 class TestVerdictWording:
@@ -121,11 +88,6 @@ class TestVerdictWording:
         assert "Price: Unknown" in msg
 
 
-# ---------------------------------------------------------------------------
-# Empty / fallback behaviour
-# ---------------------------------------------------------------------------
-
-
 class TestOmissionAndFallback:
     def test_empty_strengths_omits_section(self):
         msg = format_analysis_message(_listing(), _result(strengths=[]))
@@ -143,26 +105,22 @@ class TestOmissionAndFallback:
         assert "Risks:" not in msg
         assert "Price:" in msg
 
-    def test_no_price_explanation_omits_dash(self):
+    def test_no_price_explanation_omits_separator(self):
         msg = format_analysis_message(
             _listing(),
-            _result(price_explanation=""),
+            _result(price_explanation="", strengths=[], risks=[]),
         )
-        assert "Price: Fair" in msg
-        assert "—" not in msg
+        price_line = msg.splitlines()[-1]
+        assert price_line == "Price: Fair"
+        assert " - " not in price_line
 
     def test_single_strength_bullet(self):
         msg = format_analysis_message(_listing(), _result(strengths=["Only one"]))
-        assert "• Only one" in msg
+        assert "- Only one" in msg
 
     def test_single_risk_bullet(self):
         msg = format_analysis_message(_listing(), _result(risks=["Only risk"]))
-        assert "• Only risk" in msg
-
-
-# ---------------------------------------------------------------------------
-# Length guard
-# ---------------------------------------------------------------------------
+        assert "- Only risk" in msg
 
 
 class TestLengthGuard:
@@ -171,7 +129,6 @@ class TestLengthGuard:
         assert _TRUNCATION_SUFFIX not in msg
 
     def test_long_message_truncated_with_notice(self):
-        # Create a result with a summary long enough to exceed the limit
         long_summary = "x" * (_TELEGRAM_MAX_CHARS + 500)
         result = _result(summary=long_summary)
         msg = format_analysis_message(_listing(), result)
@@ -185,10 +142,6 @@ class TestLengthGuard:
         assert len(msg) == _TELEGRAM_MAX_CHARS
 
     def test_message_at_exact_limit_not_truncated(self):
-        # Build a message that is exactly _TELEGRAM_MAX_CHARS long
-        # by padding the summary so the full message hits the boundary.
-        base_msg = format_analysis_message(_listing(), _result(summary="S"))
-        # We just need a case where len == limit — test the guard boundary directly
         from src.telegram.formatter import _guard_length
 
         at_limit = "a" * _TELEGRAM_MAX_CHARS

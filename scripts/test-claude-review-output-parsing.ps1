@@ -64,7 +64,7 @@ foreach ($case in $cases) {
 }
 
 $preview = Get-ClaudeReviewOutputPreview -Text @('line one', 'line two')
-if ($preview -notmatch 'line one line two') {
+if ($preview -ne 'line one line two') {
     throw 'Preview should normalize string-array Claude output.'
 }
 

@@ -1,7 +1,7 @@
 """Telegram message formatter for listing analysis results.
 
 Accepts a NormalizedListing and AnalysisResult and returns a
-Telegram-safe plain-text message.  The output is intentionally
+Telegram-safe plain-text message. The output is intentionally
 short and deterministic so it stays within Telegram's 4096-character
 message limit.
 """
@@ -11,8 +11,9 @@ from __future__ import annotations
 from src.analysis.result import AnalysisResult, PriceVerdict
 from src.domain.listing import NormalizedListing
 
-# Telegram hard limit for a single message is 4096 UTF-16 code units.
-# We use a conservative byte budget to stay safely below it.
+# Telegram hard limit for a single message is 4096 characters.
+# This formatter keeps output short and ASCII-friendly, so a simple character
+# count is a practical guard against oversize messages.
 _TELEGRAM_MAX_CHARS = 4096
 _TRUNCATION_SUFFIX = "\n\n[Message truncated]"
 
@@ -43,26 +44,20 @@ def format_analysis_message(
     """
     parts: list[str] = []
 
-    # Header
     parts.append(listing.title)
-
-    # Summary
     parts.append(result.summary)
 
-    # Strengths — omit section entirely when there are none
     if result.strengths:
-        lines = ["Strengths:"] + [f"• {s}" for s in result.strengths]
+        lines = ["Strengths:"] + [f"- {strength}" for strength in result.strengths]
         parts.append("\n".join(lines))
 
-    # Risks — omit section entirely when there are none
     if result.risks:
-        lines = ["Risks:"] + [f"• {r}" for r in result.risks]
+        lines = ["Risks:"] + [f"- {risk}" for risk in result.risks]
         parts.append("\n".join(lines))
 
-    # Price fairness
     verdict_label = _VERDICT_LABEL.get(result.price_verdict, "Unknown")
     if result.price_explanation:
-        price_line = f"Price: {verdict_label} — {result.price_explanation}"
+        price_line = f"Price: {verdict_label} - {result.price_explanation}"
     else:
         price_line = f"Price: {verdict_label}"
     parts.append(price_line)
