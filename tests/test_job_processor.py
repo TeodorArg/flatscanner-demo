@@ -392,8 +392,6 @@ class TestDequeueAnalysisJob:
         redis = AsyncMock()
         redis.brpop.return_value = None
         await dequeue_analysis_job(redis)
-        _, kwargs = redis.brpop.call_args
-        args = redis.brpop.call_args[0]
         # timeout may be positional or keyword
         call_kwargs = redis.brpop.call_args[1]
         call_args = redis.brpop.call_args[0]
@@ -593,3 +591,62 @@ class TestRunWorker:
             await run_worker(redis, settings)
 
         mock_requeue.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_malformed_payload_is_dropped_not_requeued(self):
+        """A payload that fails schema validation is dropped, not requeued."""
+        settings = _make_settings()
+        redis = AsyncMock()
+        bad_payload = b'{"not": "a valid job"}'
+
+        brpop_responses = iter([(QUEUE_KEY, bad_payload)])
+
+        async def brpop_side_effect(*args, **kwargs):
+            try:
+                return next(brpop_responses)
+            except StopIteration:
+                raise asyncio.CancelledError
+
+        redis.brpop.side_effect = brpop_side_effect
+
+        with patch(
+            "src.jobs.worker.requeue_raw_payload", new_callable=AsyncMock
+        ) as mock_requeue:
+            await run_worker(redis, settings)
+
+        mock_requeue.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_requeue_failure_does_not_crash_worker_loop(self):
+        """If requeue_raw_payload raises, the worker logs the error and keeps running."""
+        settings = _make_settings()
+        redis = AsyncMock()
+        job = _make_job()
+
+        brpop_responses = iter([(QUEUE_KEY, job.model_dump_json())])
+
+        async def brpop_side_effect(*args, **kwargs):
+            try:
+                return next(brpop_responses)
+            except StopIteration:
+                raise asyncio.CancelledError
+
+        redis.brpop.side_effect = brpop_side_effect
+
+        async def failing_requeue(*args, **kwargs):
+            raise OSError("Redis connection refused")
+
+        with (
+            patch(
+                "src.jobs.worker.process_job",
+                side_effect=RuntimeError("transient error"),
+            ),
+            patch(
+                "src.jobs.worker.requeue_raw_payload",
+                side_effect=failing_requeue,
+            ),
+        ):
+            # Must not raise — worker should log and continue to the next iteration
+            await run_worker(redis, settings)
+
+        assert redis.brpop.await_count == 2

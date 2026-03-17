@@ -21,6 +21,8 @@ import asyncio
 import logging
 from typing import TYPE_CHECKING
 
+from pydantic import ValidationError
+
 from src.domain.listing import AnalysisJob
 from src.jobs.processor import UnsupportedProviderError, process_job
 from src.jobs.queue import QUEUE_KEY, dequeue_analysis_job, requeue_raw_payload
@@ -92,7 +94,18 @@ async def run_worker(redis: "Redis", settings: "Settings") -> None:
             break
         except UnsupportedProviderError as exc:
             logger.error("Unsupported provider, dropping job: %s", exc)
+        except ValidationError as exc:
+            logger.error(
+                "Malformed job payload — dropping (not retryable): %s", exc
+            )
         except Exception as exc:
             logger.exception("Unexpected error processing job: %s", exc)
             if raw_payload is not None:
-                await requeue_raw_payload(redis, raw_payload)
+                try:
+                    await requeue_raw_payload(redis, raw_payload)
+                except Exception as requeue_exc:
+                    logger.error(
+                        "Failed to requeue job payload after processing error"
+                        " — job may be lost: %s",
+                        requeue_exc,
+                    )
