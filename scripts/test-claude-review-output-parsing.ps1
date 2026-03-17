@@ -28,6 +28,18 @@ $cases = @(
         ExpectedNotes = 1
     },
     @{
+        Name = 'nested review object is unwrapped'
+        RawText = '{"review":{"verdict":"comment","summary":"ok","findings":[]}}'
+        ExpectedVerdict = 'comment'
+        ExpectedNotes = 1
+    },
+    @{
+        Name = 'nested review object with alias is normalized'
+        RawText = '{"review":{"review_action":"approve","summary":"ok","findings":[]}}'
+        ExpectedVerdict = 'approve'
+        ExpectedNotes = 2
+    },
+    @{
         Name = 'fenced json with action is normalized'
         RawText = @'
 ```json
