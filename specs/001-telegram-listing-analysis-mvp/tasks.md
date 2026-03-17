@@ -51,7 +51,7 @@
   - [x] Add AnalysisService (prompt building, orchestration, JSON response parsing)
   - [x] Require openrouter_api_key outside development/testing environments
   - [x] Add focused tests for client, parser, prompt builder, and service orchestration
-- [ ] Format Telegram output for summary, risks, and price fairness
+- [x] Format Telegram output for summary, risks, and price fairness
 
 ## Validation
 
@@ -63,7 +63,7 @@
 - [x] Add regression test that /rooms/123/photos extra-segment URLs are rejected (PR-5-fix-12)
 - [x] Add negative tests for bogus ccTLD hosts and non-web schemes (PR-5-fix-13)
 - [x] Add tests for normalized listing mapping
-- [ ] Add tests for Telegram output formatting
+- [x] Add tests for Telegram output formatting
 - [ ] Add orchestration tests for partial enrichment scenarios
 
 ## Follow-Up
