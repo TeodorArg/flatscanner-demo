@@ -36,6 +36,18 @@ $cases = @(
 '@
         ExpectedVerdict = 'approve'
         ExpectedNotes = 1
+    },
+    @{
+        Name = 'string array output is joined before parsing'
+        RawText = @(
+            '{',
+            '  "review_action": "comment",',
+            '  "summary": "joined",',
+            '  "findings": []',
+            '}'
+        )
+        ExpectedVerdict = 'comment'
+        ExpectedNotes = 1
     }
 )
 
@@ -49,6 +61,11 @@ foreach ($case in $cases) {
     if (@($parsed.NormalizationNotes).Count -ne $case.ExpectedNotes) {
         throw "Case failed: $($case.Name). Expected $($case.ExpectedNotes) normalization notes but got $(@($parsed.NormalizationNotes).Count)."
     }
+}
+
+$preview = Get-ClaudeReviewOutputPreview -Text @('line one', 'line two')
+if ($preview -notmatch 'line one line two') {
+    throw 'Preview should normalize string-array Claude output.'
 }
 
 $invalidFailed = $false

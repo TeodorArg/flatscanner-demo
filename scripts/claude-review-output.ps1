@@ -1,11 +1,22 @@
 function Get-ClaudeReviewOutputPreview {
     param(
         [Parameter(Mandatory = $true)]
-        [AllowEmptyString()]
-        [string]$Text,
+        [AllowNull()]
+        $Text,
 
         [int]$MaxLength = 500
     )
+
+    if ($null -eq $Text) {
+        return ''
+    }
+
+    if ($Text -is [System.Array]) {
+        $Text = ($Text | ForEach-Object { [string]$_ }) -join [Environment]::NewLine
+    }
+    else {
+        $Text = [string]$Text
+    }
 
     if ([string]::IsNullOrEmpty($Text)) {
         return ''
@@ -22,9 +33,20 @@ function Get-ClaudeReviewOutputPreview {
 function ConvertFrom-ClaudeReviewOutput {
     param(
         [Parameter(Mandatory = $true)]
-        [AllowEmptyString()]
-        [string]$RawText
+        [AllowNull()]
+        $RawText
     )
+
+    if ($null -eq $RawText) {
+        throw 'Claude review output was empty.'
+    }
+
+    if ($RawText -is [System.Array]) {
+        $RawText = ($RawText | ForEach-Object { [string]$_ }) -join [Environment]::NewLine
+    }
+    else {
+        $RawText = [string]$RawText
+    }
 
     $resultText = $RawText.Trim()
     if (-not $resultText) {

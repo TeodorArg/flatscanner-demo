@@ -180,6 +180,13 @@ $diffBlock
         throw "Claude CLI review failed with exit code $claudeExitCode."
     }
 
+    if ($resultText -is [System.Array]) {
+        $resultText = ($resultText | ForEach-Object { [string]$_ }) -join [Environment]::NewLine
+    }
+    else {
+        $resultText = [string]$resultText
+    }
+
     Set-Content -Path $script:rawOutputPath -Value $resultText
     Write-Diagnostic "Raw Claude output saved to $script:rawOutputPath"
     Write-Diagnostic ("Claude output preview: " + (Get-ClaudeReviewOutputPreview -Text $resultText))
