@@ -78,6 +78,7 @@
 
 ## Follow-Up
 
+- [ ] Thread enrichment outcome data into analysis input once the first real enrichment providers are selected
 - [ ] Decide the first enrichment provider set for safety, transport, and nearby places
 - [ ] Decide the long-term worker library choice on top of Redis
 - [ ] Define how price fairness will use comparables versus heuristic signals
