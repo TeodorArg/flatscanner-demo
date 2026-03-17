@@ -80,6 +80,8 @@
 
 - [x] Decide the first enrichment provider set for transport and nearby places (Geoapify Places API — transport and nearby-places providers; safety deferred)
 - [x] Thread enrichment outcome data into analysis input (`build_prompt` now accepts `EnrichmentOutcome`; processor passes it through)
+- [x] Require geoapify_api_key outside development/testing environments (mirrors telegram/apify/openrouter treatment)
+- [x] Fix nearby-places provider to scan all categories per feature instead of relying on categories[0] ordering; add regression test
 - [ ] Decide the long-term worker library choice on top of Redis
 - [ ] Define how price fairness will use comparables versus heuristic signals
 - [ ] Decide regional safety enrichment provider (deferred from MVP)
