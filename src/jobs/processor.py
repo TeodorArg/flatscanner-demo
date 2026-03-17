@@ -23,6 +23,7 @@ import httpx
 from src.adapters.registry import resolve_adapter
 from src.analysis.service import AnalysisService
 from src.domain.listing import AnalysisJob
+from src.enrichment.runner import EnrichmentProvider, run_enrichments
 from src.telegram.formatter import format_analysis_message
 from src.telegram.sender import send_message
 
@@ -44,6 +45,7 @@ async def process_job(
     adapter: "ListingAdapter | None" = None,
     analysis_service: AnalysisService | None = None,
     http_client: httpx.AsyncClient | None = None,
+    enrichment_providers: list[EnrichmentProvider] | None = None,
 ) -> None:
     """Process one queued analysis job end-to-end.
 
@@ -63,6 +65,10 @@ async def process_job(
     http_client:
         Optional ``httpx.AsyncClient`` injected into ``send_message`` for
         testing without real network calls.
+    enrichment_providers:
+        Optional list of enrichment providers to run after the listing is
+        fetched.  Failures are recorded but never propagate; an empty list
+        or ``None`` skips enrichment entirely.
 
     Raises
     ------
@@ -93,6 +99,16 @@ async def process_job(
     # --- 2. Fetch listing ----------------------------------------------------
     listing = await adapter.fetch(job.source_url)
     logger.debug("Fetched listing %s for job %s", listing.id, job.id)
+
+    # --- 2b. Enrich (optional, tolerant) -------------------------------------
+    if enrichment_providers:
+        enrichment_outcome = await run_enrichments(listing, enrichment_providers)
+        if enrichment_outcome.all_failed:
+            logger.warning(
+                "All enrichments failed for listing %s (job %s); continuing without enrichment data",
+                listing.id,
+                job.id,
+            )
 
     # --- 3. Analyse ----------------------------------------------------------
     service = analysis_service or AnalysisService(settings)

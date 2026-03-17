@@ -74,10 +74,11 @@
 - [x] Add tests for Telegram output formatting
 - [x] Add end-to-end processor tests: success path, unsupported provider, adapter failure, OpenRouter failure, send failure
 - [x] Add dequeue helper tests and worker loop tests (process_once, run_worker)
-- [ ] Add orchestration tests for partial enrichment scenarios
+- [x] Add orchestration tests for partial enrichment scenarios
 
 ## Follow-Up
 
+- [ ] Thread enrichment outcome data into analysis input once the first real enrichment providers are selected
 - [ ] Decide the first enrichment provider set for safety, transport, and nearby places
 - [ ] Decide the long-term worker library choice on top of Redis
 - [ ] Define how price fairness will use comparables versus heuristic signals
