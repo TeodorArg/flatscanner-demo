@@ -73,9 +73,9 @@ class Settings(BaseSettings):
 
     # Apify
     apify_api_token: str = ""
-    # Actor used to scrape Airbnb listings.  Override to switch to a different
-    # actor version without changing application code.
-    apify_airbnb_actor_id: str = "dtrungtin~airbnb-scraper"
+    # Actor used to scrape Airbnb listing detail URLs. Override to switch to a
+    # different compatible actor without changing application code.
+    apify_airbnb_actor_id: str = "curious_coder~airbnb-scraper"
 
     # Geoapify
     # Required outside development/testing because transport and nearby-places

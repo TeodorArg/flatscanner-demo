@@ -19,10 +19,14 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from typing import TYPE_CHECKING
 
+import httpx
 from pydantic import ValidationError
 
+from src.adapters.apify_client import ApifyError
+from src.analysis.openrouter_client import OpenRouterError
 from src.domain.listing import AnalysisJob
 from src.enrichment.providers import build_default_providers
 from src.jobs.processor import UnsupportedProviderError, process_job
@@ -34,6 +38,37 @@ if TYPE_CHECKING:
     from src.app.config import Settings
 
 logger = logging.getLogger(__name__)
+_STATUS_CODE_RE = re.compile(r"\bstatus (\d{3})\b")
+
+
+def _extract_status_code(exc: Exception) -> int | None:
+    """Best-effort extraction of an upstream HTTP status code from *exc*."""
+    if isinstance(exc, httpx.HTTPStatusError):
+        return exc.response.status_code
+
+    if isinstance(exc, (ApifyError, OpenRouterError)):
+        match = _STATUS_CODE_RE.search(str(exc))
+        if match:
+            try:
+                return int(match.group(1))
+            except ValueError:
+                return None
+    return None
+
+
+def _is_retryable_error(exc: Exception) -> bool:
+    """Return True when *exc* is worth requeueing."""
+    if isinstance(exc, (UnsupportedProviderError, ValidationError)):
+        return False
+
+    status_code = _extract_status_code(exc)
+    if status_code is not None:
+        return status_code == 429 or status_code >= 500
+
+    if isinstance(exc, ValueError):
+        return False
+
+    return True
 
 
 async def process_once(redis: "Redis", settings: "Settings") -> bool:
@@ -102,8 +137,13 @@ async def run_worker(redis: "Redis", settings: "Settings") -> None:
                 "Malformed job payload - dropping (not retryable): %s", exc
             )
         except Exception as exc:
-            logger.exception("Unexpected error processing job: %s", exc)
-            if raw_payload is not None:
+            retryable = _is_retryable_error(exc)
+            logger.exception(
+                "Unexpected error processing job (retryable=%s): %s",
+                retryable,
+                exc,
+            )
+            if retryable and raw_payload is not None:
                 try:
                     await requeue_raw_payload(redis, raw_payload)
                 except Exception as requeue_exc:

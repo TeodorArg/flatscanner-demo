@@ -85,7 +85,7 @@ class ApifyClient:
         async with httpx.AsyncClient(timeout=self._timeout) as client:
             response = await client.post(url, headers=headers, json=input_data)
 
-        if response.status_code != 200:
+        if not (200 <= response.status_code < 300):
             raise ApifyError(
                 f"Apify actor run failed with status {response.status_code}: "
                 f"{response.text[:400]}"

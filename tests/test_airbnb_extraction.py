@@ -14,7 +14,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.adapters.airbnb import AirbnbAdapter, _normalize
+from src.adapters.airbnb import AirbnbAdapter, _build_actor_input, _normalize
 from src.adapters.apify_client import ApifyClient, ApifyError
 from src.app.config import Settings
 from src.domain.listing import ListingProvider, NormalizedListing
@@ -70,6 +70,34 @@ def _full_airbnb_payload(listing_id: str = "12345") -> dict[str, Any]:
     }
 
 
+def _curious_coder_payload(listing_id: str = "33166539") -> dict[str, Any]:
+    """Return a listing item in the `curious_coder` actor schema."""
+    return {
+        "id": listing_id,
+        "inputUrl": f"https://www.airbnb.com/rooms/{listing_id}",
+        "title": "Sunny apartment in Buenos Aires",
+        "description": "Bright apartment close to the subway.",
+        "location": {
+            "latitude": -34.62743,
+            "longitude": -58.42722,
+            "address": "Parque Chacabuco, Buenos Aires, Argentina",
+            "description": "Parque Chacabuco",
+        },
+        "maxGuestCapacity": 3,
+        "amenities": [
+            {"title": "Wifi", "available": True},
+            {"title": "Kitchen", "available": True},
+            {"title": "Hot water", "available": False},
+        ],
+        "starRating": 5,
+        "reviewsCount": 3,
+        "hostDetails": {
+            "name": "Juan Andres",
+            "isSuperhost": True,
+        },
+    }
+
+
 # ---------------------------------------------------------------------------
 # ApifyClient
 # ---------------------------------------------------------------------------
@@ -91,6 +119,24 @@ class TestApifyClientSuccess:
 
             client = ApifyClient(api_token="tok", actor_id="usr~act")
             result = await client.run_and_get_items({"startUrls": []})
+
+        assert result == items
+
+    @pytest.mark.asyncio
+    async def test_returns_items_on_201(self):
+        items = [{"id": "1", "name": "Listing A"}]
+        mock_response = MagicMock()
+        mock_response.status_code = 201
+        mock_response.json.return_value = items
+
+        with patch("httpx.AsyncClient") as mock_cls:
+            mock_client = AsyncMock()
+            mock_client.post = AsyncMock(return_value=mock_response)
+            mock_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+
+            client = ApifyClient(api_token="tok", actor_id="usr~act")
+            result = await client.run_and_get_items({"urls": ["https://www.airbnb.com/rooms/1"]})
 
         assert result == items
 
@@ -218,6 +264,19 @@ class TestAirbnbAdapterFetch:
 
         call_input = mock_run.call_args.args[0]
         assert call_input["startUrls"][0]["url"] == self._URL
+
+    @pytest.mark.asyncio
+    async def test_fetch_uses_actor_specific_input_for_curious_coder(self):
+        settings = _make_settings(apify_airbnb_actor_id="curious_coder~airbnb-scraper")
+        adapter = AirbnbAdapter(settings=settings)
+
+        with patch.object(ApifyClient, "run_and_get_items", new_callable=AsyncMock) as mock_run:
+            mock_run.return_value = [_curious_coder_payload()]
+            await adapter.fetch(self._URL)
+
+        call_input = mock_run.call_args.args[0]
+        assert call_input["urls"] == [self._URL]
+        assert call_input["scrapeReviews"] is True
 
     @pytest.mark.asyncio
     async def test_fetch_raises_value_error_on_empty_dataset(self):
@@ -362,6 +421,18 @@ class TestNormalize:
         listing = _normalize(self._URL, payload)
         assert listing.max_guests == 4
 
+    def test_curious_coder_payload_maps_expected_fields(self):
+        listing = _normalize(self._URL, _curious_coder_payload())
+        assert listing.title == "Sunny apartment in Buenos Aires"
+        assert listing.location.latitude == pytest.approx(-34.62743)
+        assert listing.location.longitude == pytest.approx(-58.42722)
+        assert listing.location.address == "Parque Chacabuco, Buenos Aires, Argentina"
+        assert listing.location.neighbourhood == "Parque Chacabuco"
+        assert listing.max_guests == 3
+        assert listing.amenities == ["Wifi", "Kitchen"]
+        assert listing.host_name == "Juan Andres"
+        assert listing.host_is_superhost is True
+
     def test_max_guests_field_accepted(self):
         payload = {"name": "Test", "maxGuests": 6}
         listing = _normalize(self._URL, payload)
@@ -408,3 +479,23 @@ class TestNormalize:
         payload = {"name": "Test", "starRating": 0.0, "rating": 4.5}
         listing = _normalize(self._URL, payload)
         assert listing.rating == pytest.approx(0.0)
+
+
+class TestBuildActorInput:
+    def test_default_actor_uses_start_urls_contract(self):
+        payload = _build_actor_input(
+            "https://www.airbnb.com/rooms/12345",
+            "other~actor",
+        )
+        assert payload == {
+            "startUrls": [{"url": "https://www.airbnb.com/rooms/12345"}],
+            "maxListings": 1,
+        }
+
+    def test_curious_coder_actor_uses_urls_contract(self):
+        payload = _build_actor_input(
+            "https://www.airbnb.com/rooms/12345",
+            "curious_coder~airbnb-scraper",
+        )
+        assert payload["urls"] == ["https://www.airbnb.com/rooms/12345"]
+        assert payload["scrapeReviews"] is True

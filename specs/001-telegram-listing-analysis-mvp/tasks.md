@@ -44,6 +44,7 @@
   - [x] Switch Apify client to header-based auth (Authorization: Bearer) instead of query-param token (pr-15-followup-apify-config)
   - [x] Document default Airbnb actor dependency and token requirement in backend docs (pr-15-followup-apify-config)
   - [x] Remove wraps=ApifyClient from test_fetch_uses_settings_actor_id to prevent real-client path exercise (pr-15-followup-apify-test-mock)
+  - [x] Switch the default actor contract to a listing-detail-compatible Airbnb actor and normalize its payload shape for MVP deployment
 - [x] Add background job orchestration using Redis
 - [x] Add initial AI analysis flow through OpenRouter
   - [x] Add AnalysisResult schema (summary, strengths, risks, price verdict/explanation)
@@ -60,6 +61,7 @@
 - [x] Add worker loop (`src/jobs/worker.py`)
   - [x] `process_once` dequeues and processes one job; returns bool
   - [x] `run_worker` loops until cancelled; logs and continues on per-job errors
+  - [x] Drop permanent 4xx-style processing failures instead of requeueing them forever during MVP runtime
 
 ## Validation
 

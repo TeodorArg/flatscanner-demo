@@ -75,6 +75,9 @@ _AIRBNB_SUPPORTED_TLDS: frozenset[str] = frozenset({
 # Requires exactly /rooms/<id> with an optional trailing slash.
 # Rejects bare /rooms/ and any extra path segments like /rooms/123/photos.
 _AIRBNB_LISTING_PATH_RE = re.compile(r"^/rooms/([^/?#\s]+)/?$", re.IGNORECASE)
+_CURIOUS_CODER_ACTOR_IDS: frozenset[str] = frozenset({
+    "curious_coder~airbnb-scraper",
+})
 
 
 def _is_airbnb_host(host: str) -> bool:
@@ -120,6 +123,33 @@ def _first_non_none(mapping: dict[str, Any], *keys: str) -> Any:
     return None
 
 
+def _first_present(*values: Any) -> Any:
+    """Return the first value that is not ``None``."""
+    for value in values:
+        if value is not None:
+            return value
+    return None
+
+
+def _build_actor_input(url: str, actor_id: str) -> dict[str, Any]:
+    """Return the actor-specific Apify input payload for *url*.
+
+    Different public Airbnb actors expect different input contracts. The
+    rollout actor for this MVP (`curious_coder~airbnb-scraper`) accepts a
+    `urls` array rather than `startUrls`.
+    """
+    if actor_id in _CURIOUS_CODER_ACTOR_IDS:
+        return {
+            "urls": [url],
+            "currency": "USD",
+            "scrapeAvailability": False,
+            "scrapeDetail": False,
+            "scrapeReviews": True,
+        }
+
+    return {"startUrls": [{"url": url}], "maxListings": 1}
+
+
 def _normalize(url: str, raw: dict[str, Any]) -> NormalizedListing:
     """Map a raw Apify Airbnb actor item to a ``NormalizedListing``.
 
@@ -156,8 +186,21 @@ def _normalize(url: str, raw: dict[str, Any]) -> NormalizedListing:
                 )
             except Exception:
                 pass
+    if price is None and raw.get("costPerNight") is not None:
+        try:
+            price = PriceInfo(
+                amount=Decimal(str(raw["costPerNight"])),
+                currency=str(raw.get("currency") or "USD"),
+                period="night",
+            )
+        except Exception:
+            pass
 
     # --- location ------------------------------------------------------------
+    raw_location = raw.get("location")
+    if not isinstance(raw_location, dict):
+        raw_location = {}
+
     def _float_or_none(val: Any) -> float | None:
         try:
             return float(val) if val is not None else None
@@ -167,19 +210,36 @@ def _normalize(url: str, raw: dict[str, Any]) -> NormalizedListing:
     # Use _first_non_none so that zero-valued coordinates (e.g. lat=0, lng=0)
     # are preserved rather than treated as falsy and silently dropped.
     location = ListingLocation(
-        latitude=_float_or_none(_first_non_none(raw, "lat", "latitude")),
-        longitude=_float_or_none(_first_non_none(raw, "lng", "longitude")),
-        address=raw.get("address") or None,
+        latitude=_float_or_none(
+            _first_present(
+                _first_non_none(raw, "lat", "latitude"),
+                raw_location.get("latitude"),
+            )
+        ),
+        longitude=_float_or_none(
+            _first_present(
+                _first_non_none(raw, "lng", "longitude"),
+                raw_location.get("longitude"),
+            )
+        ),
+        address=raw.get("address") or raw_location.get("address") or None,
         city=raw.get("city") or None,
         country=raw.get("country") or raw.get("countryCode") or None,
-        neighbourhood=raw.get("neighbourhood") or None,
+        neighbourhood=raw.get("neighbourhood") or raw_location.get("description") or None,
     )
 
     # --- amenities -----------------------------------------------------------
     raw_amenities = raw.get("amenities")
     amenities: list[str] = []
     if isinstance(raw_amenities, list):
-        amenities = [str(a) for a in raw_amenities if a]
+        if raw_amenities and isinstance(raw_amenities[0], dict):
+            amenities = [
+                str(item.get("title"))
+                for item in raw_amenities
+                if isinstance(item, dict) and item.get("available") is not False and item.get("title")
+            ]
+        else:
+            amenities = [str(a) for a in raw_amenities if a]
 
     # --- host ----------------------------------------------------------------
     host = raw.get("host")
@@ -188,6 +248,12 @@ def _normalize(url: str, raw: dict[str, Any]) -> NormalizedListing:
     if isinstance(host, dict):
         host_name = host.get("name") or None
         raw_superhost = host.get("isSuperHost")
+        if raw_superhost is not None:
+            host_is_superhost = bool(raw_superhost)
+    host_details = raw.get("hostDetails")
+    if isinstance(host_details, dict):
+        host_name = host_name or host_details.get("name") or None
+        raw_superhost = host_details.get("isSuperhost")
         if raw_superhost is not None:
             host_is_superhost = bool(raw_superhost)
 
@@ -217,7 +283,7 @@ def _normalize(url: str, raw: dict[str, Any]) -> NormalizedListing:
         # _first_non_none preserves zero (e.g. personCapacity=0 on a listing
         # pending capacity configuration) instead of falling through.
         max_guests=_int_or_none(
-            _first_non_none(raw, "personCapacity", "maxGuests")
+            _first_non_none(raw, "personCapacity", "maxGuests", "maxGuestCapacity")
         ),
         amenities=amenities,
         rating=_rating_or_none(_first_non_none(raw, "starRating", "rating")),
@@ -308,7 +374,7 @@ class AirbnbAdapter(ListingAdapter):
             actor_id=settings.apify_airbnb_actor_id,
         )
         items = await client.run_and_get_items(
-            {"startUrls": [{"url": url}], "maxListings": 1}
+            _build_actor_input(url, settings.apify_airbnb_actor_id)
         )
         if not items:
             raise ValueError(

@@ -9,6 +9,7 @@ This runbook covers the first VPS deployment path for `flatscanner`.
 - `flatscanner-redis` runs in Docker for the MVP queue
 - the existing public nginx container keeps owning ports `80/443`
 - nginx routes `flatscanner.godmodetools.com` to `flatscanner-web:8000` over a shared Docker network
+- for first MVP trials, `web` and `worker` bind-mount `src/` so the live containers always use the current checkout on the VPS
 
 ## Files
 
@@ -56,3 +57,5 @@ Optional:
 - Redis is mandatory for MVP because job orchestration depends on it.
 - The server already has an nginx container on `80/443`, so `flatscanner` must not bind those ports directly.
 - On the current VPS, the shared ingress network is `app_app_network`.
+- The default Airbnb actor is `curious_coder~airbnb-scraper` because it accepts listing detail URLs; actors that only support search-result URLs will fail for the Telegram MVP flow.
+- If `flatscanner.godmodetools.com` is proxied through Cloudflare, webhook POST requests may be blocked by Cloudflare WAF/bot rules. For the first live MVP test, prefer DNS-only mode on that subdomain or add an explicit allow rule for Telegram webhook traffic.

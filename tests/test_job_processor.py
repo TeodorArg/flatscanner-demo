@@ -10,6 +10,7 @@ import httpx
 import pytest
 
 from src.analysis.openrouter_client import OpenRouterError
+from src.adapters.apify_client import ApifyError
 from src.analysis.result import AnalysisResult, PriceVerdict
 from src.analysis.service import AnalysisService
 from src.domain.listing import (
@@ -651,3 +652,87 @@ class TestRunWorker:
             await run_worker(redis, settings)
 
         assert redis.brpop.await_count == 2
+
+    @pytest.mark.asyncio
+    async def test_http_400_send_failure_is_dropped_not_requeued(self):
+        settings = _make_settings()
+        redis = AsyncMock()
+        job = _make_job()
+
+        brpop_responses = iter([(QUEUE_KEY, job.model_dump_json())])
+
+        async def brpop_side_effect(*args, **kwargs):
+            try:
+                return next(brpop_responses)
+            except StopIteration:
+                raise asyncio.CancelledError
+
+        redis.brpop.side_effect = brpop_side_effect
+
+        error = httpx.HTTPStatusError(
+            "400 Bad Request",
+            request=MagicMock(),
+            response=MagicMock(status_code=400),
+        )
+
+        with (
+            patch("src.jobs.worker.process_job", side_effect=error),
+            patch("src.jobs.worker.requeue_raw_payload", new_callable=AsyncMock) as mock_requeue,
+        ):
+            await run_worker(redis, settings)
+
+        mock_requeue.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_apify_400_is_dropped_not_requeued(self):
+        settings = _make_settings()
+        redis = AsyncMock()
+        job = _make_job()
+
+        brpop_responses = iter([(QUEUE_KEY, job.model_dump_json())])
+
+        async def brpop_side_effect(*args, **kwargs):
+            try:
+                return next(brpop_responses)
+            except StopIteration:
+                raise asyncio.CancelledError
+
+        redis.brpop.side_effect = brpop_side_effect
+
+        with (
+            patch(
+                "src.jobs.worker.process_job",
+                side_effect=ApifyError("Apify actor run failed with status 400: invalid-input"),
+            ),
+            patch("src.jobs.worker.requeue_raw_payload", new_callable=AsyncMock) as mock_requeue,
+        ):
+            await run_worker(redis, settings)
+
+        mock_requeue.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_openrouter_500_is_requeued(self):
+        settings = _make_settings()
+        redis = AsyncMock()
+        job = _make_job()
+
+        brpop_responses = iter([(QUEUE_KEY, job.model_dump_json())])
+
+        async def brpop_side_effect(*args, **kwargs):
+            try:
+                return next(brpop_responses)
+            except StopIteration:
+                raise asyncio.CancelledError
+
+        redis.brpop.side_effect = brpop_side_effect
+
+        with (
+            patch(
+                "src.jobs.worker.process_job",
+                side_effect=OpenRouterError("OpenRouter request failed with status 500: upstream timeout"),
+            ),
+            patch("src.jobs.worker.requeue_raw_payload", new_callable=AsyncMock) as mock_requeue,
+        ):
+            await run_worker(redis, settings)
+
+        mock_requeue.assert_awaited_once()
