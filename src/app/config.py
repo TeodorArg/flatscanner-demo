@@ -77,7 +77,9 @@ class Settings(BaseSettings):
     # actor version without changing application code.
     apify_airbnb_actor_id: str = "dtrungtin~airbnb-scraper"
 
-    # Geoapify – optional; enrichment is skipped gracefully when absent.
+    # Geoapify
+    # Required outside development/testing because transport and nearby-places
+    # enrichment are part of the default MVP analysis pipeline.
     geoapify_api_key: str = ""
 
 
