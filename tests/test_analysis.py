@@ -255,6 +255,22 @@ class TestOpenRouterClientErrors:
             with pytest.raises(OpenRouterError, match="timed out"):
                 await client.chat([])
 
+    @pytest.mark.asyncio
+    async def test_connect_error_raises_openrouter_error(self):
+        import httpx as _httpx
+
+        with patch("httpx.AsyncClient") as mock_cls:
+            mock_client = AsyncMock()
+            mock_client.post = AsyncMock(
+                side_effect=_httpx.ConnectError("Connection refused")
+            )
+            mock_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+
+            client = OpenRouterClient(api_key="key", model="m")
+            with pytest.raises(OpenRouterError, match="Connection refused"):
+                await client.chat([])
+
 
 # ---------------------------------------------------------------------------
 # parse_analysis_response
@@ -513,8 +529,10 @@ class TestSettingsOpenRouterValidation:
             telegram_webhook_secret="sec",
             apify_api_token="apify",
             openrouter_api_key="or-key",
+            openrouter_model="anthropic/claude-3-haiku",
         )
         assert s.openrouter_api_key == "or-key"
+        assert s.openrouter_model == "anthropic/claude-3-haiku"
 
     def test_openrouter_model_required_outside_dev(self):
         with pytest.raises(ValueError, match="openrouter_model"):

@@ -67,7 +67,8 @@ class OpenRouterClient:
         ------
         OpenRouterError
             If the API returns a non-200 status, a missing ``choices`` field,
-            any other unexpected response shape, or the request times out.
+            any other unexpected response shape, the request times out, or
+            any other network-level error occurs (e.g. connection refused).
         """
         url = f"{OPENROUTER_BASE_URL}/chat/completions"
         headers = {
@@ -85,6 +86,10 @@ class OpenRouterClient:
             except httpx.TimeoutException as exc:
                 raise OpenRouterError(
                     f"OpenRouter request timed out after {self._timeout}s"
+                ) from exc
+            except httpx.RequestError as exc:
+                raise OpenRouterError(
+                    f"OpenRouter request failed: {exc}"
                 ) from exc
 
         if response.status_code != 200:
