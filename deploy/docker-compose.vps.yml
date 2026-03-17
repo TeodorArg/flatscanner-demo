@@ -1,0 +1,52 @@
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: flatscanner-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    restart: unless-stopped
+    volumes:
+      - flatscanner-redis-data:/data
+
+  web:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: flatscanner:latest
+    container_name: flatscanner-web
+    env_file:
+      - ../.env
+    command: ["uvicorn", "src.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    restart: unless-stopped
+    depends_on:
+      - redis
+    ports:
+      - "127.0.0.1:8010:8000"
+    networks:
+      - default
+      - ingress
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5).read()"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  worker:
+    image: flatscanner:latest
+    container_name: flatscanner-worker
+    env_file:
+      - ../.env
+    command: ["python", "-m", "src.jobs.cli"]
+    restart: unless-stopped
+    depends_on:
+      - redis
+    networks:
+      - default
+
+volumes:
+  flatscanner-redis-data:
+
+networks:
+  ingress:
+    name: ${FLATSCANNER_INGRESS_NETWORK:-app_app_network}
+    external: true

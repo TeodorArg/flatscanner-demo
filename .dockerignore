@@ -1,0 +1,16 @@
+.git
+.github
+.specify
+.pytest_cache
+.venv
+venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+*.log
+docs
+specs
+tests
+.env
+

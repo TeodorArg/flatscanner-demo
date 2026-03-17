@@ -49,6 +49,7 @@
 - Reviewer selection comes only from `AI_REVIEW_AGENT` and supports `claude` or `codex`, with `claude` as fallback.
 - Runner setup lives in `docs/project/backend/self-hosted-runner.md`.
 - Local Claude worker launches live in `docs/claude-worker-orchestration.md`.
+- Docker-first VPS rollout guidance lives in `docs/project/backend/docker-mvp-deployment.md`.
 
 ## Open Decisions
 
