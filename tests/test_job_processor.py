@@ -468,62 +468,128 @@ class TestRunWorker:
         settings = _make_settings()
         redis = AsyncMock()
 
-        call_count = 0
+        async def brpop_raise_cancelled(*args, **kwargs):
+            raise asyncio.CancelledError
 
-        async def raise_after_one(r, s):
-            nonlocal call_count
-            call_count += 1
-            if call_count >= 1:
-                raise asyncio.CancelledError
+        redis.brpop.side_effect = brpop_raise_cancelled
 
-        with patch("src.jobs.worker.process_once", side_effect=raise_after_one):
-            # Should not raise
-            await run_worker(redis, settings)
+        # Should not raise
+        await run_worker(redis, settings)
 
-        assert call_count == 1
+        redis.brpop.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_continues_after_unsupported_provider_error(self):
         """UnsupportedProviderError is logged and the loop continues."""
         settings = _make_settings()
         redis = AsyncMock()
+        job = _make_job()
 
-        call_count = 0
+        brpop_responses = iter([(QUEUE_KEY, job.model_dump_json())])
 
-        async def raise_unsupported_then_cancel(r, s):
-            nonlocal call_count
-            call_count += 1
-            if call_count == 1:
-                raise UnsupportedProviderError("unknown provider")
-            raise asyncio.CancelledError
+        async def brpop_side_effect(*args, **kwargs):
+            try:
+                return next(brpop_responses)
+            except StopIteration:
+                raise asyncio.CancelledError
+
+        redis.brpop.side_effect = brpop_side_effect
 
         with patch(
-            "src.jobs.worker.process_once",
-            side_effect=raise_unsupported_then_cancel,
+            "src.jobs.worker.process_job",
+            side_effect=UnsupportedProviderError("unknown provider"),
         ):
             await run_worker(redis, settings)
 
-        assert call_count == 2
+        assert redis.brpop.await_count == 2
 
     @pytest.mark.asyncio
     async def test_continues_after_generic_exception(self):
         """Generic processing errors are logged and the loop continues."""
         settings = _make_settings()
         redis = AsyncMock()
+        job = _make_job()
 
-        call_count = 0
+        brpop_responses = iter([(QUEUE_KEY, job.model_dump_json())])
 
-        async def raise_then_cancel(r, s):
-            nonlocal call_count
-            call_count += 1
-            if call_count == 1:
-                raise RuntimeError("transient network error")
-            raise asyncio.CancelledError
+        async def brpop_side_effect(*args, **kwargs):
+            try:
+                return next(brpop_responses)
+            except StopIteration:
+                raise asyncio.CancelledError
 
-        with patch(
-            "src.jobs.worker.process_once",
-            side_effect=raise_then_cancel,
+        redis.brpop.side_effect = brpop_side_effect
+
+        with (
+            patch(
+                "src.jobs.worker.process_job",
+                side_effect=RuntimeError("transient network error"),
+            ),
+            patch(
+                "src.jobs.worker.requeue_raw_payload", new_callable=AsyncMock
+            ),
         ):
             await run_worker(redis, settings)
 
-        assert call_count == 2
+        assert redis.brpop.await_count == 2
+
+    @pytest.mark.asyncio
+    async def test_requeues_raw_payload_on_generic_exception(self):
+        """A failed job is requeued instead of silently lost."""
+        settings = _make_settings()
+        redis = AsyncMock()
+        job = _make_job()
+        raw_payload = job.model_dump_json()
+
+        brpop_responses = iter([(QUEUE_KEY, raw_payload)])
+
+        async def brpop_side_effect(*args, **kwargs):
+            try:
+                return next(brpop_responses)
+            except StopIteration:
+                raise asyncio.CancelledError
+
+        redis.brpop.side_effect = brpop_side_effect
+
+        with (
+            patch(
+                "src.jobs.worker.process_job",
+                side_effect=RuntimeError("transient error"),
+            ),
+            patch(
+                "src.jobs.worker.requeue_raw_payload", new_callable=AsyncMock
+            ) as mock_requeue,
+        ):
+            await run_worker(redis, settings)
+
+        mock_requeue.assert_awaited_once_with(redis, raw_payload)
+
+    @pytest.mark.asyncio
+    async def test_unsupported_provider_is_dropped_not_requeued(self):
+        """UnsupportedProviderError causes the job to be dropped, not requeued."""
+        settings = _make_settings()
+        redis = AsyncMock()
+        job = _make_job()
+
+        brpop_responses = iter([(QUEUE_KEY, job.model_dump_json())])
+
+        async def brpop_side_effect(*args, **kwargs):
+            try:
+                return next(brpop_responses)
+            except StopIteration:
+                raise asyncio.CancelledError
+
+        redis.brpop.side_effect = brpop_side_effect
+
+        with (
+            patch(
+                "src.jobs.worker.process_job",
+                side_effect=UnsupportedProviderError("unsupported"),
+            ),
+            patch(
+                "src.jobs.worker.requeue_raw_payload", new_callable=AsyncMock
+            ) as mock_requeue,
+        ):
+            await run_worker(redis, settings)
+
+        mock_requeue.assert_not_called()

@@ -7,8 +7,9 @@ Provides two entry points:
   Designed for easy testing and one-shot execution.
 
 - ``run_worker`` — continuously dequeue and process jobs until cancelled.
-  Logs errors and continues on transient failures so the worker stays alive
-  across individual job failures.
+  Requeues jobs on retryable failures so transient adapter/OpenRouter/
+  Telegram errors do not cause silent job loss.  ``UnsupportedProviderError``
+  is treated as non-retryable: the job is logged and dropped.
 
 No heavyweight worker framework is introduced here; the open library choice
 (documented in docs/project/backend/backend-docs.md) remains deferred.
@@ -20,8 +21,9 @@ import asyncio
 import logging
 from typing import TYPE_CHECKING
 
+from src.domain.listing import AnalysisJob
 from src.jobs.processor import UnsupportedProviderError, process_job
-from src.jobs.queue import dequeue_analysis_job
+from src.jobs.queue import QUEUE_KEY, dequeue_analysis_job, requeue_raw_payload
 
 if TYPE_CHECKING:
     from redis.asyncio import Redis
@@ -63,22 +65,34 @@ async def process_once(redis: "Redis", settings: "Settings") -> bool:
 async def run_worker(redis: "Redis", settings: "Settings") -> None:
     """Continuously dequeue and process analysis jobs until cancelled.
 
-    Each iteration blocks for up to 1 second waiting for a job.  On
-    ``UnsupportedProviderError`` or other processing exceptions the error is
-    logged and the loop continues, preventing a single bad job from killing
-    the worker.
+    Each iteration blocks for up to 1 second waiting for a job.  The raw
+    Redis payload is captured before processing so that any retryable
+    failure can restore the job to the queue:
+
+    - ``UnsupportedProviderError`` — non-retryable; job is logged and
+      dropped.
+    - Any other exception — job is requeued via ``requeue_raw_payload``
+      before the loop continues, preventing silent job loss.
 
     The loop exits cleanly when ``asyncio.CancelledError`` is raised (e.g.
     from an OS signal or test cancellation).
     """
     logger.info("Worker started — waiting for jobs on queue")
     while True:
+        raw_payload: bytes | None = None
         try:
-            await process_once(redis, settings)
+            result = await redis.brpop(QUEUE_KEY, timeout=1)
+            if result is None:
+                continue
+            _, raw_payload = result
+            job = AnalysisJob.model_validate_json(raw_payload)
+            await process_job(job, settings)
         except asyncio.CancelledError:
             logger.info("Worker cancelled — shutting down")
             break
         except UnsupportedProviderError as exc:
-            logger.error("Unsupported provider, skipping job: %s", exc)
+            logger.error("Unsupported provider, dropping job: %s", exc)
         except Exception as exc:
             logger.exception("Unexpected error processing job: %s", exc)
+            if raw_payload is not None:
+                await requeue_raw_payload(redis, raw_payload)

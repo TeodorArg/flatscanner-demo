@@ -66,6 +66,17 @@ async def dequeue_analysis_job(
     return AnalysisJob.model_validate_json(payload)
 
 
+async def requeue_raw_payload(redis: Redis, payload: bytes | str) -> None:
+    """Push a raw job payload back onto the queue for retry.
+
+    Bypasses the idempotency check — used only to restore a job that was
+    already dequeued and whose processing failed with a retryable error.
+    The payload is pushed to the same side as normal enqueues (LPUSH) so
+    the job is processed after any jobs already waiting in the queue.
+    """
+    await redis.lpush(QUEUE_KEY, payload)
+
+
 async def enqueue_analysis_job(redis: Redis, job: AnalysisJob) -> bool:
     """Serialise *job* to JSON and push it onto the analysis job queue.
 
