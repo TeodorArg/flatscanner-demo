@@ -1,13 +1,14 @@
 """Tests for analysis job creation, serialisation, and Redis enqueue."""
 
 import json
+import logging
 import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from src.domain.listing import AnalysisJob, JobStatus, ListingProvider
-from src.jobs.queue import QUEUE_KEY, enqueue_analysis_job
+from src.jobs.queue import QUEUE_KEY, _IDEMPOTENCY_KEY_PREFIX, enqueue_analysis_job
 
 
 # ---------------------------------------------------------------------------
@@ -101,6 +102,7 @@ class TestEnqueueAnalysisJob:
     @pytest.mark.asyncio
     async def test_calls_lpush_with_queue_key(self):
         redis = AsyncMock()
+        redis.set.return_value = True
         job = AnalysisJob(
             source_url="https://www.airbnb.com/rooms/1",
             provider=ListingProvider.AIRBNB,
@@ -115,6 +117,7 @@ class TestEnqueueAnalysisJob:
     @pytest.mark.asyncio
     async def test_enqueued_payload_is_valid_json(self):
         redis = AsyncMock()
+        redis.set.return_value = True
         job = AnalysisJob(
             source_url="https://www.airbnb.com/rooms/55",
             provider=ListingProvider.AIRBNB,
@@ -132,6 +135,7 @@ class TestEnqueueAnalysisJob:
     @pytest.mark.asyncio
     async def test_enqueued_payload_roundtrips_to_analysis_job(self):
         redis = AsyncMock()
+        redis.set.return_value = True
         job = AnalysisJob(
             source_url="https://www.airbnb.com/rooms/7",
             provider=ListingProvider.AIRBNB,
@@ -144,6 +148,61 @@ class TestEnqueueAnalysisJob:
         assert restored.id == job.id
         assert restored.provider == ListingProvider.AIRBNB
         assert restored.status == JobStatus.PENDING
+
+
+# ---------------------------------------------------------------------------
+# Idempotency guard: same chat/message pair must not enqueue twice
+# ---------------------------------------------------------------------------
+
+
+class TestEnqueueIdempotency:
+    """enqueue_analysis_job is idempotent: the same (chat_id, message_id) pair
+    must only reach LPUSH once even when the webhook is retried by Telegram."""
+
+    def _make_job(self, chat_id: int = 1001, message_id: int = 5) -> AnalysisJob:
+        return AnalysisJob(
+            source_url="https://www.airbnb.com/rooms/123",
+            provider=ListingProvider.AIRBNB,
+            telegram_chat_id=chat_id,
+            telegram_message_id=message_id,
+        )
+
+    @pytest.mark.asyncio
+    async def test_sets_idempotency_key_with_nx_and_ex(self):
+        redis = AsyncMock()
+        redis.set.return_value = True
+        await enqueue_analysis_job(redis, self._make_job())
+        redis.set.assert_awaited_once()
+        call_kwargs = redis.set.call_args[1]
+        assert call_kwargs.get("nx") is True
+        assert "ex" in call_kwargs
+
+    @pytest.mark.asyncio
+    async def test_idempotency_key_includes_chat_and_message_ids(self):
+        redis = AsyncMock()
+        redis.set.return_value = True
+        await enqueue_analysis_job(redis, self._make_job(chat_id=42, message_id=99))
+        key = redis.set.call_args[0][0]
+        assert _IDEMPOTENCY_KEY_PREFIX in key
+        assert "42" in key
+        assert "99" in key
+
+    @pytest.mark.asyncio
+    async def test_returns_true_when_newly_enqueued(self):
+        redis = AsyncMock()
+        redis.set.return_value = True
+        result = await enqueue_analysis_job(redis, self._make_job())
+        assert result is True
+        redis.lpush.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_returns_false_and_skips_lpush_when_already_enqueued(self):
+        """SET NX returns None when the key already exists — lpush must be skipped."""
+        redis = AsyncMock()
+        redis.set.return_value = None  # Redis returns None when NX key already set
+        result = await enqueue_analysis_job(redis, self._make_job())
+        assert result is False
+        redis.lpush.assert_not_awaited()
 
 
 # ---------------------------------------------------------------------------
@@ -221,6 +280,25 @@ class TestWebhookEnqueueWiring:
         client = TestClient(app)
         response = client.post("/telegram/webhook", json=self._airbnb_payload())
         assert response.status_code == 200
+        mock_enqueue.assert_not_awaited()
+
+    @patch("src.telegram.router.enqueue_analysis_job", new_callable=AsyncMock)
+    @patch("src.telegram.router.send_message", new_callable=AsyncMock)
+    def test_warning_logged_when_redis_is_none(self, mock_send, mock_enqueue, caplog):
+        """A WARNING must be emitted when Redis is unavailable and enqueue is skipped."""
+        from fastapi.testclient import TestClient
+
+        from src.app.main import create_app
+
+        app = create_app(settings=_test_settings())
+        # app.state.redis is None by default
+
+        client = TestClient(app)
+        with caplog.at_level(logging.WARNING, logger="src.telegram.router"):
+            response = client.post("/telegram/webhook", json=self._airbnb_payload())
+
+        assert response.status_code == 200
+        assert any("Redis" in r.message or "redis" in r.message.lower() for r in caplog.records)
         mock_enqueue.assert_not_awaited()
 
     @patch("src.telegram.router.enqueue_analysis_job", new_callable=AsyncMock)

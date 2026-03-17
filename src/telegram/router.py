@@ -5,7 +5,6 @@ import logging
 import httpx
 from fastapi import APIRouter, HTTPException, Request
 
-from src.adapters.registry import detect_provider
 from src.domain.listing import AnalysisJob
 from src.jobs.queue import enqueue_analysis_job
 from src.telegram.dispatcher import route_update
@@ -57,15 +56,22 @@ async def webhook(request: Request) -> dict:
         return {"ok": True}
 
     if decision["action"] == "analyse":
+        assert update.message is not None, "message must be present when action is 'analyse'"
         redis = request.app.state.redis
         if redis is not None:
             job = AnalysisJob(
                 source_url=decision["url"],
-                provider=detect_provider(decision["url"]),
+                provider=decision["provider"],
                 telegram_chat_id=decision["chat_id"],
-                telegram_message_id=update.message.message_id,  # type: ignore[union-attr]
+                telegram_message_id=update.message.message_id,
             )
             await enqueue_analysis_job(redis, job)
+        else:
+            logger.warning(
+                "Redis unavailable; skipping enqueue for chat_id=%s message_id=%s",
+                decision["chat_id"],
+                update.message.message_id,
+            )
         text = _MSG_ANALYSING.format(url=decision["url"])
     elif decision["action"] == "unsupported":
         text = _MSG_UNSUPPORTED

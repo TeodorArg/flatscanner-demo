@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 
 from src.app.config import Settings
 from src.app.main import create_app
+from src.domain.listing import ListingProvider
 from src.telegram.dispatcher import extract_url, extract_urls, is_supported_provider, route_update
 from src.telegram.models import TelegramChat, TelegramMessage, TelegramUpdate, TelegramUser
 from src.telegram.sender import send_message
@@ -254,6 +255,12 @@ class TestRouteUpdate:
         assert decision["action"] == "analyse"
         assert decision["url"] == "https://abnb.me/abc123"
         assert decision["chat_id"] == 6
+
+    def test_analyse_decision_includes_provider(self):
+        update = _make_update("https://www.airbnb.com/rooms/999", chat_id=5)
+        decision = route_update(update)
+        assert decision["action"] == "analyse"
+        assert decision["provider"] == ListingProvider.AIRBNB
 
     def test_unsupported_when_non_airbnb_url(self):
         update = _make_update("https://www.booking.com/hotel/xyz", chat_id=9)
