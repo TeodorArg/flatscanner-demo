@@ -45,7 +45,12 @@
   - [x] Document default Airbnb actor dependency and token requirement in backend docs (pr-15-followup-apify-config)
   - [x] Remove wraps=ApifyClient from test_fetch_uses_settings_actor_id to prevent real-client path exercise (pr-15-followup-apify-test-mock)
 - [x] Add background job orchestration using Redis
-- [ ] Add initial AI analysis flow through OpenRouter
+- [x] Add initial AI analysis flow through OpenRouter
+  - [x] Add AnalysisResult schema (summary, strengths, risks, price verdict/explanation)
+  - [x] Add OpenRouterClient (Bearer auth, chat completions, error handling)
+  - [x] Add AnalysisService (prompt building, orchestration, JSON response parsing)
+  - [x] Require openrouter_api_key outside development/testing environments
+  - [x] Add focused tests for client, parser, prompt builder, and service orchestration
 - [ ] Format Telegram output for summary, risks, and price fairness
 
 ## Validation
