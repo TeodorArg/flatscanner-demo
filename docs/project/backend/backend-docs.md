@@ -32,6 +32,7 @@
   - **Nearby places provider** (`src/enrichment/providers/geoapify_nearby_places.py`): fetches nearby POIs (supermarkets, restaurants, parks, pharmacies) within 500 m.
   - `GEOAPIFY_API_KEY` is required in all non-development/testing environments and validated at startup.
   - In development/testing, enrichment is skipped when the key is absent.
+  - Geoapify Places currently authenticates via the `apiKey` query parameter rather than a bearer header, so future hardening should re-check this if the provider adds header-based auth.
   - Safety enrichment remains deferred for a future decision.
   - Enrichment results are threaded into the AI analysis prompt via `build_prompt(listing, enrichment)` so the model factors in local context.
 
