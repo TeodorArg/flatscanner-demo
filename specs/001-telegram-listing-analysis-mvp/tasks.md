@@ -74,7 +74,7 @@
 - [x] Add tests for Telegram output formatting
 - [x] Add end-to-end processor tests: success path, unsupported provider, adapter failure, OpenRouter failure, send failure
 - [x] Add dequeue helper tests and worker loop tests (process_once, run_worker)
-- [ ] Add orchestration tests for partial enrichment scenarios
+- [x] Add orchestration tests for partial enrichment scenarios
 
 ## Follow-Up
 
