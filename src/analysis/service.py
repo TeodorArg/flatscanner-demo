@@ -148,6 +148,25 @@ def parse_analysis_response(raw: str) -> AnalysisResult:
             f"Expected a JSON object, got {type(data).__name__}"
         )
 
+    # summary is required and must be a non-empty string.
+    summary = data.get("summary")
+    if not isinstance(summary, str) or not summary.strip():
+        raise ValueError(
+            "Model response missing required field 'summary' or it is not a non-empty string"
+        )
+
+    # strengths and risks must be lists when present.
+    strengths_raw = data.get("strengths", [])
+    if not isinstance(strengths_raw, list):
+        raise ValueError(
+            f"'strengths' must be a list, got {type(strengths_raw).__name__}"
+        )
+    risks_raw = data.get("risks", [])
+    if not isinstance(risks_raw, list):
+        raise ValueError(
+            f"'risks' must be a list, got {type(risks_raw).__name__}"
+        )
+
     # Coerce price_verdict to enum; fall back to UNKNOWN for unrecognised values.
     raw_verdict = data.get("price_verdict", "unknown")
     try:
@@ -159,9 +178,9 @@ def parse_analysis_response(raw: str) -> AnalysisResult:
         verdict = PriceVerdict.UNKNOWN
 
     return AnalysisResult(
-        summary=str(data.get("summary", "")),
-        strengths=[str(s) for s in data.get("strengths", []) if isinstance(s, str)],
-        risks=[str(r) for r in data.get("risks", []) if isinstance(r, str)],
+        summary=summary,
+        strengths=[str(s) for s in strengths_raw if isinstance(s, str)],
+        risks=[str(r) for r in risks_raw if isinstance(r, str)],
         price_verdict=verdict,
         price_explanation=str(data.get("price_explanation", "")),
     )
@@ -179,11 +198,18 @@ class AnalysisService:
     ----------
     settings:
         Application settings; ``openrouter_api_key`` and
-        ``openrouter_model`` are used to configure the client.
+        ``openrouter_model`` are used to build the default client.
+    client:
+        Optional pre-built ``OpenRouterClient``.  When provided, *settings*
+        is not used to construct the client (useful for testing).
     """
 
-    def __init__(self, settings: Settings) -> None:
-        self._client = OpenRouterClient(
+    def __init__(
+        self,
+        settings: Settings,
+        client: OpenRouterClient | None = None,
+    ) -> None:
+        self._client = client or OpenRouterClient(
             api_key=settings.openrouter_api_key,
             model=settings.openrouter_model,
         )

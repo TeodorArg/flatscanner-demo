@@ -241,6 +241,20 @@ class TestOpenRouterClientErrors:
             with pytest.raises(OpenRouterError, match="Unexpected"):
                 await client.chat([])
 
+    @pytest.mark.asyncio
+    async def test_timeout_raises_openrouter_error(self):
+        import httpx as _httpx
+
+        with patch("httpx.AsyncClient") as mock_cls:
+            mock_client = AsyncMock()
+            mock_client.post = AsyncMock(side_effect=_httpx.TimeoutException("timed out"))
+            mock_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+
+            client = OpenRouterClient(api_key="key", model="m", timeout=5.0)
+            with pytest.raises(OpenRouterError, match="timed out"):
+                await client.chat([])
+
 
 # ---------------------------------------------------------------------------
 # parse_analysis_response
@@ -315,6 +329,59 @@ class TestParseAnalysisResponse:
         # Only actual strings should appear
         assert result.strengths == ["good", "also good"]
 
+    def test_raises_when_summary_missing(self):
+        data = {
+            "strengths": ["fine"],
+            "risks": [],
+            "price_verdict": "fair",
+            "price_explanation": "ok",
+        }
+        with pytest.raises(ValueError, match="summary"):
+            parse_analysis_response(json.dumps(data))
+
+    def test_raises_when_summary_empty_string(self):
+        data = {
+            "summary": "",
+            "strengths": [],
+            "risks": [],
+            "price_verdict": "fair",
+            "price_explanation": "ok",
+        }
+        with pytest.raises(ValueError, match="summary"):
+            parse_analysis_response(json.dumps(data))
+
+    def test_raises_when_summary_whitespace_only(self):
+        data = {"summary": "   "}
+        with pytest.raises(ValueError, match="summary"):
+            parse_analysis_response(json.dumps(data))
+
+    def test_raises_when_summary_is_non_string(self):
+        data = {"summary": 42}
+        with pytest.raises(ValueError, match="summary"):
+            parse_analysis_response(json.dumps(data))
+
+    def test_raises_when_strengths_not_a_list(self):
+        data = {
+            "summary": "Good place.",
+            "strengths": "should be a list",
+            "risks": [],
+            "price_verdict": "fair",
+            "price_explanation": "ok",
+        }
+        with pytest.raises(ValueError, match="strengths"):
+            parse_analysis_response(json.dumps(data))
+
+    def test_raises_when_risks_not_a_list(self):
+        data = {
+            "summary": "Good place.",
+            "strengths": [],
+            "risks": {"unexpected": "dict"},
+            "price_verdict": "fair",
+            "price_explanation": "ok",
+        }
+        with pytest.raises(ValueError, match="risks"):
+            parse_analysis_response(json.dumps(data))
+
 
 # ---------------------------------------------------------------------------
 # build_prompt
@@ -369,19 +436,18 @@ class TestBuildPrompt:
 
 
 class TestAnalysisService:
-    def _service(self) -> AnalysisService:
-        return AnalysisService(settings=_make_settings())
+    def _service(self, mock_client: AsyncMock | None = None) -> tuple[AnalysisService, AsyncMock]:
+        chat_mock = mock_client or AsyncMock()
+        client = MagicMock(spec=OpenRouterClient)
+        client.chat = chat_mock
+        return AnalysisService(settings=_make_settings(), client=client), chat_mock
 
     @pytest.mark.asyncio
     async def test_analyse_returns_result_on_success(self):
-        service = self._service()
-        raw_reply = _valid_analysis_json()
+        service, mock_chat = self._service()
+        mock_chat.return_value = _valid_analysis_json()
 
-        with patch.object(
-            service._client, "chat", new_callable=AsyncMock
-        ) as mock_chat:
-            mock_chat.return_value = raw_reply
-            result = await service.analyse(_full_listing())
+        result = await service.analyse(_full_listing())
 
         assert isinstance(result, AnalysisResult)
         assert result.price_verdict == PriceVerdict.FAIR
@@ -389,13 +455,10 @@ class TestAnalysisService:
 
     @pytest.mark.asyncio
     async def test_analyse_passes_system_and_user_messages(self):
-        service = self._service()
+        service, mock_chat = self._service()
+        mock_chat.return_value = _valid_analysis_json()
 
-        with patch.object(
-            service._client, "chat", new_callable=AsyncMock
-        ) as mock_chat:
-            mock_chat.return_value = _valid_analysis_json()
-            await service.analyse(_full_listing())
+        await service.analyse(_full_listing())
 
         messages = mock_chat.call_args.args[0]
         assert messages[0]["role"] == "system"
@@ -404,25 +467,19 @@ class TestAnalysisService:
 
     @pytest.mark.asyncio
     async def test_analyse_propagates_openrouter_error(self):
-        service = self._service()
+        service, mock_chat = self._service()
+        mock_chat.side_effect = OpenRouterError("network failure")
 
-        with patch.object(
-            service._client, "chat", new_callable=AsyncMock
-        ) as mock_chat:
-            mock_chat.side_effect = OpenRouterError("network failure")
-            with pytest.raises(OpenRouterError, match="network failure"):
-                await service.analyse(_full_listing())
+        with pytest.raises(OpenRouterError, match="network failure"):
+            await service.analyse(_full_listing())
 
     @pytest.mark.asyncio
     async def test_analyse_propagates_parse_error(self):
-        service = self._service()
+        service, mock_chat = self._service()
+        mock_chat.return_value = "not valid json {{ }}"
 
-        with patch.object(
-            service._client, "chat", new_callable=AsyncMock
-        ) as mock_chat:
-            mock_chat.return_value = "not valid json {{ }}"
-            with pytest.raises(ValueError, match="not valid JSON"):
-                await service.analyse(_full_listing())
+        with pytest.raises(ValueError, match="not valid JSON"):
+            await service.analyse(_full_listing())
 
 
 # ---------------------------------------------------------------------------
@@ -458,3 +515,22 @@ class TestSettingsOpenRouterValidation:
             openrouter_api_key="or-key",
         )
         assert s.openrouter_api_key == "or-key"
+
+    def test_openrouter_model_required_outside_dev(self):
+        with pytest.raises(ValueError, match="openrouter_model"):
+            Settings(
+                app_env="production",
+                telegram_bot_token="tok",
+                telegram_webhook_secret="sec",
+                apify_api_token="apify",
+                openrouter_api_key="or-key",
+                openrouter_model="",  # empty — should fail
+            )
+
+    def test_openrouter_model_not_required_in_testing(self):
+        s = Settings(app_env="testing", openrouter_model="")
+        assert s.openrouter_model == ""
+
+    def test_openrouter_model_not_required_in_development(self):
+        s = Settings(app_env="development", openrouter_model="")
+        assert s.openrouter_model == ""

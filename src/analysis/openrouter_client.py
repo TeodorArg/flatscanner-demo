@@ -67,9 +67,7 @@ class OpenRouterClient:
         ------
         OpenRouterError
             If the API returns a non-200 status, a missing ``choices`` field,
-            or any other unexpected response shape.
-        httpx.TimeoutException
-            If the request exceeds *timeout* seconds.
+            any other unexpected response shape, or the request times out.
         """
         url = f"{OPENROUTER_BASE_URL}/chat/completions"
         headers = {
@@ -82,7 +80,12 @@ class OpenRouterClient:
         }
 
         async with httpx.AsyncClient(timeout=self._timeout) as client:
-            response = await client.post(url, headers=headers, json=payload)
+            try:
+                response = await client.post(url, headers=headers, json=payload)
+            except httpx.TimeoutException as exc:
+                raise OpenRouterError(
+                    f"OpenRouter request timed out after {self._timeout}s"
+                ) from exc
 
         if response.status_code != 200:
             raise OpenRouterError(

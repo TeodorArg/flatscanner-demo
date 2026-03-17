@@ -47,6 +47,11 @@ class Settings(BaseSettings):
                     "openrouter_api_key must be set when app_env is not "
                     "'development' or 'testing'"
                 )
+            if not self.openrouter_model:
+                raise ValueError(
+                    "openrouter_model must be set when app_env is not "
+                    "'development' or 'testing'"
+                )
         return self
 
     # Database – asyncpg driver will be added when storage layer lands
