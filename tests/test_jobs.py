@@ -8,7 +8,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from src.domain.listing import AnalysisJob, JobStatus, ListingProvider
-from src.jobs.queue import QUEUE_KEY, _IDEMPOTENCY_KEY_PREFIX, enqueue_analysis_job
+from src.jobs.queue import (
+    QUEUE_KEY,
+    _IDEMPOTENCY_KEY_PREFIX,
+    _IDEMPOTENCY_TTL_SECONDS,
+    enqueue_analysis_job,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -100,9 +105,9 @@ class TestAnalysisJobModel:
 
 class TestEnqueueAnalysisJob:
     @pytest.mark.asyncio
-    async def test_calls_lpush_with_queue_key(self):
+    async def test_eval_uses_queue_key_as_second_key(self):
         redis = AsyncMock()
-        redis.set.return_value = True
+        redis.eval.return_value = 1
         job = AnalysisJob(
             source_url="https://www.airbnb.com/rooms/1",
             provider=ListingProvider.AIRBNB,
@@ -110,14 +115,15 @@ class TestEnqueueAnalysisJob:
             telegram_message_id=1,
         )
         await enqueue_analysis_job(redis, job)
-        redis.lpush.assert_awaited_once()
-        call_args = redis.lpush.call_args[0]
-        assert call_args[0] == QUEUE_KEY
+        redis.eval.assert_awaited_once()
+        # Positional args: script, numkeys, key1, key2, ttl, payload
+        call_args = redis.eval.call_args[0]
+        assert call_args[3] == QUEUE_KEY
 
     @pytest.mark.asyncio
     async def test_enqueued_payload_is_valid_json(self):
         redis = AsyncMock()
-        redis.set.return_value = True
+        redis.eval.return_value = 1
         job = AnalysisJob(
             source_url="https://www.airbnb.com/rooms/55",
             provider=ListingProvider.AIRBNB,
@@ -125,7 +131,8 @@ class TestEnqueueAnalysisJob:
             telegram_message_id=10,
         )
         await enqueue_analysis_job(redis, job)
-        payload = redis.lpush.call_args[0][1]
+        # ARGV[2] is the 6th positional arg (index 5)
+        payload = redis.eval.call_args[0][5]
         data = json.loads(payload)
         assert data["source_url"] == "https://www.airbnb.com/rooms/55"
         assert data["telegram_chat_id"] == 99
@@ -135,7 +142,7 @@ class TestEnqueueAnalysisJob:
     @pytest.mark.asyncio
     async def test_enqueued_payload_roundtrips_to_analysis_job(self):
         redis = AsyncMock()
-        redis.set.return_value = True
+        redis.eval.return_value = 1
         job = AnalysisJob(
             source_url="https://www.airbnb.com/rooms/7",
             provider=ListingProvider.AIRBNB,
@@ -143,7 +150,7 @@ class TestEnqueueAnalysisJob:
             telegram_message_id=3,
         )
         await enqueue_analysis_job(redis, job)
-        payload = redis.lpush.call_args[0][1]
+        payload = redis.eval.call_args[0][5]
         restored = AnalysisJob.model_validate_json(payload)
         assert restored.id == job.id
         assert restored.provider == ListingProvider.AIRBNB
@@ -168,40 +175,58 @@ class TestEnqueueIdempotency:
         )
 
     @pytest.mark.asyncio
-    async def test_sets_idempotency_key_with_nx_and_ex(self):
+    async def test_idempotency_key_is_first_eval_key_with_ttl(self):
+        """The Lua script receives the idempotency key as KEYS[1] and the TTL as ARGV[1]."""
         redis = AsyncMock()
-        redis.set.return_value = True
+        redis.eval.return_value = 1
         await enqueue_analysis_job(redis, self._make_job())
-        redis.set.assert_awaited_once()
-        call_kwargs = redis.set.call_args[1]
-        assert call_kwargs.get("nx") is True
-        assert "ex" in call_kwargs
+        redis.eval.assert_awaited_once()
+        args = redis.eval.call_args[0]
+        # args: script, numkeys=2, key1 (idempotency), key2 (queue), ttl, payload
+        idempotency_key = args[2]
+        ttl_arg = args[4]
+        assert _IDEMPOTENCY_KEY_PREFIX in idempotency_key
+        assert ttl_arg == str(_IDEMPOTENCY_TTL_SECONDS)
 
     @pytest.mark.asyncio
     async def test_idempotency_key_includes_chat_and_message_ids(self):
         redis = AsyncMock()
-        redis.set.return_value = True
+        redis.eval.return_value = 1
         await enqueue_analysis_job(redis, self._make_job(chat_id=42, message_id=99))
-        key = redis.set.call_args[0][0]
+        key = redis.eval.call_args[0][2]
         assert _IDEMPOTENCY_KEY_PREFIX in key
         assert "42" in key
         assert "99" in key
 
     @pytest.mark.asyncio
     async def test_returns_true_when_newly_enqueued(self):
+        """Lua script returns 1 when the key did not exist → function returns True."""
         redis = AsyncMock()
-        redis.set.return_value = True
+        redis.eval.return_value = 1
         result = await enqueue_analysis_job(redis, self._make_job())
         assert result is True
-        redis.lpush.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_returns_false_and_skips_lpush_when_already_enqueued(self):
-        """SET NX returns None when the key already exists — lpush must be skipped."""
+    async def test_returns_false_when_already_enqueued(self):
+        """Lua script returns 0 when the key already existed → function returns False."""
         redis = AsyncMock()
-        redis.set.return_value = None  # Redis returns None when NX key already set
+        redis.eval.return_value = 0
         result = await enqueue_analysis_job(redis, self._make_job())
         assert result is False
+
+    @pytest.mark.asyncio
+    async def test_single_atomic_eval_call_no_separate_set_or_lpush(self):
+        """The idempotency check and queue push must be a single eval, not two calls.
+
+        Two separate calls (SET NX then LPUSH) create a window where the key can
+        be set but the push can fail, turning any transient Redis error into a
+        permanently dropped job on retry.
+        """
+        redis = AsyncMock()
+        redis.eval.return_value = 1
+        await enqueue_analysis_job(redis, self._make_job())
+        redis.eval.assert_awaited_once()
+        redis.set.assert_not_awaited()
         redis.lpush.assert_not_awaited()
 
 
