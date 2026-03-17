@@ -40,6 +40,32 @@ return 0
 """
 
 
+async def dequeue_analysis_job(
+    redis: Redis, *, timeout: int = 0
+) -> AnalysisJob | None:
+    """Block until a job is available on the queue and return it.
+
+    Parameters
+    ----------
+    redis:
+        Async Redis client.
+    timeout:
+        BRPOP timeout in seconds.  ``0`` blocks indefinitely until a job
+        arrives.  A positive value returns ``None`` when the timeout elapses
+        with no job available.
+
+    Returns
+    -------
+    AnalysisJob | None
+        The next job, or ``None`` if the BRPOP timed out.
+    """
+    result = await redis.brpop(QUEUE_KEY, timeout=timeout)
+    if result is None:
+        return None
+    _, payload = result
+    return AnalysisJob.model_validate_json(payload)
+
+
 async def enqueue_analysis_job(redis: Redis, job: AnalysisJob) -> bool:
     """Serialise *job* to JSON and push it onto the analysis job queue.
 

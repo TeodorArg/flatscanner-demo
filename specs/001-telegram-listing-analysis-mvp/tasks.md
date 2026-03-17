@@ -52,6 +52,14 @@
   - [x] Require openrouter_api_key outside development/testing environments
   - [x] Add focused tests for client, parser, prompt builder, and service orchestration
 - [x] Format Telegram output for summary, risks, and price fairness
+- [x] Implement end-to-end job processor (`src/jobs/processor.py`)
+  - [x] `process_job` orchestrates adapter fetch → analysis → Telegram reply
+  - [x] `UnsupportedProviderError` raised for unknown providers
+  - [x] All errors from adapter, analysis, and send propagate to caller
+- [x] Add `dequeue_analysis_job` BRPOP helper to `src/jobs/queue.py`
+- [x] Add worker loop (`src/jobs/worker.py`)
+  - [x] `process_once` dequeues and processes one job; returns bool
+  - [x] `run_worker` loops until cancelled; logs and continues on per-job errors
 
 ## Validation
 
@@ -64,6 +72,8 @@
 - [x] Add negative tests for bogus ccTLD hosts and non-web schemes (PR-5-fix-13)
 - [x] Add tests for normalized listing mapping
 - [x] Add tests for Telegram output formatting
+- [x] Add end-to-end processor tests: success path, unsupported provider, adapter failure, OpenRouter failure, send failure
+- [x] Add dequeue helper tests and worker loop tests (process_once, run_worker)
 - [ ] Add orchestration tests for partial enrichment scenarios
 
 ## Follow-Up
