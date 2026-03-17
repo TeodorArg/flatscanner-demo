@@ -156,7 +156,8 @@ class TestProcessJobSuccess:
                 analysis_service=mock_service,
             )
 
-        mock_service.analyse.assert_awaited_once_with(listing)
+        mock_service.analyse.assert_awaited_once()
+        assert mock_service.analyse.call_args.args[0] is listing
 
     @pytest.mark.asyncio
     async def test_send_message_uses_bot_token_from_settings(self):

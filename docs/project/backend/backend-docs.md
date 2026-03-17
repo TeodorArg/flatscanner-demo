@@ -27,6 +27,14 @@
   - The client authenticates using an `Authorization: Bearer <token>` header (not a query parameter).
 - OpenRouter is the model gateway.
 - Enrichment sources may vary by geography and must tolerate partial availability.
+- Geoapify Places API is the first enrichment provider set (MVP):
+  - **Transport provider** (`src/enrichment/providers/geoapify_transport.py`): fetches nearby public transport stops (subway, train, tram, bus, ferry) within 500 m of listing coordinates.
+  - **Nearby places provider** (`src/enrichment/providers/geoapify_nearby_places.py`): fetches nearby POIs (supermarkets, restaurants, parks, pharmacies) within 500 m.
+  - `GEOAPIFY_API_KEY` is required in all non-development/testing environments and validated at startup.
+  - In development/testing, enrichment is skipped when the key is absent.
+  - Geoapify Places currently authenticates via the `apiKey` query parameter rather than a bearer header, so future hardening should re-check this if the provider adds header-based auth.
+  - Safety enrichment remains deferred for a future decision.
+  - Enrichment results are threaded into the AI analysis prompt via `build_prompt(listing, enrichment)` so the model factors in local context.
 
 ## Design Constraints
 
@@ -45,6 +53,6 @@
 ## Open Decisions
 
 - Redis worker library
-- regional safety and public-context providers
-- long-term source payload retention
-- comparable-listing strategy for price fairness
+- Regional safety providers (safety enrichment deferred from MVP)
+- Long-term source payload retention
+- Comparable-listing strategy for price fairness

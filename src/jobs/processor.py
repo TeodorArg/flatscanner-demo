@@ -23,7 +23,7 @@ import httpx
 from src.adapters.registry import resolve_adapter
 from src.analysis.service import AnalysisService
 from src.domain.listing import AnalysisJob
-from src.enrichment.runner import EnrichmentProvider, run_enrichments
+from src.enrichment.runner import EnrichmentOutcome, EnrichmentProvider, run_enrichments
 from src.telegram.formatter import format_analysis_message
 from src.telegram.sender import send_message
 
@@ -101,6 +101,7 @@ async def process_job(
     logger.debug("Fetched listing %s for job %s", listing.id, job.id)
 
     # --- 2b. Enrich (optional, tolerant) -------------------------------------
+    enrichment_outcome: EnrichmentOutcome | None = None
     if enrichment_providers:
         enrichment_outcome = await run_enrichments(listing, enrichment_providers)
         if enrichment_outcome.all_failed:
@@ -112,7 +113,7 @@ async def process_job(
 
     # --- 3. Analyse ----------------------------------------------------------
     service = analysis_service or AnalysisService(settings)
-    result = await service.analyse(listing)
+    result = await service.analyse(listing, enrichment_outcome)
     logger.debug("Analysis complete for job %s", job.id)
 
     # --- 4. Format -----------------------------------------------------------

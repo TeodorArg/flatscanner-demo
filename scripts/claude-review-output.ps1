@@ -72,7 +72,20 @@ function ConvertFrom-ClaudeReviewOutput {
         throw "Claude review output was not valid JSON: $resultText"
     }
 
-    $normalizationNotes = @()
+    if (
+        $result.PSObject.Properties['review'] -and
+        $result.review -is [psobject] -and
+        -not $result.PSObject.Properties['summary'] -and
+        -not $result.PSObject.Properties['verdict'] -and
+        -not $result.PSObject.Properties['findings']
+    ) {
+        $result = $result.review
+        $normalizationNotes = @("Unwrapped nested Claude review field 'review'.")
+    }
+    else {
+        $normalizationNotes = @()
+    }
+
     $verdictAliases = @('action', 'review_status', 'review_action')
     foreach ($alias in $verdictAliases) {
         if (-not $result.PSObject.Properties['verdict'] -and $result.PSObject.Properties[$alias]) {

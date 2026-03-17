@@ -27,6 +27,7 @@ from src.domain.listing import (
     NormalizedListing,
     PriceInfo,
 )
+from src.enrichment.runner import EnrichmentOutcome, EnrichmentProviderResult
 
 
 # ---------------------------------------------------------------------------
@@ -445,6 +446,68 @@ class TestBuildPrompt:
         assert "price_verdict" in prompt
         assert "summary" in prompt
 
+    def test_no_enrichment_section_when_enrichment_is_none(self):
+        prompt = build_prompt(_minimal_listing(), enrichment=None)
+        assert "Nearby context" not in prompt
+
+    def test_no_enrichment_section_when_all_enrichments_failed(self):
+        outcome = EnrichmentOutcome(
+            successes=[],
+            failures=[EnrichmentProviderResult(name="transport", error=RuntimeError("down"))],
+        )
+        prompt = build_prompt(_minimal_listing(), enrichment=outcome)
+        assert "Nearby context" not in prompt
+
+    def test_transport_enrichment_appears_in_prompt(self):
+        transport_result = EnrichmentProviderResult(
+            name="transport",
+            data={"count": 3, "nearest_name": "Châtelet", "nearest_distance_m": 120.0, "categories_found": ["public_transport"]},
+        )
+        outcome = EnrichmentOutcome(successes=[transport_result])
+        prompt = build_prompt(_minimal_listing(), enrichment=outcome)
+        assert "Nearby context" in prompt
+        assert "Transport" in prompt
+        assert "3 public transport stop(s)" in prompt
+        assert "Châtelet" in prompt
+
+    def test_nearby_places_enrichment_appears_in_prompt(self):
+        places_result = EnrichmentProviderResult(
+            name="nearby_places",
+            data={"count": 10, "by_category": {"shops": 3, "restaurants_cafes": 5, "parks": 2}},
+        )
+        outcome = EnrichmentOutcome(successes=[places_result])
+        prompt = build_prompt(_minimal_listing(), enrichment=outcome)
+        assert "Nearby context" in prompt
+        assert "Nearby places" in prompt
+        assert "10 total within 500 m" in prompt
+        assert "shops: 3" in prompt
+
+    def test_both_enrichments_appear_in_prompt(self):
+        outcome = EnrichmentOutcome(
+            successes=[
+                EnrichmentProviderResult(
+                    name="transport",
+                    data={"count": 2, "nearest_name": None, "nearest_distance_m": None, "categories_found": []},
+                ),
+                EnrichmentProviderResult(
+                    name="nearby_places",
+                    data={"count": 5, "by_category": {"parks": 2}},
+                ),
+            ]
+        )
+        prompt = build_prompt(_minimal_listing(), enrichment=outcome)
+        assert "Transport" in prompt
+        assert "Nearby places" in prompt
+
+    def test_transport_without_nearest_name_omits_nearest(self):
+        transport_result = EnrichmentProviderResult(
+            name="transport",
+            data={"count": 1, "nearest_name": None, "nearest_distance_m": None, "categories_found": []},
+        )
+        outcome = EnrichmentOutcome(successes=[transport_result])
+        prompt = build_prompt(_minimal_listing(), enrichment=outcome)
+        assert "nearest:" not in prompt
+
 
 # ---------------------------------------------------------------------------
 # AnalysisService
@@ -497,6 +560,25 @@ class TestAnalysisService:
         with pytest.raises(ValueError, match="not valid JSON"):
             await service.analyse(_full_listing())
 
+    @pytest.mark.asyncio
+    async def test_analyse_includes_enrichment_in_prompt(self):
+        """Enrichment data reaches the user-turn prompt content."""
+        service, mock_chat = self._service()
+        mock_chat.return_value = _valid_analysis_json()
+
+        transport_result = EnrichmentProviderResult(
+            name="transport",
+            data={"count": 4, "nearest_name": "Gare du Nord", "nearest_distance_m": 80.0, "categories_found": ["public_transport"]},
+        )
+        outcome = EnrichmentOutcome(successes=[transport_result])
+
+        await service.analyse(_full_listing(), enrichment=outcome)
+
+        messages = mock_chat.call_args.args[0]
+        user_content = messages[1]["content"]
+        assert "Gare du Nord" in user_content
+        assert "4 public transport stop(s)" in user_content
+
 
 # ---------------------------------------------------------------------------
 # Settings validation
@@ -530,6 +612,7 @@ class TestSettingsOpenRouterValidation:
             apify_api_token="apify",
             openrouter_api_key="or-key",
             openrouter_model="anthropic/claude-3-haiku",
+            geoapify_api_key="geo-key",
         )
         assert s.openrouter_api_key == "or-key"
         assert s.openrouter_model == "anthropic/claude-3-haiku"

@@ -52,6 +52,11 @@ class Settings(BaseSettings):
                     "openrouter_model must be set when app_env is not "
                     "'development' or 'testing'"
                 )
+            if not self.geoapify_api_key:
+                raise ValueError(
+                    "geoapify_api_key must be set when app_env is not "
+                    "'development' or 'testing'"
+                )
         return self
 
     # Database – asyncpg driver will be added when storage layer lands
@@ -71,6 +76,11 @@ class Settings(BaseSettings):
     # Actor used to scrape Airbnb listings.  Override to switch to a different
     # actor version without changing application code.
     apify_airbnb_actor_id: str = "dtrungtin~airbnb-scraper"
+
+    # Geoapify
+    # Required outside development/testing because transport and nearby-places
+    # enrichment are part of the default MVP analysis pipeline.
+    geoapify_api_key: str = ""
 
 
 @lru_cache(maxsize=1)
