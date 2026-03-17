@@ -407,7 +407,11 @@ class TestTelegramModels:
 
 class TestWebhookEndpoint:
     def _client(self, **settings_overrides) -> TestClient:
-        return TestClient(create_app(settings=_test_settings(**settings_overrides)))
+        app = create_app(settings=_test_settings(**settings_overrides))
+        mock_redis = AsyncMock()
+        mock_redis.eval.return_value = 1  # enqueue_analysis_job succeeds
+        app.state.redis = mock_redis
+        return TestClient(app)
 
     def _update_payload(self, text: str | None, chat_id: int = 1001) -> dict:
         payload: dict = {
@@ -579,6 +583,17 @@ class TestWebhookEndpoint:
         assert call_args[1] == 1001
         assert "airbnb.com/rooms/456" in call_args[2]
 
+    @patch("src.telegram.router.send_message", new_callable=AsyncMock)
+    def test_webhook_analyse_returns_502_when_redis_unavailable(self, mock_send):
+        """When Redis is unavailable, the analyse path must return 502 and not send a false acknowledgement."""
+        app = create_app(settings=_test_settings())
+        # app.state.redis is None by default (lifespan not run)
+        client = TestClient(app)
+        payload = self._update_payload("https://www.airbnb.com/rooms/123")
+        response = client.post("/telegram/webhook", json=payload)
+        assert response.status_code == 502
+        mock_send.assert_not_awaited()
+
 
 # ---------------------------------------------------------------------------
 # Webhook authentication
@@ -587,7 +602,11 @@ class TestWebhookEndpoint:
 
 class TestWebhookAuthentication:
     def _client(self, **settings_overrides) -> TestClient:
-        return TestClient(create_app(settings=_test_settings(**settings_overrides)))
+        app = create_app(settings=_test_settings(**settings_overrides))
+        mock_redis = AsyncMock()
+        mock_redis.eval.return_value = 1
+        app.state.redis = mock_redis
+        return TestClient(app)
 
     def _update_payload(self) -> dict:
         return {

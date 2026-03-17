@@ -294,7 +294,7 @@ class TestWebhookEnqueueWiring:
     @patch("src.telegram.router.enqueue_analysis_job", new_callable=AsyncMock)
     @patch("src.telegram.router.send_message", new_callable=AsyncMock)
     def test_enqueue_skipped_when_redis_is_none(self, mock_send, mock_enqueue):
-        """Without a Redis connection, enqueue is silently skipped."""
+        """Without a Redis connection, enqueue is skipped and a 502 is returned so Telegram retries."""
         from fastapi.testclient import TestClient
 
         from src.app.main import create_app
@@ -304,13 +304,14 @@ class TestWebhookEnqueueWiring:
 
         client = TestClient(app)
         response = client.post("/telegram/webhook", json=self._airbnb_payload())
-        assert response.status_code == 200
+        assert response.status_code == 502
         mock_enqueue.assert_not_awaited()
+        mock_send.assert_not_awaited()
 
     @patch("src.telegram.router.enqueue_analysis_job", new_callable=AsyncMock)
     @patch("src.telegram.router.send_message", new_callable=AsyncMock)
     def test_warning_logged_when_redis_is_none(self, mock_send, mock_enqueue, caplog):
-        """A WARNING must be emitted when Redis is unavailable and enqueue is skipped."""
+        """A WARNING must be emitted when Redis is unavailable and the request gets a 502."""
         from fastapi.testclient import TestClient
 
         from src.app.main import create_app
@@ -322,9 +323,10 @@ class TestWebhookEnqueueWiring:
         with caplog.at_level(logging.WARNING, logger="src.telegram.router"):
             response = client.post("/telegram/webhook", json=self._airbnb_payload())
 
-        assert response.status_code == 200
+        assert response.status_code == 502
         assert any("Redis" in r.message or "redis" in r.message.lower() for r in caplog.records)
         mock_enqueue.assert_not_awaited()
+        mock_send.assert_not_awaited()
 
     @patch("src.telegram.router.enqueue_analysis_job", new_callable=AsyncMock)
     @patch("src.telegram.router.send_message", new_callable=AsyncMock)

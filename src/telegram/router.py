@@ -56,22 +56,27 @@ async def webhook(request: Request) -> dict:
         return {"ok": True}
 
     if decision["action"] == "analyse":
-        assert update.message is not None, "message must be present when action is 'analyse'"
+        if update.message is None:
+            # Defensive: route_update only returns 'analyse' when a message is present.
+            # Guard explicitly rather than relying on assert (disabled under -O).
+            logger.error(
+                "route_update returned 'analyse' but update.message is None; dropping update"
+            )
+            return {"ok": True}
         redis = request.app.state.redis
-        if redis is not None:
-            job = AnalysisJob(
-                source_url=decision["url"],
-                provider=decision["provider"],
-                telegram_chat_id=decision["chat_id"],
-                telegram_message_id=update.message.message_id,
-            )
-            await enqueue_analysis_job(redis, job)
-        else:
+        if redis is None:
             logger.warning(
-                "Redis unavailable; skipping enqueue for chat_id=%s message_id=%s",
+                "Redis unavailable; cannot enqueue job for chat_id=%s — returning 502 for retry",
                 decision["chat_id"],
-                update.message.message_id,
             )
+            raise HTTPException(status_code=502, detail="Queue unavailable; please retry")
+        job = AnalysisJob(
+            source_url=decision["url"],
+            provider=decision["provider"],
+            telegram_chat_id=decision["chat_id"],
+            telegram_message_id=update.message.message_id,
+        )
+        await enqueue_analysis_job(redis, job)
         text = _MSG_ANALYSING.format(url=decision["url"])
     elif decision["action"] == "unsupported":
         text = _MSG_UNSUPPORTED
