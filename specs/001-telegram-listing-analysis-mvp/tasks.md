@@ -36,7 +36,7 @@
   - [x] Require a real listing ID after /rooms/ (bare /rooms/ path rejected); require non-empty path for abnb.me shortlinks (PR-5-fix-10)
   - [x] Route messages with Airbnb URLs in media captions the same as text messages (PR-5-fix-10)
   - [x] Anchor /rooms/<id> path matcher to reject extra segments like /rooms/123/photos (PR-5-fix-12)
-  - [x] Replace broad localized-Airbnb regex with explicit supported-domain TLD allowlist; reject non-http/https schemes inside is_supported_provider() (PR-5-fix-13)
+  - [x] Replace broad localized-Airbnb regex with a generic Airbnb domain matcher (`airbnb.<tld>` / `airbnb.<tld>.<tld>`); reject non-http/https schemes inside is_supported_provider() (PR-5-fix-13)
 - [x] Define normalized listing schemas and persistence models
 - [x] Add provider detection and the Airbnb adapter interface
 - [x] Integrate Apify-backed Airbnb extraction

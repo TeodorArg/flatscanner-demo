@@ -34,43 +34,13 @@ from src.domain.listing import (
 if TYPE_CHECKING:
     from src.app.config import Settings
 
-# Explicit allowlist of TLD suffixes for Airbnb domains supported in this MVP.
-# Hosts are matched as (www.)?airbnb.<tld>.  Any domain not in this set is
-# rejected.  This is intentionally conservative: add new entries as markets
-# are validated.
-_AIRBNB_SUPPORTED_TLDS: frozenset[str] = frozenset({
-    "com",       # US (primary)
-    "ca",        # Canada
-    "co.uk",     # United Kingdom
-    "com.au",    # Australia
-    "co.nz",     # New Zealand
-    "co.in",     # India
-    "de",        # Germany
-    "fr",        # France
-    "es",        # Spain
-    "it",        # Italy
-    "pt",        # Portugal
-    "nl",        # Netherlands
-    "pl",        # Poland
-    "se",        # Sweden
-    "no",        # Norway
-    "dk",        # Denmark
-    "fi",        # Finland
-    "at",        # Austria
-    "ch",        # Switzerland
-    "be",        # Belgium
-    "ie",        # Ireland
-    "gr",        # Greece
-    "com.br",    # Brazil
-    "com.mx",    # Mexico
-    "com.ar",    # Argentina
-    "com.co",    # Colombia
-    "com.sg",    # Singapore
-    "com.hk",    # Hong Kong
-    "co.kr",     # South Korea
-    "co.id",     # Indonesia
-    "com.my",    # Malaysia
-})
+# Accept `airbnb.<tld>` and `airbnb.<tld>.<tld>` (optionally prefixed by `www.`).
+# This removes the need for a hand-maintained market allowlist while still
+# rejecting obvious lookalikes such as `airbnb.evil.com`.
+_AIRBNB_HOST_RE = re.compile(
+    r"^(?:www\.)?airbnb\.[a-z]{2,3}(?:\.[a-z]{2,3})?$",
+    re.IGNORECASE,
+)
 
 # Requires exactly /rooms/<id> with an optional trailing slash.
 # Rejects bare /rooms/ and any extra path segments like /rooms/123/photos.
@@ -81,19 +51,8 @@ _CURIOUS_CODER_ACTOR_IDS: frozenset[str] = frozenset({
 
 
 def _is_airbnb_host(host: str) -> bool:
-    """Return True if *host* is a known Airbnb domain from the supported allowlist.
-
-    Only the bare domain (airbnb.<tld>) and its www. subdomain are accepted;
-    other subdomains (e.g. fr.airbnb.com) are not matched to keep the check
-    narrow for the MVP.
-    """
-    h = host.lower()
-    if h.startswith("www."):
-        h = h[4:]
-    if not h.startswith("airbnb."):
-        return False
-    tld = h[len("airbnb."):]
-    return tld in _AIRBNB_SUPPORTED_TLDS
+    """Return True if *host* matches the supported Airbnb hostname shape."""
+    return bool(_AIRBNB_HOST_RE.match(host.lower()))
 
 
 def _extract_listing_id_from_url(url: str) -> str:

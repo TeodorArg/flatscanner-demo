@@ -59,8 +59,14 @@ class TestAirbnbAdapterSupportsUrlPositive:
     def test_airbnb_de(self, airbnb_adapter):
         assert airbnb_adapter.supports_url("https://www.airbnb.de/rooms/789") is True
 
+    def test_airbnb_ru(self, airbnb_adapter):
+        assert airbnb_adapter.supports_url("https://www.airbnb.ru/rooms/789") is True
+
     def test_airbnb_com_au(self, airbnb_adapter):
         assert airbnb_adapter.supports_url("https://www.airbnb.com.au/rooms/1") is True
+
+    def test_airbnb_xyz_supported_without_allowlist(self, airbnb_adapter):
+        assert airbnb_adapter.supports_url("https://www.airbnb.xyz/rooms/1") is True
 
     def test_airbnb_com_listing_with_trailing_slash(self, airbnb_adapter):
         assert airbnb_adapter.supports_url("https://airbnb.com/rooms/99/") is True
@@ -105,12 +111,6 @@ class TestAirbnbAdapterSupportsUrlNegative:
     def test_airbnb_lookalike_subdomain_rejected(self, airbnb_adapter):
         assert airbnb_adapter.supports_url("https://airbnb.evil.com/rooms/1") is False
 
-    def test_airbnb_unlisted_tld_rejected(self, airbnb_adapter):
-        assert airbnb_adapter.supports_url("https://airbnb.xyz/rooms/123") is False
-
-    def test_airbnb_unlisted_compound_tld_rejected(self, airbnb_adapter):
-        assert airbnb_adapter.supports_url("https://airbnb.co.xx/rooms/123") is False
-
     def test_abnb_me_root_path_rejected(self, airbnb_adapter):
         assert airbnb_adapter.supports_url("https://abnb.me/") is False
 
@@ -144,6 +144,9 @@ class TestDetectProvider:
 
     def test_airbnb_localized_domain_returns_airbnb(self):
         assert detect_provider("https://airbnb.de/rooms/1") == ListingProvider.AIRBNB
+
+    def test_airbnb_ru_returns_airbnb(self):
+        assert detect_provider("https://www.airbnb.ru/rooms/1") == ListingProvider.AIRBNB
 
     def test_abnb_me_returns_airbnb(self):
         assert detect_provider("https://abnb.me/xyz") == ListingProvider.AIRBNB

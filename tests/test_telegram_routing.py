@@ -142,8 +142,14 @@ class TestIsSupportedProvider:
     def test_airbnb_ccTLD_is_supported(self):
         assert is_supported_provider("https://www.airbnb.de/rooms/789") is True
 
+    def test_airbnb_ru_is_supported(self):
+        assert is_supported_provider("https://www.airbnb.ru/rooms/789") is True
+
     def test_airbnb_compound_ccTLD_com_au_is_supported(self):
         assert is_supported_provider("https://www.airbnb.com.au/rooms/1") is True
+
+    def test_airbnb_generic_tld_is_supported(self):
+        assert is_supported_provider("https://www.airbnb.xyz/rooms/1") is True
 
     def test_airbnb_localized_non_listing_page_is_not_supported(self):
         assert is_supported_provider("https://www.airbnb.co.uk/help/article/1") is False
@@ -208,18 +214,10 @@ class TestIsSupportedProvider:
         # /rooms/123/photos is not a canonical listing URL — extra segments must be rejected
         assert is_supported_provider("https://www.airbnb.com/rooms/123/photos") is False
 
-    # --- Bogus ccTLD hosts not in the allowlist ---
+    # --- Bogus hosts outside the generic Airbnb hostname shape ---
 
-    def test_airbnb_unlisted_cctld_is_not_supported(self):
-        # airbnb.xyz is not in the supported TLD allowlist
-        assert is_supported_provider("https://airbnb.xyz/rooms/123") is False
-
-    def test_airbnb_unlisted_compound_cctld_is_not_supported(self):
-        # airbnb.co.xx is not a real Airbnb market and must not match
-        assert is_supported_provider("https://airbnb.co.xx/rooms/123") is False
-
-    def test_airbnb_unlisted_cctld_www_is_not_supported(self):
-        # www.airbnb.notreal is not in the allowlist
+    def test_airbnb_long_fake_suffix_is_not_supported(self):
+        # www.airbnb.notreal does not match the 1-2 label TLD pattern
         assert is_supported_provider("https://www.airbnb.notreal/rooms/123") is False
 
     # --- Non-http/https schemes ---
