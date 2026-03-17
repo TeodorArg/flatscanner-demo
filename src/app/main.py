@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
 from fastapi import FastAPI
+from redis.asyncio import Redis
 
 from src.app.config import Settings
 from src.telegram.router import router as telegram_router
@@ -9,9 +10,13 @@ from src.telegram.router import router as telegram_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    # Startup: nothing to connect on bootstrap; services added in later slices
-    yield
-    # Shutdown: teardown added alongside each service
+    settings: Settings = app.state.settings
+    redis = Redis.from_url(settings.redis_url, decode_responses=True)
+    app.state.redis = redis
+    try:
+        yield
+    finally:
+        await redis.aclose()
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -27,6 +32,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
 
     app.state.settings = settings
+    # Default to None; overwritten by lifespan on startup.
+    app.state.redis = None
 
     @app.get("/health", tags=["meta"])
     async def health() -> dict:

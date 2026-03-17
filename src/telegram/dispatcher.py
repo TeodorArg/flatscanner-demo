@@ -38,6 +38,7 @@ class AnalyseDecision(TypedDict):
     action: Literal["analyse"]
     url: str
     chat_id: int
+    provider: ListingProvider
 
 
 class HelpDecision(TypedDict):
@@ -80,8 +81,11 @@ def route_update(update: TelegramUpdate) -> RoutingDecision:
         return HelpDecision(action="help", chat_id=chat_id)
 
     for url in urls:
-        if is_supported_provider(url):
-            return AnalyseDecision(action="analyse", url=url, chat_id=chat_id)
+        provider = detect_provider(url)
+        if provider != ListingProvider.UNKNOWN:
+            return AnalyseDecision(
+                action="analyse", url=url, chat_id=chat_id, provider=provider
+            )
 
     # No supported URL found — report the first URL as unsupported
     return UnsupportedDecision(action="unsupported", url=urls[0], chat_id=chat_id)

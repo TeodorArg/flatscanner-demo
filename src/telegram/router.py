@@ -3,8 +3,11 @@
 import logging
 
 import httpx
+import redis.asyncio as aioredis
 from fastapi import APIRouter, HTTPException, Request
 
+from src.domain.listing import AnalysisJob
+from src.jobs.queue import enqueue_analysis_job
 from src.telegram.dispatcher import route_update
 from src.telegram.models import TelegramUpdate
 from src.telegram.sender import send_message
@@ -54,6 +57,36 @@ async def webhook(request: Request) -> dict:
         return {"ok": True}
 
     if decision["action"] == "analyse":
+        if update.message is None:
+            # Defensive: route_update only returns 'analyse' when a message is present.
+            # Guard explicitly rather than relying on assert (disabled under -O).
+            logger.error(
+                "route_update returned 'analyse' but update.message is None; dropping update"
+            )
+            return {"ok": True}
+        redis = request.app.state.redis
+        if redis is None:
+            logger.warning(
+                "Redis unavailable; cannot enqueue job for chat_id=%s — returning 502 for retry",
+                decision["chat_id"],
+            )
+            raise HTTPException(status_code=502, detail="Queue unavailable; please retry")
+        job = AnalysisJob(
+            source_url=decision["url"],
+            provider=decision["provider"],
+            telegram_chat_id=decision["chat_id"],
+            telegram_message_id=update.message.message_id,
+        )
+        try:
+            await enqueue_analysis_job(redis, job)
+        except aioredis.RedisError as exc:
+            logger.error(
+                "Redis error while enqueueing job for chat_id=%s url=%s: %s",
+                decision["chat_id"],
+                decision["url"],
+                exc,
+            )
+            raise HTTPException(status_code=502, detail="Queue unavailable; please retry")
         text = _MSG_ANALYSING.format(url=decision["url"])
     elif decision["action"] == "unsupported":
         text = _MSG_UNSUPPORTED

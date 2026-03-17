@@ -4,10 +4,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
+import redis.asyncio as aioredis
 from fastapi.testclient import TestClient
 
 from src.app.config import Settings
 from src.app.main import create_app
+from src.domain.listing import ListingProvider
 from src.telegram.dispatcher import extract_url, extract_urls, is_supported_provider, route_update
 from src.telegram.models import TelegramChat, TelegramMessage, TelegramUpdate, TelegramUser
 from src.telegram.sender import send_message
@@ -255,6 +257,12 @@ class TestRouteUpdate:
         assert decision["url"] == "https://abnb.me/abc123"
         assert decision["chat_id"] == 6
 
+    def test_analyse_decision_includes_provider(self):
+        update = _make_update("https://www.airbnb.com/rooms/999", chat_id=5)
+        decision = route_update(update)
+        assert decision["action"] == "analyse"
+        assert decision["provider"] == ListingProvider.AIRBNB
+
     def test_unsupported_when_non_airbnb_url(self):
         update = _make_update("https://www.booking.com/hotel/xyz", chat_id=9)
         decision = route_update(update)
@@ -400,7 +408,11 @@ class TestTelegramModels:
 
 class TestWebhookEndpoint:
     def _client(self, **settings_overrides) -> TestClient:
-        return TestClient(create_app(settings=_test_settings(**settings_overrides)))
+        app = create_app(settings=_test_settings(**settings_overrides))
+        mock_redis = AsyncMock()
+        mock_redis.eval.return_value = 1  # enqueue_analysis_job succeeds
+        app.state.redis = mock_redis
+        return TestClient(app)
 
     def _update_payload(self, text: str | None, chat_id: int = 1001) -> dict:
         payload: dict = {
@@ -572,6 +584,30 @@ class TestWebhookEndpoint:
         assert call_args[1] == 1001
         assert "airbnb.com/rooms/456" in call_args[2]
 
+    @patch("src.telegram.router.send_message", new_callable=AsyncMock)
+    def test_webhook_analyse_returns_502_when_redis_unavailable(self, mock_send):
+        """When Redis is unavailable, the analyse path must return 502 and not send a false acknowledgement."""
+        app = create_app(settings=_test_settings())
+        # app.state.redis is None by default (lifespan not run)
+        client = TestClient(app)
+        payload = self._update_payload("https://www.airbnb.com/rooms/123")
+        response = client.post("/telegram/webhook", json=payload)
+        assert response.status_code == 502
+        mock_send.assert_not_awaited()
+
+    @patch("src.telegram.router.send_message", new_callable=AsyncMock)
+    def test_webhook_analyse_returns_502_on_redis_error_during_enqueue(self, mock_send):
+        """A RedisError raised by enqueue_analysis_job must return 502 and not call send_message."""
+        app = create_app(settings=_test_settings())
+        mock_redis = AsyncMock()
+        mock_redis.eval.side_effect = aioredis.RedisError("connection reset")
+        app.state.redis = mock_redis
+        client = TestClient(app)
+        payload = self._update_payload("https://www.airbnb.com/rooms/123")
+        response = client.post("/telegram/webhook", json=payload)
+        assert response.status_code == 502
+        mock_send.assert_not_awaited()
+
 
 # ---------------------------------------------------------------------------
 # Webhook authentication
@@ -580,7 +616,11 @@ class TestWebhookEndpoint:
 
 class TestWebhookAuthentication:
     def _client(self, **settings_overrides) -> TestClient:
-        return TestClient(create_app(settings=_test_settings(**settings_overrides)))
+        app = create_app(settings=_test_settings(**settings_overrides))
+        mock_redis = AsyncMock()
+        mock_redis.eval.return_value = 1
+        app.state.redis = mock_redis
+        return TestClient(app)
 
     def _update_payload(self) -> dict:
         return {
