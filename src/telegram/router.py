@@ -3,6 +3,7 @@
 import logging
 
 import httpx
+import redis.asyncio as aioredis
 from fastapi import APIRouter, HTTPException, Request
 
 from src.domain.listing import AnalysisJob
@@ -76,7 +77,16 @@ async def webhook(request: Request) -> dict:
             telegram_chat_id=decision["chat_id"],
             telegram_message_id=update.message.message_id,
         )
-        await enqueue_analysis_job(redis, job)
+        try:
+            await enqueue_analysis_job(redis, job)
+        except aioredis.RedisError as exc:
+            logger.error(
+                "Redis error while enqueueing job for chat_id=%s url=%s: %s",
+                decision["chat_id"],
+                decision["url"],
+                exc,
+            )
+            raise HTTPException(status_code=502, detail="Queue unavailable; please retry")
         text = _MSG_ANALYSING.format(url=decision["url"])
     elif decision["action"] == "unsupported":
         text = _MSG_UNSUPPORTED

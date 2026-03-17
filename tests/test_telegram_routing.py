@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
+import redis.asyncio as aioredis
 from fastapi.testclient import TestClient
 
 from src.app.config import Settings
@@ -588,6 +589,19 @@ class TestWebhookEndpoint:
         """When Redis is unavailable, the analyse path must return 502 and not send a false acknowledgement."""
         app = create_app(settings=_test_settings())
         # app.state.redis is None by default (lifespan not run)
+        client = TestClient(app)
+        payload = self._update_payload("https://www.airbnb.com/rooms/123")
+        response = client.post("/telegram/webhook", json=payload)
+        assert response.status_code == 502
+        mock_send.assert_not_awaited()
+
+    @patch("src.telegram.router.send_message", new_callable=AsyncMock)
+    def test_webhook_analyse_returns_502_on_redis_error_during_enqueue(self, mock_send):
+        """A RedisError raised by enqueue_analysis_job must return 502 and not call send_message."""
+        app = create_app(settings=_test_settings())
+        mock_redis = AsyncMock()
+        mock_redis.eval.side_effect = aioredis.RedisError("connection reset")
+        app.state.redis = mock_redis
         client = TestClient(app)
         payload = self._update_payload("https://www.airbnb.com/rooms/123")
         response = client.post("/telegram/webhook", json=payload)
