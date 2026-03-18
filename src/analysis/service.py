@@ -29,9 +29,10 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 _SYSTEM_PROMPT = (
-    "You are a rental-property analyst. "
-    "Respond ONLY with a valid JSON object — no markdown, no commentary. "
-    "Use the schema provided in the user message."
+    "Ты аналитик по аренде жилья. "
+    "Отвечай ТОЛЬКО корректным JSON-объектом без markdown и без пояснений вне JSON. "
+    "Все текстовые поля ответа пиши на русском языке. "
+    "Используй схему из пользовательского сообщения."
 )
 
 _JSON_SCHEMA_HINT = """\
@@ -51,7 +52,7 @@ def build_prompt(
     """Return a user-turn prompt for the given listing.
 
     Includes all available structured fields so the model has maximum
-    context.  Description is capped at 600 characters to control token
+    context. Description is capped at 600 characters to control token
     cost.
 
     Parameters
@@ -59,79 +60,75 @@ def build_prompt(
     listing:
         Normalized listing to analyse.
     enrichment:
-        Optional enrichment outcome.  Successful provider results are
-        appended as a structured "Nearby context" section so the model
+        Optional enrichment outcome. Successful provider results are
+        appended as a structured nearby-context section so the model
         can factor in transport access and local amenities.
     """
-    lines: list[str] = ["Analyse this rental listing.\n"]
+    lines: list[str] = ["Проанализируй это объявление об аренде.\n"]
 
-    lines.append(f"Title: {listing.title}")
+    lines.append(f"Название: {listing.title}")
 
     if listing.description:
         snippet = listing.description[:600]
         if len(listing.description) > 600:
-            snippet += "…"
-        lines.append(f"Description: {snippet}")
+            snippet += "..."
+        lines.append(f"Описание: {snippet}")
 
     loc = listing.location
-    location_parts = [
-        p
-        for p in [loc.neighbourhood, loc.city, loc.country]
-        if p
-    ]
+    location_parts = [p for p in [loc.neighbourhood, loc.city, loc.country] if p]
     if location_parts:
-        lines.append(f"Location: {', '.join(location_parts)}")
+        lines.append(f"Локация: {', '.join(location_parts)}")
 
     if listing.price is not None:
         p = listing.price
-        lines.append(
-            f"Price: {p.amount} {p.currency} per {p.period}"
-        )
+        lines.append(f"Цена: {p.amount} {p.currency} за {p.period}")
         if p.cleaning_fee is not None:
-            lines.append(f"Cleaning fee: {p.cleaning_fee} {p.currency}")
+            lines.append(f"Плата за уборку: {p.cleaning_fee} {p.currency}")
 
     if listing.bedrooms is not None:
-        lines.append(f"Bedrooms: {listing.bedrooms}")
+        lines.append(f"Спальни: {listing.bedrooms}")
     if listing.bathrooms is not None:
-        lines.append(f"Bathrooms: {listing.bathrooms}")
+        lines.append(f"Ванные: {listing.bathrooms}")
     if listing.max_guests is not None:
-        lines.append(f"Max guests: {listing.max_guests}")
+        lines.append(f"Макс. гостей: {listing.max_guests}")
 
     if listing.amenities:
-        lines.append(f"Amenities: {', '.join(listing.amenities[:15])}")
+        lines.append(f"Удобства: {', '.join(listing.amenities[:15])}")
 
     if listing.rating is not None:
-        lines.append(f"Rating: {listing.rating:.2f} / 5")
+        lines.append(f"Рейтинг: {listing.rating:.2f} / 5")
     if listing.review_count is not None:
-        lines.append(f"Reviews: {listing.review_count}")
+        lines.append(f"Отзывы: {listing.review_count}")
 
     if listing.host_name:
-        host_line = f"Host: {listing.host_name}"
+        host_line = f"Хозяин: {listing.host_name}"
         if listing.host_is_superhost:
-            host_line += " (Superhost)"
+            host_line += " (Суперхост)"
         lines.append(host_line)
 
     if enrichment and enrichment.successes:
-        lines.append("\nNearby context (from enrichment):")
+        lines.append("\nКонтекст рядом с жильем (из enrichment):")
         for result in enrichment.successes:
             data = result.data or {}
             if result.name == "transport":
                 count = data.get("count", 0)
-                parts = [f"{count} public transport stop(s) within 500 m"]
+                parts = [f"{count} остановок общественного транспорта в радиусе 500 м"]
                 nearest = data.get("nearest_name")
                 if nearest:
-                    parts.append(f"nearest: {nearest!r}")
-                lines.append(f"  Transport: {', '.join(parts)}")
+                    parts.append(f"ближайшая: {nearest!r}")
+                lines.append(f"  Транспорт: {', '.join(parts)}")
             elif result.name == "nearby_places":
                 count = data.get("count", 0)
                 by_cat = data.get("by_category", {})
                 cat_str = ", ".join(f"{k}: {v}" for k, v in by_cat.items())
-                line = f"  Nearby places: {count} total within 500 m"
+                line = f"  Места рядом: {count} всего в радиусе 500 м"
                 if cat_str:
                     line += f" ({cat_str})"
                 lines.append(line)
 
-    lines.append(f"\nRespond ONLY with JSON matching this schema:\n{_JSON_SCHEMA_HINT}")
+    lines.append(
+        f"\nОтветь ТОЛЬКО JSON-объектом, который соответствует этой схеме:\n{_JSON_SCHEMA_HINT}"
+    )
 
     return "\n".join(lines)
 
@@ -144,7 +141,7 @@ def build_prompt(
 def parse_analysis_response(raw: str) -> AnalysisResult:
     """Parse the model's raw text response into an ``AnalysisResult``.
 
-    The model is instructed to reply with pure JSON.  This function is
+    The model is instructed to reply with pure JSON. This function is
     lenient about leading/trailing whitespace but strict about the JSON
     structure itself.
 
@@ -180,9 +177,7 @@ def parse_analysis_response(raw: str) -> AnalysisResult:
         raise ValueError(f"Model response is not valid JSON: {exc}") from exc
 
     if not isinstance(data, dict):
-        raise ValueError(
-            f"Expected a JSON object, got {type(data).__name__}"
-        )
+        raise ValueError(f"Expected a JSON object, got {type(data).__name__}")
 
     # summary is required and must be a non-empty string.
     summary = data.get("summary")
@@ -199,9 +194,7 @@ def parse_analysis_response(raw: str) -> AnalysisResult:
         )
     risks_raw = data.get("risks", [])
     if not isinstance(risks_raw, list):
-        raise ValueError(
-            f"'risks' must be a list, got {type(risks_raw).__name__}"
-        )
+        raise ValueError(f"'risks' must be a list, got {type(risks_raw).__name__}")
 
     # Coerce price_verdict to enum; fall back to UNKNOWN for unrecognised values.
     raw_verdict = data.get("price_verdict", "unknown")
@@ -236,7 +229,7 @@ class AnalysisService:
         Application settings; ``openrouter_api_key`` and
         ``openrouter_model`` are used to build the default client.
     client:
-        Optional pre-built ``OpenRouterClient``.  When provided, *settings*
+        Optional pre-built ``OpenRouterClient``. When provided, *settings*
         is not used to construct the client (useful for testing).
     """
 
@@ -262,7 +255,7 @@ class AnalysisService:
         listing:
             Provider-agnostic normalized listing data.
         enrichment:
-            Optional enrichment outcome.  Successful provider results are
+            Optional enrichment outcome. Successful provider results are
             included in the prompt so the model can factor in nearby context.
 
         Returns

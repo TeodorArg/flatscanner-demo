@@ -45,19 +45,19 @@ class TestMessageStructure:
 
     def test_strengths_section_present(self):
         msg = format_analysis_message(_listing(), _result())
-        assert "Strengths:" in msg
+        assert "Плюсы:" in msg
         assert "- Great location" in msg
         assert "- Superhost" in msg
 
     def test_risks_section_present(self):
         msg = format_analysis_message(_listing(), _result())
-        assert "Risks:" in msg
+        assert "Риски:" in msg
         assert "- Small space" in msg
         assert "- Steep cleaning fee" in msg
 
     def test_price_section_with_explanation(self):
         msg = format_analysis_message(_listing(), _result())
-        assert "Price: Fair - Price is in line with similar studios." in msg
+        assert "Цена: Справедливо - Price is in line with similar studios." in msg
 
     def test_sections_separated_by_blank_lines(self):
         msg = format_analysis_message(_listing(), _result())
@@ -67,43 +67,43 @@ class TestMessageStructure:
 class TestVerdictWording:
     def test_fair_verdict(self):
         msg = format_analysis_message(_listing(), _result(price_verdict=PriceVerdict.FAIR))
-        assert "Price: Fair" in msg
+        assert "Цена: Справедливо" in msg
 
     def test_overpriced_verdict(self):
         msg = format_analysis_message(
             _listing(), _result(price_verdict=PriceVerdict.OVERPRICED)
         )
-        assert "Price: Overpriced" in msg
+        assert "Цена: Завышено" in msg
 
     def test_underpriced_verdict(self):
         msg = format_analysis_message(
             _listing(), _result(price_verdict=PriceVerdict.UNDERPRICED)
         )
-        assert "Price: Underpriced" in msg
+        assert "Цена: Занижено" in msg
 
     def test_unknown_verdict(self):
         msg = format_analysis_message(
             _listing(), _result(price_verdict=PriceVerdict.UNKNOWN)
         )
-        assert "Price: Unknown" in msg
+        assert "Цена: Неясно" in msg
 
 
 class TestOmissionAndFallback:
     def test_empty_strengths_omits_section(self):
         msg = format_analysis_message(_listing(), _result(strengths=[]))
-        assert "Strengths:" not in msg
+        assert "Плюсы:" not in msg
 
     def test_empty_risks_omits_section(self):
         msg = format_analysis_message(_listing(), _result(risks=[]))
-        assert "Risks:" not in msg
+        assert "Риски:" not in msg
 
     def test_both_empty_message_still_valid(self):
         msg = format_analysis_message(_listing(), _result(strengths=[], risks=[]))
         assert "Cozy Studio in Paris" in msg
         assert "A charming place to stay." in msg
-        assert "Strengths:" not in msg
-        assert "Risks:" not in msg
-        assert "Price:" in msg
+        assert "Плюсы:" not in msg
+        assert "Риски:" not in msg
+        assert "Цена:" in msg
 
     def test_no_price_explanation_omits_separator(self):
         msg = format_analysis_message(
@@ -111,7 +111,7 @@ class TestOmissionAndFallback:
             _result(price_explanation="", strengths=[], risks=[]),
         )
         price_line = msg.splitlines()[-1]
-        assert price_line == "Price: Fair"
+        assert price_line == "Цена: Справедливо"
         assert " - " not in price_line
 
     def test_single_strength_bullet(self):

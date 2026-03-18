@@ -416,12 +416,12 @@ class TestBuildPrompt:
         assert "85" in prompt
         assert "USD" in prompt
         assert "night" in prompt
-        assert "Bedrooms: 1" in prompt
+        assert "Спальни: 1" in prompt
         assert "WiFi" in prompt
         assert "4.87" in prompt
         assert "156" in prompt
         assert "Marie" in prompt
-        assert "Superhost" in prompt
+        assert "Суперхост" in prompt
 
     def test_description_included_when_present(self):
         prompt = build_prompt(_full_listing())
@@ -431,15 +431,15 @@ class TestBuildPrompt:
         long_desc = "x" * 700
         listing = _minimal_listing(description=long_desc)
         prompt = build_prompt(listing)
-        # The description snippet is 600 chars + ellipsis, not the full 700
+        # The description snippet is 600 chars + truncation suffix, not the full 700
         assert long_desc not in prompt
-        assert "…" in prompt
+        assert "..." in prompt
 
     def test_missing_optional_fields_absent(self):
         prompt = build_prompt(_minimal_listing())
-        assert "Price:" not in prompt
-        assert "Bedrooms:" not in prompt
-        assert "Rating:" not in prompt
+        assert "Цена:" not in prompt
+        assert "Спальни:" not in prompt
+        assert "Рейтинг:" not in prompt
 
     def test_prompt_requests_json_schema(self):
         prompt = build_prompt(_minimal_listing())
@@ -448,7 +448,7 @@ class TestBuildPrompt:
 
     def test_no_enrichment_section_when_enrichment_is_none(self):
         prompt = build_prompt(_minimal_listing(), enrichment=None)
-        assert "Nearby context" not in prompt
+        assert "Контекст рядом с жильем" not in prompt
 
     def test_no_enrichment_section_when_all_enrichments_failed(self):
         outcome = EnrichmentOutcome(
@@ -456,7 +456,7 @@ class TestBuildPrompt:
             failures=[EnrichmentProviderResult(name="transport", error=RuntimeError("down"))],
         )
         prompt = build_prompt(_minimal_listing(), enrichment=outcome)
-        assert "Nearby context" not in prompt
+        assert "Контекст рядом с жильем" not in prompt
 
     def test_transport_enrichment_appears_in_prompt(self):
         transport_result = EnrichmentProviderResult(
@@ -465,9 +465,9 @@ class TestBuildPrompt:
         )
         outcome = EnrichmentOutcome(successes=[transport_result])
         prompt = build_prompt(_minimal_listing(), enrichment=outcome)
-        assert "Nearby context" in prompt
-        assert "Transport" in prompt
-        assert "3 public transport stop(s)" in prompt
+        assert "Контекст рядом с жильем" in prompt
+        assert "Транспорт" in prompt
+        assert "3 остановок общественного транспорта" in prompt
         assert "Châtelet" in prompt
 
     def test_nearby_places_enrichment_appears_in_prompt(self):
@@ -477,9 +477,9 @@ class TestBuildPrompt:
         )
         outcome = EnrichmentOutcome(successes=[places_result])
         prompt = build_prompt(_minimal_listing(), enrichment=outcome)
-        assert "Nearby context" in prompt
-        assert "Nearby places" in prompt
-        assert "10 total within 500 m" in prompt
+        assert "Контекст рядом с жильем" in prompt
+        assert "Места рядом" in prompt
+        assert "10 всего в радиусе 500 м" in prompt
         assert "shops: 3" in prompt
 
     def test_both_enrichments_appear_in_prompt(self):
@@ -496,8 +496,8 @@ class TestBuildPrompt:
             ]
         )
         prompt = build_prompt(_minimal_listing(), enrichment=outcome)
-        assert "Transport" in prompt
-        assert "Nearby places" in prompt
+        assert "Транспорт" in prompt
+        assert "Места рядом" in prompt
 
     def test_transport_without_nearest_name_omits_nearest(self):
         transport_result = EnrichmentProviderResult(
@@ -506,7 +506,7 @@ class TestBuildPrompt:
         )
         outcome = EnrichmentOutcome(successes=[transport_result])
         prompt = build_prompt(_minimal_listing(), enrichment=outcome)
-        assert "nearest:" not in prompt
+        assert "ближайшая:" not in prompt
 
 
 # ---------------------------------------------------------------------------
@@ -542,7 +542,9 @@ class TestAnalysisService:
         messages = mock_chat.call_args.args[0]
         assert messages[0]["role"] == "system"
         assert messages[1]["role"] == "user"
+        assert "пиши на русском языке" in messages[0]["content"]
         assert "Cozy Studio in Paris" in messages[1]["content"]
+        assert "Название:" in messages[1]["content"]
 
     @pytest.mark.asyncio
     async def test_analyse_propagates_openrouter_error(self):
@@ -577,7 +579,7 @@ class TestAnalysisService:
         messages = mock_chat.call_args.args[0]
         user_content = messages[1]["content"]
         assert "Gare du Nord" in user_content
-        assert "4 public transport stop(s)" in user_content
+        assert "4 остановок общественного транспорта" in user_content
 
 
 # ---------------------------------------------------------------------------
