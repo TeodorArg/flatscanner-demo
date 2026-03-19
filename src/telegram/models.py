@@ -24,6 +24,18 @@ class TelegramMessage(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+class TelegramCallbackQuery(BaseModel):
+    """Inline-keyboard button press from the Telegram Bot API."""
+
+    id: str
+    from_: TelegramUser = Field(..., alias="from")
+    message: TelegramMessage | None = None
+    data: str | None = None
+
+    model_config = {"populate_by_name": True}
+
+
 class TelegramUpdate(BaseModel):
     update_id: int
     message: TelegramMessage | None = None
+    callback_query: TelegramCallbackQuery | None = None

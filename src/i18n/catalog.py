@@ -117,6 +117,109 @@ _CATALOG: dict[str, dict[Language, str]] = {
         Language.EN: "\n\n[Message truncated]",
         Language.ES: "\n\n[Mensaje truncado]",
     },
+    # --- Menu: main ---
+    "menu.main.title": {
+        Language.RU: "Главное меню",
+        Language.EN: "Main Menu",
+        Language.ES: "Menú principal",
+    },
+    "menu.main.lang_btn": {
+        Language.RU: "🌐 Язык",
+        Language.EN: "🌐 Language",
+        Language.ES: "🌐 Idioma",
+    },
+    "menu.main.settings_btn": {
+        Language.RU: "⚙️ Настройки",
+        Language.EN: "⚙️ Settings",
+        Language.ES: "⚙️ Configuración",
+    },
+    "menu.main.billing_btn": {
+        Language.RU: "💳 Оплата",
+        Language.EN: "💳 Billing",
+        Language.ES: "💳 Facturación",
+    },
+    "menu.main.help_btn": {
+        Language.RU: "❓ Помощь",
+        Language.EN: "❓ Help",
+        Language.ES: "❓ Ayuda",
+    },
+    # --- Menu: language screen ---
+    "menu.language.title": {
+        Language.RU: "Выберите язык:",
+        Language.EN: "Choose your language:",
+        Language.ES: "Elige tu idioma:",
+    },
+    "menu.language.selected": {
+        Language.RU: "Язык изменён.",
+        Language.EN: "Language updated.",
+        Language.ES: "Idioma actualizado.",
+    },
+    "menu.language.ru_btn": {
+        Language.RU: "🇷🇺 Русский",
+        Language.EN: "🇷🇺 Русский",
+        Language.ES: "🇷🇺 Русский",
+    },
+    "menu.language.en_btn": {
+        Language.RU: "🇬🇧 English",
+        Language.EN: "🇬🇧 English",
+        Language.ES: "🇬🇧 English",
+    },
+    "menu.language.es_btn": {
+        Language.RU: "🇪🇸 Español",
+        Language.EN: "🇪🇸 Español",
+        Language.ES: "🇪🇸 Español",
+    },
+    # --- Menu: settings screen ---
+    "menu.settings.title": {
+        Language.RU: "Настройки",
+        Language.EN: "Settings",
+        Language.ES: "Configuración",
+    },
+    "menu.settings.body": {
+        Language.RU: "Дополнительные настройки появятся здесь в следующих обновлениях.",
+        Language.EN: "Additional settings will appear here in future updates.",
+        Language.ES: "La configuración adicional aparecerá aquí en futuras actualizaciones.",
+    },
+    # --- Menu: billing screen ---
+    "menu.billing.title": {
+        Language.RU: "Оплата",
+        Language.EN: "Billing",
+        Language.ES: "Facturación",
+    },
+    "menu.billing.body": {
+        Language.RU: "Тарифные планы и оплата появятся здесь в следующих обновлениях.",
+        Language.EN: "Plans and payment options will appear here in future updates.",
+        Language.ES: "Los planes y opciones de pago aparecerán aquí en futuras actualizaciones.",
+    },
+    # --- Menu: help screen ---
+    "menu.help.title": {
+        Language.RU: "❓ Помощь",
+        Language.EN: "❓ Help",
+        Language.ES: "❓ Ayuda",
+    },
+    "menu.help.body": {
+        Language.RU: (
+            "Отправьте ссылку на объявление об аренде (например, Airbnb) "
+            "— я проанализирую его для вас.\n\n"
+            "Команды:\n/menu — открыть меню\n/language <код> — сменить язык"
+        ),
+        Language.EN: (
+            "Send a rental listing URL (e.g. Airbnb) "
+            "and I'll analyse it for you.\n\n"
+            "Commands:\n/menu — open menu\n/language <code> — change language"
+        ),
+        Language.ES: (
+            "Envía una URL de anuncio de alquiler (p. ej. Airbnb) "
+            "y lo analizaré para ti.\n\n"
+            "Comandos:\n/menu — abrir menú\n/language <código> — cambiar idioma"
+        ),
+    },
+    # --- Menu: shared navigation ---
+    "menu.back_btn": {
+        Language.RU: "← Назад",
+        Language.EN: "← Back",
+        Language.ES: "← Volver",
+    },
 }
 
 
