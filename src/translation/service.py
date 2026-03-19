@@ -1,8 +1,8 @@
 """On-demand translation of freeform analysis result blocks.
 
-``TranslationService`` translates the freeform text fields of an
-``AnalysisResult`` (summary, strengths, risks, price_explanation) into
-the requested language using the LLM.
+``TranslationService`` translates the user-facing text fields of an
+``AnalysisResult`` (`display_title`, `summary`, `strengths`, `risks`,
+`price_explanation`) into the requested language using the LLM.
 
 Design constraints:
 - English results are returned as-is without any LLM call.
@@ -35,6 +35,7 @@ _LANGUAGE_NAME: dict[Language, str] = {
 
 _TRANSLATION_SCHEMA_HINT = """\
 {
+  "display_title": "<translated title>",
   "summary": "<translated summary>",
   "strengths": ["<translated strength 1>", "<translated strength 2>"],
   "risks": ["<translated risk 1>", "<translated risk 2>"],
@@ -50,6 +51,7 @@ def _build_translation_prompt(result: AnalysisResult, language: Language) -> str
     """Return the user-turn prompt for translating *result* into *language*."""
     lang_name = _LANGUAGE_NAME[language]
     source = {
+        "display_title": result.display_title,
         "summary": result.summary,
         "strengths": result.strengths,
         "risks": result.risks,
@@ -141,6 +143,11 @@ def _parse_translation_response(raw: str, original: AnalysisResult) -> AnalysisR
             f"Translation response must be a JSON object, got {type(data).__name__}"
         )
 
+    display_title = data.get("display_title", original.display_title)
+    if not isinstance(display_title, str) or not display_title.strip():
+        logger.warning("Translation response missing 'display_title'; using original")
+        display_title = original.display_title
+
     summary = data.get("summary")
     if not isinstance(summary, str) or not summary.strip():
         logger.warning("Translation response missing 'summary'; using original")
@@ -163,6 +170,7 @@ def _parse_translation_response(raw: str, original: AnalysisResult) -> AnalysisR
         price_explanation = original.price_explanation
 
     return AnalysisResult(
+        display_title=display_title,
         summary=summary,
         strengths=strengths,
         risks=risks,

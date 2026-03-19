@@ -18,14 +18,15 @@
 ## Implementation
 
 - [x] Add `src/i18n/` with language types, catalog, and `get_string` helper
-- [x] Add `src/storage/chat_preferences.py` — Redis-backed chat language preference repository
+- [x] Add `src/storage/chat_preferences.py` - Redis-backed chat language preference repository
 - [x] Extend `AnalysisJob` with `language` (defaults to `DEFAULT_LANGUAGE`)
 - [x] Snapshot the effective language when enqueueing an analysis job
 - [x] Localize immediate Telegram replies (`help`, `unsupported`, `analysing`) via i18n catalog
 - [x] Keep `AnalysisService` canonical output in English for generated freeform blocks
-- [x] Add `src/translation/` — on-demand translation service for structured freeform result blocks
+- [x] Add `src/translation/` - on-demand translation service for structured freeform result blocks
 - [x] Keep translated output ephemeral; do not persist it as a multilingual cache artifact
 - [x] Update the formatter to render localized labels and consume translated blocks (`language` parameter + i18n catalog)
+- [x] Localize provider-derived listing display titles through the same translation stage before final Telegram rendering
 - [x] Add language switching flow in Telegram (`/language ru|en|es` command in dispatcher + router)
 - [x] Add formatter i18n catalog keys (section labels, verdict labels, truncation suffix)
 
@@ -37,7 +38,8 @@
 - [x] Add tests for on-demand translation behavior without persisted translation caching (`tests/test_translation_service.py`)
 - [x] Add tests for `ru`, `en`, and `es` formatter output (`tests/test_telegram_formatter.py`)
 - [x] Add tests for `/language` command routing and webhook integration
-- [x] Run full `python -m pytest -q` — 486 passed
+- [x] Add regression tests for localized provider-derived display titles in translation, processing, and formatting
+- [x] Run full `python -m pytest -q` - 497 passed
 
 ## Follow-Up
 

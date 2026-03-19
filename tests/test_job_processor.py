@@ -55,6 +55,7 @@ def _make_listing() -> NormalizedListing:
 
 def _make_result() -> AnalysisResult:
     return AnalysisResult(
+        display_title="Cozy flat in Berlin",
         summary="A pleasant flat in central Berlin.",
         strengths=["Central location", "Modern kitchen"],
         risks=["Noisy street"],
@@ -410,6 +411,43 @@ class TestProcessJobTranslationFallback:
         assert sent_texts
         assert "A pleasant flat in central Berlin." in sent_texts[0]
         assert "Price:" in sent_texts[0]
+
+
+class TestProcessJobLocalizedTitle:
+    @pytest.mark.asyncio
+    async def test_uses_translated_display_title_in_sent_message(self):
+        job = _make_job(language=Language.ES)
+        listing = _make_listing()
+        result = _make_result()
+        settings = _make_settings()
+
+        mock_adapter = MagicMock()
+        mock_adapter.fetch = AsyncMock(return_value=listing)
+        mock_service = MagicMock(spec=AnalysisService)
+        mock_service.analyse = AsyncMock(return_value=result)
+
+        translated_result = result.model_copy(
+            update={"display_title": "Apartamento acogedor en Berlin"}
+        )
+        mock_translation_service = MagicMock()
+        mock_translation_service.translate = AsyncMock(return_value=translated_result)
+
+        sent_texts: list[str] = []
+
+        async def fake_send(token, chat_id, text, *, client=None):
+            sent_texts.append(text)
+
+        with patch("src.jobs.processor.send_message", side_effect=fake_send):
+            await process_job(
+                job,
+                settings,
+                adapter=mock_adapter,
+                analysis_service=mock_service,
+                translation_service=mock_translation_service,
+            )
+
+        assert sent_texts
+        assert sent_texts[0].startswith("Apartamento acogedor en Berlin")
 
 
 # ---------------------------------------------------------------------------
