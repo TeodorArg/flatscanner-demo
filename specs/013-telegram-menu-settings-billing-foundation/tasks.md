@@ -18,24 +18,33 @@
 
 ## Implementation
 
-- [ ] Add Telegram menu callback parsing and screen rendering foundation
-- [ ] Add `/menu` command handling
-- [ ] Add main menu inline keyboard and localized copy
-- [ ] Introduce generalized `ChatSettings` storage and migrate language access
-- [ ] Add menu-based language selection screen
-- [ ] Keep `/language` fallback behavior working on top of the settings layer
-- [ ] Add stub settings screen designed for future options
-- [ ] Add stub billing screen designed for future plans and checkout flows
-- [ ] Add i18n strings for menu labels, buttons, and navigation feedback
+- [x] Add Telegram menu callback parsing and screen rendering foundation
+  (`src/telegram/menu/callback.py`, `src/telegram/menu/screens.py`)
+- [x] Add `/menu` command handling (dispatcher + router)
+- [x] Add main menu inline keyboard and localized copy
+- [x] Introduce generalized `ChatSettings` storage and migrate language access
+  (`src/storage/chat_settings.py` wraps `chat_preferences`)
+- [x] Add menu-based language selection screen
+- [x] Keep `/language` fallback behavior working on top of the settings layer
+- [x] Add stub settings screen designed for future options
+- [x] Add stub billing screen designed for future plans and checkout flows
+- [x] Add i18n strings for menu labels, buttons, and navigation feedback
+  (all `menu.*` keys added to `src/i18n/catalog.py`)
 
 ## Validation
 
-- [ ] Add tests for callback payload parsing and dispatch
-- [ ] Add tests for localized main-menu rendering
-- [ ] Add tests for language selection through the menu
-- [ ] Add tests for `ChatSettings` persistence
-- [ ] Add tests for settings/billing stub screens and back navigation
-- [ ] Run `python -m pytest -q`
+- [x] Add tests for callback payload parsing and dispatch
+  (`tests/test_menu.py::TestBuildCallback`, `TestParseCallback`, `TestIsMenuCallback`,
+  `TestMenuCommandRouting`, `TestCallbackQueryRouting`)
+- [x] Add tests for localized main-menu rendering (`tests/test_menu.py::TestRenderMainMenu`,
+  `TestRenderLanguageScreen`, `TestRenderSettingsScreen`, `TestRenderBillingScreen`,
+  `TestRenderHelpScreen`, `TestScreenRenderers`)
+- [x] Add tests for language selection through the menu
+  (`tests/test_menu.py::TestWebhookMenuCallback.test_language_set_*`)
+- [x] Add tests for `ChatSettings` persistence (`tests/test_menu.py::TestChatSettings`)
+- [x] Add tests for settings/billing stub screens and back navigation
+  (`tests/test_menu.py::TestWebhookMenuCallback`)
+- [x] Run `python -m pytest -q` — 645 passed
 
 ## Follow-Up
 

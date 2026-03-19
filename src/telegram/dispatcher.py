@@ -6,12 +6,16 @@ from typing import Literal, TypedDict
 from src.adapters.registry import detect_provider
 from src.domain.listing import ListingProvider
 from src.i18n.types import Language
+from src.telegram.menu.callback import is_menu_callback
 from src.telegram.models import TelegramUpdate
 
 _URL_RE = re.compile(r"https?://\S+", re.IGNORECASE)
 
 # Matches "/language" optionally followed by a language code, e.g. "/language ru".
 _LANGUAGE_CMD_RE = re.compile(r"^/language(?:\s+(\S+))?", re.IGNORECASE)
+
+# Matches "/menu" with optional trailing whitespace.
+_MENU_CMD_RE = re.compile(r"^/menu\b", re.IGNORECASE)
 
 
 def extract_url(text: str) -> str | None:
@@ -63,27 +67,55 @@ class SetLanguageDecision(TypedDict):
     language: Language | None
 
 
+class OpenMenuDecision(TypedDict):
+    action: Literal["open_menu"]
+    chat_id: int
+
+
+class MenuCallbackDecision(TypedDict):
+    action: Literal["menu_callback"]
+    chat_id: int
+    callback_query_id: str
+    message_id: int
+    callback_data: str
+
+
 RoutingDecision = (
     IgnoreDecision
     | AnalyseDecision
     | HelpDecision
     | UnsupportedDecision
     | SetLanguageDecision
+    | OpenMenuDecision
+    | MenuCallbackDecision
 )
 
 
 def route_update(update: TelegramUpdate) -> RoutingDecision:
     """Inspect a Telegram update and return a routing decision.
 
-    - ``ignore``: no message or no text to act on.
-    - ``analyse``: message contains a supported provider URL — enqueue an analysis job.
+    - ``ignore``: no actionable content.
+    - ``open_menu``: user sent the ``/menu`` command.
+    - ``menu_callback``: user pressed an inline-keyboard button with menu data.
+    - ``analyse``: message contains a supported provider URL.
     - ``unsupported``: message contains URLs but none from a supported provider.
     - ``set_language``: message is a ``/language <code>`` command.
     - ``help``: message has text but no URL and no recognised command.
-
-    All URLs in the message are inspected; a supported URL is chosen even when it
-    is not the first URL in the text.
     """
+    # --- Callback queries (inline keyboard button presses) ---
+    if update.callback_query is not None:
+        cb = update.callback_query
+        if cb.data and is_menu_callback(cb.data) and cb.message is not None:
+            return MenuCallbackDecision(
+                action="menu_callback",
+                chat_id=cb.message.chat.id,
+                callback_query_id=cb.id,
+                message_id=cb.message.message_id,
+                callback_data=cb.data,
+            )
+        return IgnoreDecision(action="ignore")
+
+    # --- Regular messages ---
     if not update.message:
         return IgnoreDecision(action="ignore")
 
@@ -96,8 +128,12 @@ def route_update(update: TelegramUpdate) -> RoutingDecision:
     chat_id = update.message.chat.id
 
     if not urls:
-        # Check for /language command before falling back to help.
-        m = _LANGUAGE_CMD_RE.match(text.strip())
+        stripped = text.strip()
+        # /menu command
+        if _MENU_CMD_RE.match(stripped):
+            return OpenMenuDecision(action="open_menu", chat_id=chat_id)
+        # /language command
+        m = _LANGUAGE_CMD_RE.match(stripped)
         if m:
             code = m.group(1)
             lang: Language | None = None
