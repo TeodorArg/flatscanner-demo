@@ -13,7 +13,7 @@ from src.storage.chat_preferences import get_chat_language, set_chat_language
 from src.storage.chat_settings import ChatSettings, get_chat_settings, save_chat_settings
 from src.telegram.dispatcher import route_update
 from src.telegram.menu.callback import parse_callback
-from src.telegram.menu.screens import SCREEN_RENDERERS, render_language_screen
+from src.telegram.menu.screens import SCREEN_RENDERERS, render_language_screen, render_main_menu
 from src.telegram.models import TelegramUpdate
 from src.telegram.sender import answer_callback_query, edit_message_text, send_message
 
@@ -76,7 +76,15 @@ async def webhook(request: Request) -> dict:
                     decision["chat_id"],
                 )
                 raise HTTPException(status_code=502, detail="Storage unavailable; please retry")
-            chat_settings = await get_chat_settings(redis, decision["chat_id"])
+            try:
+                chat_settings = await get_chat_settings(redis, decision["chat_id"])
+            except aioredis.RedisError as exc:
+                logger.error(
+                    "Redis error while loading settings for nav callback chat_id=%s: %s",
+                    decision["chat_id"],
+                    exc,
+                )
+                raise HTTPException(status_code=502, detail="Storage unavailable; please retry")
             text, markup = renderer(chat_settings.language)
             await _safe_answer_callback(token, decision["callback_query_id"])
             await _safe_edit_message(
@@ -136,8 +144,6 @@ async def webhook(request: Request) -> dict:
             )
             raise HTTPException(status_code=502, detail="Storage unavailable; please retry")
         chat_settings = await get_chat_settings(redis, decision["chat_id"])
-        from src.telegram.menu.screens import render_main_menu
-
         text, markup = render_main_menu(chat_settings.language)
         try:
             await send_message(token, decision["chat_id"], text, reply_markup=markup)

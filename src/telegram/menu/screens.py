@@ -12,6 +12,8 @@ pass directly to :func:`~src.telegram.sender.send_message` or
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from src.i18n import Language, get_string
 from src.telegram.menu.callback import build_callback
 
@@ -86,7 +88,7 @@ def render_help_screen(lang: Language) -> tuple[str, _ReplyMarkup]:
 
 
 # Map screen name → renderer for use in the router callback dispatcher.
-SCREEN_RENDERERS: dict[str, callable] = {
+SCREEN_RENDERERS: dict[str, Callable[[Language], tuple[str, _ReplyMarkup]]] = {
     "main": render_main_menu,
     "language": render_language_screen,
     "settings": render_settings_screen,
