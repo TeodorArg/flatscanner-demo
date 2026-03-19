@@ -54,7 +54,7 @@
   (`tests/test_menu_routing.py::TestScreenCommandDispatch`, `TestWebhookScreenCommands`)
 - [x] Add tests for localized Telegram command-definition payloads
   (`tests/test_command_registration.py`)
-- [x] Run `python -m pytest -q` - 645 passed
+- [x] Run `python -m pytest -q` - 675 passed
 
 ## Follow-Up
 
