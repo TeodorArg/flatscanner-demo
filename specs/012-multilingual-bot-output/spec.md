@@ -21,7 +21,6 @@ This keeps the analysis pipeline unified while still allowing user-facing locali
 - Introduce an i18n layer for bot/system strings
 - Keep canonical structured analysis results in English
 - Add a translation stage for AI-generated freeform result blocks
-- Add translation caching keyed by analysis result and target language
 - Format the final Telegram reply in the selected language
 
 ## Out Of Scope
@@ -43,8 +42,8 @@ This keeps the analysis pipeline unified while still allowing user-facing locali
 - Structured non-freeform fields such as `price_verdict` must remain language-neutral
 - Bot UI/system strings must come from a centralized i18n catalog rather than language-specific branching scattered through the codebase
 - Translation must happen on structured freeform blocks before formatting, not inside the final formatter itself
-- Translation results must be cacheable per analysis result and target language
-- When a translation cache entry exists for a given analysis result and target language, the bot must reuse it instead of issuing a new translation call
+- Only canonical English analysis results are persisted/cached as the durable source of truth
+- Translated user-facing freeform output is generated on demand and is not persisted as a translation cache artifact in this feature slice
 - Final Telegram formatting must use the selected language's labels and wording
 
 ## Acceptance Criteria
@@ -55,11 +54,13 @@ This keeps the analysis pipeline unified while still allowing user-facing locali
 - An analysis job queued while the chat language is Russian still returns Russian output even if the user changes the chat preference before the job finishes
 - The canonical stored analysis result remains English for freeform blocks
 - A Russian or Spanish response is produced by translating the canonical English freeform blocks and combining them with localized formatter labels
-- Repeated requests for the same analysis result in the same target language reuse cached translation data
 - Tests cover language preference persistence, job-language snapshotting, translation-stage behavior, formatter localization, and fallback behavior
+
+## Decisions Made
+
+- Translated outputs are generated on demand and are not persisted as translation cache artifacts; only canonical English analysis results are cached.
 
 ## Open Questions
 
 - Whether translation should use the same primary analysis model or a cheaper dedicated translation model
-- Whether translated results should be persisted in PostgreSQL, Redis, or both
 - Whether language switching UX should be command-based, button-based, or hybrid
