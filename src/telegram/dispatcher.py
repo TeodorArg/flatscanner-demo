@@ -80,7 +80,7 @@ class OpenMenuDecision(TypedDict):
 class OpenScreenDecision(TypedDict):
     action: Literal["open_screen"]
     chat_id: int
-    screen: str  # "settings", "billing", "help"
+    screen: Literal["settings", "billing", "help"]
 
 
 class MenuCallbackDecision(TypedDict):

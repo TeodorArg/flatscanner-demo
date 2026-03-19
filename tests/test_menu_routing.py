@@ -545,3 +545,26 @@ class TestWebhookScreenCommands:
         assert "reply_markup" in call_kwargs
         markup = call_kwargs["reply_markup"]
         assert "inline_keyboard" in markup
+
+    @patch("src.telegram.router.send_message", new_callable=AsyncMock)
+    @patch(
+        "src.telegram.router.route_update",
+        return_value=OpenScreenDecision(
+            action="open_screen",
+            chat_id=1001,
+            screen="help",
+        ),
+    )
+    @patch("src.telegram.router.SCREEN_RENDERERS", {"settings": MagicMock()})
+    def test_unknown_screen_is_ignored(
+        self,
+        _mock_route_update,
+        mock_send,
+    ):
+        app = create_app(settings=_test_settings())
+        app.state.redis = MagicMock()
+        client = TestClient(app, raise_server_exceptions=True)
+
+        response = client.post("/telegram/webhook", json=_screen_payload("/help"))
+        assert response.status_code == 200
+        mock_send.assert_not_awaited()
