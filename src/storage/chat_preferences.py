@@ -26,6 +26,8 @@ async def get_chat_language(redis: Redis, chat_id: int) -> Language:
     value = await redis.get(_key(chat_id))
     if value is None:
         return DEFAULT_LANGUAGE
+    if isinstance(value, bytes):
+        value = value.decode()
     try:
         return Language(value)
     except ValueError:

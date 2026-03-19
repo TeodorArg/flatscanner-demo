@@ -37,6 +37,13 @@ class TestGetChatLanguage:
         assert result == Language.EN
 
     @pytest.mark.asyncio
+    async def test_decodes_bytes_from_redis(self):
+        redis = AsyncMock()
+        redis.get.return_value = b"en"
+        result = await get_chat_language(redis, chat_id=1001)
+        assert result == Language.EN
+
+    @pytest.mark.asyncio
     async def test_returns_spanish_when_stored(self):
         redis = AsyncMock()
         redis.get.return_value = "es"
