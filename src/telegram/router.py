@@ -143,7 +143,15 @@ async def webhook(request: Request) -> dict:
                 decision["chat_id"],
             )
             raise HTTPException(status_code=502, detail="Storage unavailable; please retry")
-        chat_settings = await get_chat_settings(redis, decision["chat_id"])
+        try:
+            chat_settings = await get_chat_settings(redis, decision["chat_id"])
+        except aioredis.RedisError as exc:
+            logger.error(
+                "Redis error while loading settings for /menu chat_id=%s: %s",
+                decision["chat_id"],
+                exc,
+            )
+            raise HTTPException(status_code=502, detail="Storage unavailable; please retry")
         text, markup = render_main_menu(chat_settings.language)
         try:
             await send_message(token, decision["chat_id"], text, reply_markup=markup)
