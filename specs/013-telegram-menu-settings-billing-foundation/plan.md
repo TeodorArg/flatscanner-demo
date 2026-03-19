@@ -18,6 +18,9 @@ grow without devolving into command-specific branches.
   flow the primary UX
 - Add stub settings and billing screens with stable screen IDs and copy coming
   from i18n
+- Add a Telegram command-registration layer so `/menu`, `/language`,
+  `/settings`, `/billing`, and `/help` are visible in the command picker with
+  localized descriptions
 - Keep billing logic behind a domain boundary so the first real payment
   implementation can plug in later without rewriting the menu system
 
@@ -26,6 +29,7 @@ grow without devolving into command-specific branches.
 - `src/telegram/`
 - `src/storage/`
 - `src/i18n/`
+- `scripts/`
 - `src/domain/`
 - `tests/`
 - `specs/013-telegram-menu-settings-billing-foundation/`
@@ -48,6 +52,7 @@ grow without devolving into command-specific branches.
 - Add persistence tests for generalized chat settings and language writes
 - Add webhook/Telegram integration tests for `/menu` and menu-based language
   selection
+- Add tests for command-list rendering / registration payload generation
 - Run `python -m pytest -q`
 
 ## Planned Slices
@@ -62,6 +67,10 @@ grow without devolving into command-specific branches.
    - settings screen shell
    - billing screen shell
    - navigation polish
-3. Follow-on product work
+3. Command discoverability
+   - `/settings`, `/billing`, `/help` command entry points
+   - localized Telegram command descriptions
+   - command registration script / operational flow
+4. Follow-on product work
    - first real settings toggles
    - billing products, plans, and payment integration

@@ -17,6 +17,8 @@ The bot needs a minimal, polished menu system that feels intentional and easy to
 
 - Add a Telegram menu foundation based on inline keyboards and callback actions
 - Add a `/menu` entry point and a primary menu screen
+- Register Telegram bot commands so the input field exposes the bot's primary
+  entry points
 - Add a language screen reachable from the menu
 - Add a generalized chat settings model instead of keeping language as a special
   one-off preference
@@ -36,6 +38,8 @@ The bot needs a minimal, polished menu system that feels intentional and easy to
 ## Requirements
 
 - The bot must expose a `/menu` command that opens a compact main menu
+- The bot must register the core commands `menu`, `language`, `settings`,
+  `billing`, and `help` through Telegram so they appear in the command picker
 - The main menu must be driven by inline keyboards rather than forcing users to
   type commands for common actions
 - The initial main menu must include clear entry points for language, settings,
@@ -50,6 +54,8 @@ The bot needs a minimal, polished menu system that feels intentional and easy to
 - The first menu slice must provide billing and settings screens as extensible
   placeholders even if those screens initially contain stub content
 - Static menu labels and button text must flow through the existing i18n layer
+- Telegram command descriptions must be localized for the supported user-facing
+  languages
 - The UI should stay minimal: one primary menu message, concise copy, and no
   noisy persistent keyboard by default
 
@@ -57,6 +63,9 @@ The bot needs a minimal, polished menu system that feels intentional and easy to
 
 - Sending `/menu` returns a main menu with inline buttons for language,
   settings, billing, and help
+- The Telegram command picker exposes `menu`, `language`, `settings`,
+  `billing`, and `help`
+- The command descriptions are available in Russian, English, and Spanish
 - Selecting `Language` opens a language screen where the user can choose
   Russian, English, or Spanish
 - Choosing a language updates the persisted chat settings and confirms the
