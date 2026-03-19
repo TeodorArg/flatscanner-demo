@@ -1,9 +1,9 @@
 """Analysis result schema.
 
 This module defines the structured output of the AI analysis step.
-The ``AnalysisResult`` model is intentionally narrow for the first MVP
-slice: summary, strengths, risks, and a price-fairness verdict with a
-short explanation.
+The ``AnalysisResult`` model stays intentionally compact for the MVP:
+summary, strengths, risks, a price-fairness verdict, and an optional
+localized display title used by the final Telegram renderer.
 """
 
 from __future__ import annotations
@@ -26,12 +26,20 @@ class AnalysisResult(BaseModel):
     """Structured output from the AI analysis stage.
 
     Produced by ``AnalysisService.analyse`` and intended for downstream
-    Telegram formatting.  All text fields come from the model response;
-    ``price_verdict`` is constrained to a known enum set so callers can
-    branch on it without string-matching.
+    Telegram formatting. ``price_verdict`` is constrained to a known enum
+    set so callers can branch on it without string-matching.
+
+    ``display_title`` is an optional user-facing header derived from the
+    provider listing title. It is attached by the processing/rendering
+    pipeline so the final message can localize the header together with
+    the translated analysis blocks.
     """
 
-    summary: str = Field(description="1–2 sentence overview of the listing.")
+    display_title: str = Field(
+        default="",
+        description="Localized title/header shown above the analysis summary.",
+    )
+    summary: str = Field(description="1-2 sentence overview of the listing.")
     strengths: list[str] = Field(
         default_factory=list,
         description="Notable positive aspects of the listing.",

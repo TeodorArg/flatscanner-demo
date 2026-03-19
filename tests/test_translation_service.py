@@ -24,6 +24,7 @@ from src.translation.service import (
 
 def _make_result(**overrides) -> AnalysisResult:
     base = {
+        "display_title": "Entire rental unit in Buenos Aires, Argentina",
         "summary": "A well-located flat with modern amenities.",
         "strengths": ["Great location", "Modern kitchen"],
         "risks": ["Noisy street", "Steep cleaning fee"],
@@ -67,6 +68,11 @@ class TestBuildTranslationPrompt:
         result = _make_result()
         prompt = _build_translation_prompt(result, Language.RU)
         assert result.summary in prompt
+
+    def test_prompt_contains_display_title(self):
+        result = _make_result()
+        prompt = _build_translation_prompt(result, Language.RU)
+        assert result.display_title in prompt
 
     def test_prompt_contains_source_strengths(self):
         result = _make_result()
@@ -185,6 +191,28 @@ class TestParseTranslationResponse:
         original = self._original()
         result = _parse_translation_response(json.dumps(payload), original)
         assert result.strengths == original.strengths
+
+    def test_parses_display_title_when_present(self):
+        payload = {
+            "display_title": "Apartamento entero en Buenos Aires, Argentina",
+            "summary": "Translated.",
+            "strengths": [],
+            "risks": [],
+            "price_explanation": "Translated explanation.",
+        }
+        result = _parse_translation_response(json.dumps(payload), self._original())
+        assert result.display_title == "Apartamento entero en Buenos Aires, Argentina"
+
+    def test_falls_back_to_original_display_title_when_missing(self):
+        payload = {
+            "summary": "Translated.",
+            "strengths": [],
+            "risks": [],
+            "price_explanation": "Translated explanation.",
+        }
+        original = self._original()
+        result = _parse_translation_response(json.dumps(payload), original)
+        assert result.display_title == original.display_title
 
 
 # ---------------------------------------------------------------------------
@@ -330,3 +358,45 @@ class TestTranslationServiceNonEnglish:
         result = await service.translate(original, Language.RU)
 
         assert result.summary != original.summary
+
+
+class TestTranslationServiceDisplayTitle:
+    @pytest.mark.asyncio
+    async def test_translate_ru_returns_translated_display_title(self):
+        mock_client = AsyncMock()
+        mock_client.chat.return_value = json.dumps(
+            {
+                "display_title": "Отдельная квартира в Буэнос-Айресе, Аргентина",
+                "summary": "Переведенная сводка.",
+                "strengths": ["Отличное расположение"],
+                "risks": ["Шумная улица"],
+                "price_explanation": "Цена выглядит адекватной.",
+            }
+        )
+        settings = _make_settings()
+        service = TranslationService(settings, client=mock_client)
+        original = _make_result()
+
+        result = await service.translate(original, Language.RU)
+
+        assert result.display_title == "Отдельная квартира в Буэнос-Айресе, Аргентина"
+
+    @pytest.mark.asyncio
+    async def test_translate_es_returns_translated_display_title(self):
+        mock_client = AsyncMock()
+        mock_client.chat.return_value = json.dumps(
+            {
+                "display_title": "Apartamento entero en Buenos Aires, Argentina",
+                "summary": "Un apartamento agradable.",
+                "strengths": ["Buena ubicacion"],
+                "risks": ["Calle ruidosa"],
+                "price_explanation": "El precio es adecuado.",
+            }
+        )
+        settings = _make_settings()
+        service = TranslationService(settings, client=mock_client)
+        original = _make_result()
+
+        result = await service.translate(original, Language.ES)
+
+        assert result.display_title == "Apartamento entero en Buenos Aires, Argentina"

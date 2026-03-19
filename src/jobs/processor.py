@@ -126,6 +126,7 @@ async def process_job(
     # --- 3. Analyse ----------------------------------------------------------
     service = analysis_service or AnalysisService(settings)
     result = await service.analyse(listing, enrichment_outcome)
+    result = result.model_copy(update={"display_title": listing.title})
     logger.debug("Analysis complete for job %s", job.id)
 
     # --- 3b. Translate (on demand, ephemeral) --------------------------------

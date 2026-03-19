@@ -47,7 +47,7 @@ def format_analysis_message(
     the i18n catalog using *language*.
 
     Sections included:
-    - Listing title (header)
+    - Localized display title (header)
     - Summary paragraph
     - Strengths bullet list (omitted when empty)
     - Risks bullet list (omitted when empty)
@@ -59,7 +59,8 @@ def format_analysis_message(
     Parameters
     ----------
     listing:
-        Provider-agnostic normalized listing (title used as header).
+        Provider-agnostic normalized listing. Used as a fallback source for
+        the header when ``result.display_title`` is empty.
     result:
         Already-translated analysis result.
     language:
@@ -68,7 +69,8 @@ def format_analysis_message(
     """
     parts: list[str] = []
 
-    parts.append(listing.title)
+    header = result.display_title or listing.title
+    parts.append(header)
     parts.append(result.summary)
 
     if result.strengths:

@@ -25,6 +25,7 @@ def _listing(**overrides) -> NormalizedListing:
 
 def _result(**overrides) -> AnalysisResult:
     base = {
+        "display_title": "Cozy Studio in Paris",
         "summary": "A charming place to stay.",
         "strengths": ["Great location", "Superhost"],
         "risks": ["Small space", "Steep cleaning fee"],
@@ -39,6 +40,14 @@ class TestMessageStructure:
     def test_title_appears_at_start(self):
         msg = format_analysis_message(_listing(), _result())
         assert msg.startswith("Cozy Studio in Paris")
+
+    def test_display_title_overrides_listing_title(self):
+        msg = format_analysis_message(
+            _listing(title="Original Provider Title"),
+            _result(display_title="Localized Render Title"),
+        )
+        assert msg.startswith("Localized Render Title")
+        assert "Original Provider Title" not in msg.split("\n\n", 1)[0]
 
     def test_summary_present(self):
         msg = format_analysis_message(_listing(), _result())
