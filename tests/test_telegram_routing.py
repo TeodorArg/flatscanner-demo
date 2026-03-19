@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 from src.app.config import Settings
 from src.app.main import create_app
 from src.domain.listing import ListingProvider
+from src.i18n.types import Language
 from src.telegram.dispatcher import extract_url, extract_urls, is_supported_provider, route_update
 from src.telegram.models import TelegramChat, TelegramMessage, TelegramUpdate, TelegramUser
 from src.telegram.sender import send_message
@@ -714,3 +715,154 @@ class TestSendMessage:
         # Should complete without raising
         await send_message("token", 123, "hello", client=mock_client)
         mock_client.post.assert_awaited_once()
+
+
+# ---------------------------------------------------------------------------
+# Language-switching dispatcher routing
+# ---------------------------------------------------------------------------
+
+
+class TestLanguageCommandRouting:
+    """/language commands must be routed as set_language decisions."""
+
+    def test_language_ru_routed_as_set_language(self):
+        update = _make_update("/language ru", chat_id=5)
+        decision = route_update(update)
+        assert decision["action"] == "set_language"
+        assert decision["chat_id"] == 5
+        assert decision["language"] == Language.RU
+
+    def test_language_en_routed_as_set_language(self):
+        update = _make_update("/language en", chat_id=7)
+        decision = route_update(update)
+        assert decision["action"] == "set_language"
+        assert decision["language"] == Language.EN
+
+    def test_language_es_routed_as_set_language(self):
+        update = _make_update("/language es", chat_id=9)
+        decision = route_update(update)
+        assert decision["action"] == "set_language"
+        assert decision["language"] == Language.ES
+
+    def test_unknown_language_code_yields_none(self):
+        update = _make_update("/language xx", chat_id=5)
+        decision = route_update(update)
+        assert decision["action"] == "set_language"
+        assert decision["language"] is None
+
+    def test_language_without_code_yields_none(self):
+        update = _make_update("/language", chat_id=5)
+        decision = route_update(update)
+        assert decision["action"] == "set_language"
+        assert decision["language"] is None
+
+    def test_language_command_is_case_insensitive(self):
+        update = _make_update("/Language RU", chat_id=5)
+        decision = route_update(update)
+        assert decision["action"] == "set_language"
+        assert decision["language"] == Language.RU
+
+    def test_non_command_text_is_not_set_language(self):
+        update = _make_update("I want Russian output please", chat_id=5)
+        decision = route_update(update)
+        assert decision["action"] == "help"
+
+
+# ---------------------------------------------------------------------------
+# Language-switching webhook integration
+# ---------------------------------------------------------------------------
+
+
+class TestWebhookLanguageSwitching:
+    def _client(self, **settings_overrides) -> TestClient:
+        app = create_app(settings=_test_settings(**settings_overrides))
+        mock_redis = AsyncMock()
+        mock_redis.eval.return_value = 1
+        app.state.redis = mock_redis
+        return TestClient(app)
+
+    def _language_payload(self, command: str, chat_id: int = 1001) -> dict:
+        return {
+            "update_id": 1,
+            "message": {
+                "message_id": 1,
+                "from": {"id": 42, "first_name": "Alice"},
+                "chat": {"id": chat_id, "type": "private"},
+                "text": command,
+            },
+        }
+
+    @patch("src.telegram.router.set_chat_language", new_callable=AsyncMock)
+    @patch("src.telegram.router.get_chat_language", new_callable=AsyncMock)
+    @patch("src.telegram.router.send_message", new_callable=AsyncMock)
+    def test_language_en_command_saves_preference(self, mock_send, mock_get_lang, mock_set_lang):
+        mock_get_lang.return_value = Language.RU
+        client = self._client()
+        response = client.post("/telegram/webhook", json=self._language_payload("/language en"))
+        assert response.status_code == 200
+        mock_set_lang.assert_awaited_once()
+        args = mock_set_lang.call_args[0]
+        assert args[2] == Language.EN
+
+    @patch("src.telegram.router.set_chat_language", new_callable=AsyncMock)
+    @patch("src.telegram.router.get_chat_language", new_callable=AsyncMock)
+    @patch("src.telegram.router.send_message", new_callable=AsyncMock)
+    def test_language_en_reply_is_in_english(self, mock_send, mock_get_lang, mock_set_lang):
+        mock_get_lang.return_value = Language.RU
+        client = self._client()
+        client.post("/telegram/webhook", json=self._language_payload("/language en"))
+        call_args = mock_send.call_args[0]
+        reply_text = call_args[2]
+        assert "English" in reply_text
+
+    @patch("src.telegram.router.set_chat_language", new_callable=AsyncMock)
+    @patch("src.telegram.router.get_chat_language", new_callable=AsyncMock)
+    @patch("src.telegram.router.send_message", new_callable=AsyncMock)
+    def test_language_ru_reply_is_in_russian(self, mock_send, mock_get_lang, mock_set_lang):
+        mock_get_lang.return_value = Language.EN
+        client = self._client()
+        client.post("/telegram/webhook", json=self._language_payload("/language ru"))
+        call_args = mock_send.call_args[0]
+        reply_text = call_args[2]
+        assert "русский" in reply_text.lower() or "язык" in reply_text.lower()
+
+    @patch("src.telegram.router.set_chat_language", new_callable=AsyncMock)
+    @patch("src.telegram.router.get_chat_language", new_callable=AsyncMock)
+    @patch("src.telegram.router.send_message", new_callable=AsyncMock)
+    def test_invalid_language_code_sends_error_reply(self, mock_send, mock_get_lang, mock_set_lang):
+        mock_get_lang.return_value = Language.RU
+        client = self._client()
+        client.post("/telegram/webhook", json=self._language_payload("/language xx"))
+        mock_send.assert_awaited_once()
+        call_args = mock_send.call_args[0]
+        reply_text = call_args[2]
+        # Should not have saved anything
+        mock_set_lang.assert_not_awaited()
+        # Should mention valid options
+        assert "ru" in reply_text or "language" in reply_text.lower()
+
+    @patch("src.telegram.router.send_message", new_callable=AsyncMock)
+    def test_language_change_returns_502_when_redis_unavailable(self, mock_send):
+        app = create_app(settings=_test_settings())
+        client = TestClient(app)
+        response = client.post("/telegram/webhook", json=self._language_payload("/language en"))
+        assert response.status_code == 502
+        assert "language preference" in response.json()["detail"].lower()
+        mock_send.assert_not_awaited()
+
+    @patch("src.telegram.router.set_chat_language", new_callable=AsyncMock)
+    @patch("src.telegram.router.get_chat_language", new_callable=AsyncMock)
+    @patch("src.telegram.router.send_message", new_callable=AsyncMock)
+    def test_language_change_redis_error_returns_specific_502(
+        self,
+        mock_send,
+        mock_get_lang,
+        mock_set_lang,
+    ):
+        mock_get_lang.return_value = Language.RU
+        mock_set_lang.side_effect = aioredis.RedisError("connection reset")
+        client = self._client()
+        response = client.post("/telegram/webhook", json=self._language_payload("/language en"))
+        assert response.status_code == 502
+        assert response.json()["detail"] == "Could not save language preference; please retry"
+        mock_send.assert_not_awaited()

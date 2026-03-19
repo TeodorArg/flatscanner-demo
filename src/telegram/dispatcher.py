@@ -5,9 +5,13 @@ from typing import Literal, TypedDict
 
 from src.adapters.registry import detect_provider
 from src.domain.listing import ListingProvider
+from src.i18n.types import Language
 from src.telegram.models import TelegramUpdate
 
 _URL_RE = re.compile(r"https?://\S+", re.IGNORECASE)
+
+# Matches "/language" optionally followed by a language code, e.g. "/language ru".
+_LANGUAGE_CMD_RE = re.compile(r"^/language(?:\s+(\S+))?", re.IGNORECASE)
 
 
 def extract_url(text: str) -> str | None:
@@ -52,7 +56,20 @@ class UnsupportedDecision(TypedDict):
     chat_id: int
 
 
-RoutingDecision = IgnoreDecision | AnalyseDecision | HelpDecision | UnsupportedDecision
+class SetLanguageDecision(TypedDict):
+    action: Literal["set_language"]
+    chat_id: int
+    # None means the user provided an unrecognised or missing language code.
+    language: Language | None
+
+
+RoutingDecision = (
+    IgnoreDecision
+    | AnalyseDecision
+    | HelpDecision
+    | UnsupportedDecision
+    | SetLanguageDecision
+)
 
 
 def route_update(update: TelegramUpdate) -> RoutingDecision:
@@ -61,7 +78,8 @@ def route_update(update: TelegramUpdate) -> RoutingDecision:
     - ``ignore``: no message or no text to act on.
     - ``analyse``: message contains a supported provider URL — enqueue an analysis job.
     - ``unsupported``: message contains URLs but none from a supported provider.
-    - ``help``: message has text but no URL — send usage guidance.
+    - ``set_language``: message is a ``/language <code>`` command.
+    - ``help``: message has text but no URL and no recognised command.
 
     All URLs in the message are inspected; a supported URL is chosen even when it
     is not the first URL in the text.
@@ -78,6 +96,17 @@ def route_update(update: TelegramUpdate) -> RoutingDecision:
     chat_id = update.message.chat.id
 
     if not urls:
+        # Check for /language command before falling back to help.
+        m = _LANGUAGE_CMD_RE.match(text.strip())
+        if m:
+            code = m.group(1)
+            lang: Language | None = None
+            if code is not None:
+                try:
+                    lang = Language(code.lower())
+                except ValueError:
+                    lang = None
+            return SetLanguageDecision(action="set_language", chat_id=chat_id, language=lang)
         return HelpDecision(action="help", chat_id=chat_id)
 
     for url in urls:

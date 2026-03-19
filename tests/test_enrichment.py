@@ -83,6 +83,15 @@ def _make_settings(**overrides):
     return Settings(**defaults)
 
 
+def _make_passthrough_ts():
+    """Return a mock TranslationService that returns the result unchanged."""
+    from src.translation.service import TranslationService
+
+    mock_ts = MagicMock(spec=TranslationService)
+    mock_ts.translate = AsyncMock(side_effect=lambda result, lang: result)
+    return mock_ts
+
+
 class _SuccessProvider:
     """Stub provider that always returns fixed data."""
 
@@ -379,6 +388,7 @@ class TestProcessJobEnrichmentIntegration:
                 settings,
                 adapter=mock_adapter,
                 analysis_service=mock_service,
+                translation_service=_make_passthrough_ts(),
                 enrichment_providers=providers,
             )
 
@@ -417,6 +427,7 @@ class TestProcessJobEnrichmentIntegration:
                 settings,
                 adapter=mock_adapter,
                 analysis_service=mock_service,
+                translation_service=_make_passthrough_ts(),
                 enrichment_providers=providers,
             )
 
@@ -458,6 +469,7 @@ class TestProcessJobEnrichmentIntegration:
                 settings,
                 adapter=mock_adapter,
                 analysis_service=mock_service,
+                translation_service=_make_passthrough_ts(),
                 enrichment_providers=providers,
             )
 
@@ -490,6 +502,7 @@ class TestProcessJobEnrichmentIntegration:
                 settings,
                 adapter=mock_adapter,
                 analysis_service=mock_service,
+                translation_service=_make_passthrough_ts(),
                 # no enrichment_providers
             )
 
@@ -525,6 +538,7 @@ class TestProcessJobEnrichmentIntegration:
                 settings,
                 adapter=mock_adapter,
                 analysis_service=mock_service,
+                translation_service=_make_passthrough_ts(),
                 enrichment_providers=providers,
             )
 

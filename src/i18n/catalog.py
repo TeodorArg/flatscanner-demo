@@ -63,6 +63,60 @@ _CATALOG: dict[str, dict[Language, str]] = {
             "te responderé en breve."
         ),
     },
+    # --- Language switching ---
+    "msg.language_set": {
+        Language.RU: "Язык изменён на русский.",
+        Language.EN: "Language changed to English.",
+        Language.ES: "Idioma cambiado a español.",
+    },
+    "msg.language_invalid": {
+        Language.RU: "Неизвестный язык. Используйте: /language ru, /language en, /language es.",
+        Language.EN: "Unknown language. Use: /language ru, /language en, /language es.",
+        Language.ES: "Idioma desconocido. Use: /language ru, /language en, /language es.",
+    },
+    # --- Formatter section labels ---
+    "fmt.strengths_label": {
+        Language.RU: "Плюсы:",
+        Language.EN: "Pros:",
+        Language.ES: "Ventajas:",
+    },
+    "fmt.risks_label": {
+        Language.RU: "Риски:",
+        Language.EN: "Risks:",
+        Language.ES: "Riesgos:",
+    },
+    "fmt.price_label": {
+        Language.RU: "Цена:",
+        Language.EN: "Price:",
+        Language.ES: "Precio:",
+    },
+    # --- Price verdict labels ---
+    "fmt.verdict.fair": {
+        Language.RU: "Справедливо",
+        Language.EN: "Fair",
+        Language.ES: "Justo",
+    },
+    "fmt.verdict.overpriced": {
+        Language.RU: "Завышено",
+        Language.EN: "Overpriced",
+        Language.ES: "Excesivo",
+    },
+    "fmt.verdict.underpriced": {
+        Language.RU: "Занижено",
+        Language.EN: "Underpriced",
+        Language.ES: "Asequible",
+    },
+    "fmt.verdict.unknown": {
+        Language.RU: "Неясно",
+        Language.EN: "Unknown",
+        Language.ES: "Desconocido",
+    },
+    # --- Formatter system strings ---
+    "fmt.truncated": {
+        Language.RU: "\n\n[Сообщение обрезано]",
+        Language.EN: "\n\n[Message truncated]",
+        Language.ES: "\n\n[Mensaje truncado]",
+    },
 }
 
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from src.analysis.result import AnalysisResult, PriceVerdict
 from src.domain.listing import ListingProvider, NormalizedListing
+from src.i18n.types import Language
 from src.telegram.formatter import (
     _TELEGRAM_MAX_CHARS,
     _TRUNCATION_SUFFIX,
@@ -154,3 +155,113 @@ class TestLengthGuard:
         result = _guard_length(over_limit)
         assert len(result) == _TELEGRAM_MAX_CHARS
         assert result.endswith(_TRUNCATION_SUFFIX)
+
+
+# ---------------------------------------------------------------------------
+# Multilingual formatter output
+# ---------------------------------------------------------------------------
+
+
+class TestFormatterEnglishOutput:
+    """English output uses English labels."""
+
+    def test_strengths_label_is_english(self):
+        msg = format_analysis_message(_listing(), _result(), Language.EN)
+        assert "Pros:" in msg
+        assert "Плюсы:" not in msg
+
+    def test_risks_label_is_english(self):
+        msg = format_analysis_message(_listing(), _result(), Language.EN)
+        assert "Risks:" in msg
+        assert "Риски:" not in msg
+
+    def test_price_label_is_english(self):
+        msg = format_analysis_message(_listing(), _result(), Language.EN)
+        assert "Price:" in msg
+        assert "Цена:" not in msg
+
+    def test_fair_verdict_is_english(self):
+        msg = format_analysis_message(_listing(), _result(price_verdict=PriceVerdict.FAIR), Language.EN)
+        assert "Fair" in msg
+
+    def test_overpriced_verdict_is_english(self):
+        msg = format_analysis_message(_listing(), _result(price_verdict=PriceVerdict.OVERPRICED), Language.EN)
+        assert "Overpriced" in msg
+
+    def test_underpriced_verdict_is_english(self):
+        msg = format_analysis_message(_listing(), _result(price_verdict=PriceVerdict.UNDERPRICED), Language.EN)
+        assert "Underpriced" in msg
+
+    def test_unknown_verdict_is_english(self):
+        msg = format_analysis_message(_listing(), _result(price_verdict=PriceVerdict.UNKNOWN), Language.EN)
+        assert "Unknown" in msg
+
+    def test_truncation_suffix_is_english(self):
+        from src.telegram.formatter import _guard_length
+
+        over_limit = "c" * (_TELEGRAM_MAX_CHARS + 1)
+        result = _guard_length(over_limit, Language.EN)
+        assert result.endswith("\n\n[Message truncated]")
+        assert "[Сообщение обрезано]" not in result
+
+
+class TestFormatterSpanishOutput:
+    """Spanish output uses Spanish labels."""
+
+    def test_strengths_label_is_spanish(self):
+        msg = format_analysis_message(_listing(), _result(), Language.ES)
+        assert "Ventajas:" in msg
+        assert "Плюсы:" not in msg
+
+    def test_risks_label_is_spanish(self):
+        msg = format_analysis_message(_listing(), _result(), Language.ES)
+        assert "Riesgos:" in msg
+        assert "Риски:" not in msg
+
+    def test_price_label_is_spanish(self):
+        msg = format_analysis_message(_listing(), _result(), Language.ES)
+        assert "Precio:" in msg
+        assert "Цена:" not in msg
+
+    def test_fair_verdict_is_spanish(self):
+        msg = format_analysis_message(_listing(), _result(price_verdict=PriceVerdict.FAIR), Language.ES)
+        assert "Justo" in msg
+
+    def test_overpriced_verdict_is_spanish(self):
+        msg = format_analysis_message(_listing(), _result(price_verdict=PriceVerdict.OVERPRICED), Language.ES)
+        assert "Excesivo" in msg
+
+    def test_truncation_suffix_is_spanish(self):
+        from src.telegram.formatter import _guard_length
+
+        over_limit = "d" * (_TELEGRAM_MAX_CHARS + 1)
+        result = _guard_length(over_limit, Language.ES)
+        assert result.endswith("\n\n[Mensaje truncado]")
+
+
+class TestFormatterRussianDefault:
+    """Russian remains the default when no language is passed."""
+
+    def test_default_uses_russian_labels(self):
+        msg = format_analysis_message(_listing(), _result())
+        assert "Плюсы:" in msg
+        assert "Риски:" in msg
+        assert "Цена:" in msg
+
+    def test_explicit_ru_uses_russian_labels(self):
+        msg = format_analysis_message(_listing(), _result(), Language.RU)
+        assert "Плюсы:" in msg
+
+    def test_all_languages_produce_non_empty_output(self):
+        listing = _listing()
+        result = _result()
+        for lang in Language:
+            msg = format_analysis_message(listing, result, lang)
+            assert msg, f"Empty output for language {lang}"
+
+    def test_all_languages_include_listing_title(self):
+        listing = _listing()
+        result = _result()
+        for lang in Language:
+            msg = format_analysis_message(listing, result, lang)
+            assert "Cozy Studio in Paris" in msg, f"Title missing for language {lang}"

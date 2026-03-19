@@ -1,0 +1,258 @@
+"""On-demand translation of freeform analysis result blocks.
+
+``TranslationService`` translates the freeform text fields of an
+``AnalysisResult`` (summary, strengths, risks, price_explanation) into
+the requested language using the LLM.
+
+Design constraints:
+- English results are returned as-is without any LLM call.
+- Translated output is NOT persisted; it is purely ephemeral.
+- The price_verdict enum is language-neutral and is never translated.
+- The formatter receives already-translated content plus localized labels.
+- The set of translated fields is not hard-coded to the current schema;
+  any new freeform text fields can be added to the translation prompt
+  without touching this module's caller.
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+
+from src.analysis.openrouter_client import OpenRouterClient, OpenRouterError
+from src.analysis.result import AnalysisResult
+from src.app.config import Settings
+from src.i18n.types import Language
+
+logger = logging.getLogger(__name__)
+
+# Map Language to a human-readable name used in the translation prompt.
+_LANGUAGE_NAME: dict[Language, str] = {
+    Language.RU: "Russian",
+    Language.EN: "English",
+    Language.ES: "Spanish",
+}
+
+_TRANSLATION_SCHEMA_HINT = """\
+{
+  "summary": "<translated summary>",
+  "strengths": ["<translated strength 1>", "<translated strength 2>"],
+  "risks": ["<translated risk 1>", "<translated risk 2>"],
+  "price_explanation": "<translated price explanation>"
+}"""
+
+
+class TranslationError(Exception):
+    """Raised when the translation LLM call fails or returns an unparseable response."""
+
+
+def _build_translation_prompt(result: AnalysisResult, language: Language) -> str:
+    """Return the user-turn prompt for translating *result* into *language*."""
+    lang_name = _LANGUAGE_NAME[language]
+    source = {
+        "summary": result.summary,
+        "strengths": result.strengths,
+        "risks": result.risks,
+        "price_explanation": result.price_explanation,
+    }
+    return (
+        f"Translate the following rental listing analysis fields into {lang_name}.\n"
+        "Return ONLY a JSON object matching the output schema.\n"
+        "Do not add, remove, or reorder items in lists.\n"
+        "Do not alter factual content — translate only.\n\n"
+        f"Input:\n{json.dumps(source, ensure_ascii=False, indent=2)}\n\n"
+        f"Output schema:\n{_TRANSLATION_SCHEMA_HINT}"
+    )
+
+
+def _coerce_translated_list(
+    field_name: str,
+    value: object,
+    fallback: list[str],
+) -> list[str]:
+    """Return a sanitized translated text list, logging lossy fallbacks."""
+    if not isinstance(value, list):
+        logger.warning(
+            "Translation response field '%s' was %s; using original list",
+            field_name,
+            type(value).__name__,
+        )
+        return fallback
+
+    invalid_items = [item for item in value if not isinstance(item, str)]
+    if invalid_items:
+        logger.warning(
+            "Translation response field '%s' contained %s non-string item(s); dropping them",
+            field_name,
+            len(invalid_items),
+        )
+
+    sanitized = [item for item in value if isinstance(item, str)]
+    if not sanitized and value:
+        logger.warning(
+            "Translation response field '%s' had no usable string items; using original list",
+            field_name,
+        )
+        return fallback
+    return sanitized
+
+
+def _parse_translation_response(raw: str, original: AnalysisResult) -> AnalysisResult:
+    """Parse the LLM translation response and merge into a new ``AnalysisResult``.
+
+    The price_verdict is preserved from *original* (it is not translated).
+    Fields that cannot be parsed fall back to the original English values.
+
+    Parameters
+    ----------
+    raw:
+        Raw text response from the translation LLM.
+    original:
+        The canonical English ``AnalysisResult`` used as a fallback.
+
+    Returns
+    -------
+    AnalysisResult
+        A new result with translated freeform fields and the original
+        language-neutral verdict.
+
+    Raises
+    ------
+    TranslationError
+        If the text cannot be parsed as JSON or the JSON is not a dict.
+    """
+    text = raw.strip()
+
+    # Strip optional ```json ... ``` fences that models sometimes add.
+    if text.startswith("```"):
+        lines = text.splitlines()
+        inner = lines[1:]
+        if inner and inner[-1].strip() == "```":
+            inner = inner[:-1]
+        text = "\n".join(inner).strip()
+
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise TranslationError(f"Translation response is not valid JSON: {exc}") from exc
+
+    if not isinstance(data, dict):
+        raise TranslationError(
+            f"Translation response must be a JSON object, got {type(data).__name__}"
+        )
+
+    summary = data.get("summary")
+    if not isinstance(summary, str) or not summary.strip():
+        logger.warning("Translation response missing 'summary'; using original")
+        summary = original.summary
+
+    strengths = _coerce_translated_list(
+        "strengths",
+        data.get("strengths", original.strengths),
+        original.strengths,
+    )
+
+    risks = _coerce_translated_list(
+        "risks",
+        data.get("risks", original.risks),
+        original.risks,
+    )
+
+    price_explanation = data.get("price_explanation", original.price_explanation)
+    if not isinstance(price_explanation, str):
+        price_explanation = original.price_explanation
+
+    return AnalysisResult(
+        summary=summary,
+        strengths=strengths,
+        risks=risks,
+        # price_verdict is language-neutral — never translated.
+        price_verdict=original.price_verdict,
+        price_explanation=price_explanation,
+    )
+
+
+class TranslationService:
+    """Translates freeform ``AnalysisResult`` blocks into the requested language.
+
+    Parameters
+    ----------
+    settings:
+        Application settings; ``openrouter_api_key`` and
+        ``openrouter_model`` are used to build the default client.
+    client:
+        Optional pre-built ``OpenRouterClient``.  When provided, *settings*
+        is not used to construct the client (useful for testing).
+    """
+
+    def __init__(
+        self,
+        settings: Settings,
+        client: OpenRouterClient | None = None,
+    ) -> None:
+        self._client = client or OpenRouterClient(
+            api_key=settings.openrouter_api_key,
+            model=settings.openrouter_model,
+        )
+
+    async def translate(
+        self,
+        result: AnalysisResult,
+        language: Language,
+    ) -> AnalysisResult:
+        """Return *result* with freeform fields translated into *language*.
+
+        English results are returned as-is without any LLM call.
+        Translated output is never persisted.
+
+        Parameters
+        ----------
+        result:
+            Canonical English ``AnalysisResult`` to translate.
+        language:
+            Target language.
+
+        Returns
+        -------
+        AnalysisResult
+            Original result for English; a new instance with translated
+            freeform fields for other languages.
+
+        Raises
+        ------
+        TranslationError
+            If the LLM call fails or the response cannot be parsed.
+        OpenRouterError
+            If the underlying HTTP call to OpenRouter fails.
+        """
+        if language is Language.EN:
+            return result
+
+        prompt = _build_translation_prompt(result, language)
+        messages = [
+            {
+                "role": "system",
+                "content": (
+                    "You are a professional translator. "
+                    "Reply ONLY with a valid JSON object, no markdown, no text outside the JSON."
+                ),
+            },
+            {"role": "user", "content": prompt},
+        ]
+
+        logger.debug("Requesting translation to %s", language.value)
+        try:
+            raw = await self._client.chat(messages)
+        except OpenRouterError:
+            logger.error("OpenRouter call failed during translation to %s", language.value)
+            raise
+
+        try:
+            return _parse_translation_response(raw, original=result)
+        except TranslationError:
+            logger.error(
+                "Failed to parse translation response for language %s: %r",
+                language.value,
+                raw[:200],
+            )
+            raise

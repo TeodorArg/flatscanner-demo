@@ -5,12 +5,15 @@ through the full pipeline:
 
 1. Resolve the adapter for the job's listing provider.
 2. Fetch and normalise the listing via the adapter.
-3. Run AI analysis through ``AnalysisService``.
-4. Format the result with ``format_analysis_message``.
-5. Send the Telegram reply via ``send_message``.
+3. Run AI analysis through ``AnalysisService`` (canonical English output).
+4. Translate freeform result blocks via ``TranslationService`` when the job
+   language is not English.  Translated output is ephemeral and never persisted.
+5. Format the translated result with ``format_analysis_message``.
+6. Send the Telegram reply via ``send_message``.
 
 Dependencies can be injected for unit testing (adapter, analysis_service,
-http_client).  When not supplied, production defaults are used.
+translation_service, http_client).  When not supplied, production defaults
+are used.
 """
 
 from __future__ import annotations
@@ -21,11 +24,14 @@ from typing import TYPE_CHECKING
 import httpx
 
 from src.adapters.registry import resolve_adapter
+from src.analysis.openrouter_client import OpenRouterError
 from src.analysis.service import AnalysisService
 from src.domain.listing import AnalysisJob
 from src.enrichment.runner import EnrichmentOutcome, EnrichmentProvider, run_enrichments
+from src.i18n.types import Language
 from src.telegram.formatter import format_analysis_message
 from src.telegram.sender import send_message
+from src.translation.service import TranslationError, TranslationService
 
 if TYPE_CHECKING:
     from src.adapters.base import ListingAdapter
@@ -44,6 +50,7 @@ async def process_job(
     *,
     adapter: "ListingAdapter | None" = None,
     analysis_service: AnalysisService | None = None,
+    translation_service: TranslationService | None = None,
     http_client: httpx.AsyncClient | None = None,
     enrichment_providers: list[EnrichmentProvider] | None = None,
 ) -> None:
@@ -62,6 +69,10 @@ async def process_job(
     analysis_service:
         Optional pre-built ``AnalysisService``.  When ``None`` one is
         constructed from *settings*.
+    translation_service:
+        Optional pre-built ``TranslationService``.  When ``None`` one is
+        constructed from *settings*.  For English jobs the service is never
+        called regardless.
     http_client:
         Optional ``httpx.AsyncClient`` injected into ``send_message`` for
         testing without real network calls.
@@ -76,8 +87,9 @@ async def process_job(
         If no adapter is registered for the job's listing provider.
     Exception
         Propagates any exception from the adapter fetch, analysis service,
-        or Telegram send so the caller (worker loop) can decide how to handle
-        it (e.g. log and continue, or dead-letter the job).
+        translation service, or Telegram send so the caller (worker loop)
+        can decide how to handle it (e.g. log and continue, or dead-letter
+        the job).
     """
     # --- 1. Resolve adapter --------------------------------------------------
     if adapter is None:
@@ -116,8 +128,31 @@ async def process_job(
     result = await service.analyse(listing, enrichment_outcome)
     logger.debug("Analysis complete for job %s", job.id)
 
+    # --- 3b. Translate (on demand, ephemeral) --------------------------------
+    # English jobs use the canonical result directly.  For other languages the
+    # freeform blocks are translated just-in-time; translated output is never
+    # persisted as a cache artifact.
+    t_service = translation_service or TranslationService(settings)
+    render_language = job.language
+    try:
+        translated_result = await t_service.translate(result, job.language)
+        logger.debug(
+            "Translation stage complete for job %s (language=%s)",
+            job.id,
+            job.language.value,
+        )
+    except (TranslationError, OpenRouterError) as exc:
+        logger.warning(
+            "Translation failed for job %s (requested_language=%s); falling back to English: %s",
+            job.id,
+            job.language.value,
+            exc,
+        )
+        translated_result = result
+        render_language = Language.EN
+
     # --- 4. Format -----------------------------------------------------------
-    text = format_analysis_message(listing, result)
+    text = format_analysis_message(listing, translated_result, render_language)
 
     # --- 5. Send -------------------------------------------------------------
     await send_message(

@@ -20,9 +20,11 @@ from src.domain.listing import (
     NormalizedListing,
     PriceInfo,
 )
+from src.i18n.types import Language
 from src.jobs.processor import UnsupportedProviderError, process_job
 from src.jobs.queue import QUEUE_KEY, dequeue_analysis_job
 from src.jobs.worker import process_once, run_worker
+from src.translation.service import TranslationError
 
 
 # ---------------------------------------------------------------------------
@@ -74,6 +76,15 @@ def _make_settings(**overrides):
     return Settings(**defaults)
 
 
+def _make_passthrough_ts():
+    """Return a mock TranslationService that returns the result unchanged."""
+    from src.translation.service import TranslationService
+
+    mock_ts = MagicMock(spec=TranslationService)
+    mock_ts.translate = AsyncMock(side_effect=lambda result, lang: result)
+    return mock_ts
+
+
 # ---------------------------------------------------------------------------
 # process_job — success path
 # ---------------------------------------------------------------------------
@@ -107,6 +118,7 @@ class TestProcessJobSuccess:
                 settings,
                 adapter=mock_adapter,
                 analysis_service=mock_service,
+                translation_service=_make_passthrough_ts(),
             )
 
         assert sent_chats == [job.telegram_chat_id]
@@ -132,6 +144,7 @@ class TestProcessJobSuccess:
                 settings,
                 adapter=mock_adapter,
                 analysis_service=mock_service,
+                translation_service=_make_passthrough_ts(),
             )
 
         mock_adapter.fetch.assert_awaited_once_with(job.source_url)
@@ -155,6 +168,7 @@ class TestProcessJobSuccess:
                 settings,
                 adapter=mock_adapter,
                 analysis_service=mock_service,
+                translation_service=_make_passthrough_ts(),
             )
 
         mock_service.analyse.assert_awaited_once()
@@ -183,6 +197,7 @@ class TestProcessJobSuccess:
                 settings,
                 adapter=mock_adapter,
                 analysis_service=mock_service,
+                translation_service=_make_passthrough_ts(),
             )
 
         assert captured_tokens == ["my-secret-token"]
@@ -207,7 +222,10 @@ class TestProcessJobSuccess:
             ) as mock_resolve,
             patch("src.jobs.processor.send_message", new_callable=AsyncMock),
         ):
-            await process_job(job, settings, analysis_service=mock_service)
+            await process_job(
+                job, settings, analysis_service=mock_service,
+                translation_service=_make_passthrough_ts(),
+            )
 
         mock_resolve.assert_called_once_with(job.source_url)
 
@@ -353,7 +371,45 @@ class TestProcessJobSendFailure:
                 settings,
                 adapter=mock_adapter,
                 analysis_service=mock_service,
+                translation_service=_make_passthrough_ts(),
             )
+
+
+class TestProcessJobTranslationFallback:
+    @pytest.mark.asyncio
+    async def test_translation_error_falls_back_to_english_reply(self):
+        job = _make_job(language=Language.RU)
+        listing = _make_listing()
+        result = _make_result()
+        settings = _make_settings()
+
+        mock_adapter = MagicMock()
+        mock_adapter.fetch = AsyncMock(return_value=listing)
+        mock_service = MagicMock(spec=AnalysisService)
+        mock_service.analyse = AsyncMock(return_value=result)
+
+        mock_translation_service = MagicMock()
+        mock_translation_service.translate = AsyncMock(
+            side_effect=TranslationError("model returned invalid JSON")
+        )
+
+        sent_texts: list[str] = []
+
+        async def fake_send(token, chat_id, text, *, client=None):
+            sent_texts.append(text)
+
+        with patch("src.jobs.processor.send_message", side_effect=fake_send):
+            await process_job(
+                job,
+                settings,
+                adapter=mock_adapter,
+                analysis_service=mock_service,
+                translation_service=mock_translation_service,
+            )
+
+        assert sent_texts
+        assert "A pleasant flat in central Berlin." in sent_texts[0]
+        assert "Price:" in sent_texts[0]
 
 
 # ---------------------------------------------------------------------------
@@ -433,6 +489,7 @@ class TestProcessOnce:
         with (
             patch("src.jobs.processor.resolve_adapter", return_value=mock_adapter),
             patch("src.jobs.processor.AnalysisService", return_value=mock_service),
+            patch("src.jobs.processor.TranslationService", return_value=_make_passthrough_ts()),
             patch("src.jobs.processor.send_message", new_callable=AsyncMock),
         ):
             outcome = await process_once(redis, settings)
