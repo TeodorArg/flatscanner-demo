@@ -163,6 +163,43 @@ async def webhook(request: Request) -> dict:
         return {"ok": True}
 
     # -----------------------------------------------------------------------
+    # /settings, /billing, /help — open the named screen directly
+    # -----------------------------------------------------------------------
+    if decision["action"] == "open_screen":
+        screen_name = decision["screen"]
+        renderer = SCREEN_RENDERERS.get(screen_name)
+        if renderer is None:
+            logger.warning("open_screen: unknown screen %r for chat_id=%s", screen_name, decision["chat_id"])
+            return {"ok": True}
+        redis = request.app.state.redis
+        if redis is None:
+            logger.warning(
+                "Redis unavailable; cannot load settings for /%s chat_id=%s",
+                screen_name,
+                decision["chat_id"],
+            )
+            raise HTTPException(status_code=502, detail="Storage unavailable; please retry")
+        try:
+            chat_settings = await get_chat_settings(redis, decision["chat_id"])
+        except aioredis.RedisError as exc:
+            logger.error(
+                "Redis error while loading settings for /%s chat_id=%s: %s",
+                screen_name,
+                decision["chat_id"],
+                exc,
+            )
+            raise HTTPException(status_code=502, detail="Storage unavailable; please retry")
+        text, markup = renderer(chat_settings.language)
+        try:
+            await send_message(token, decision["chat_id"], text, reply_markup=markup)
+        except httpx.HTTPStatusError as exc:
+            return _handle_send_error(exc, decision["chat_id"])
+        except Exception:
+            logger.exception("send_message failed for chat_id=%s", decision["chat_id"])
+            raise HTTPException(status_code=502, detail="Failed to deliver reply to Telegram")
+        return {"ok": True}
+
+    # -----------------------------------------------------------------------
     # Determine the effective language for this chat.  Best-effort: if Redis
     # is not yet available (e.g. during startup) we fall back to the default
     # language so non-analyse paths can still reply.

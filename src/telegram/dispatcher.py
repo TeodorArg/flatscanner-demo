@@ -17,6 +17,11 @@ _LANGUAGE_CMD_RE = re.compile(r"^/language(?:\s+(\S+))?", re.IGNORECASE)
 # Matches "/menu" with optional trailing whitespace.
 _MENU_CMD_RE = re.compile(r"^/menu\b", re.IGNORECASE)
 
+# Matches command entry points that open specific menu screens directly.
+_SETTINGS_CMD_RE = re.compile(r"^/settings\b", re.IGNORECASE)
+_BILLING_CMD_RE = re.compile(r"^/billing\b", re.IGNORECASE)
+_HELP_CMD_RE = re.compile(r"^/help\b", re.IGNORECASE)
+
 
 def extract_url(text: str) -> str | None:
     """Return the first HTTP/HTTPS URL found in *text*, or None."""
@@ -72,6 +77,12 @@ class OpenMenuDecision(TypedDict):
     chat_id: int
 
 
+class OpenScreenDecision(TypedDict):
+    action: Literal["open_screen"]
+    chat_id: int
+    screen: str  # "settings", "billing", "help"
+
+
 class MenuCallbackDecision(TypedDict):
     action: Literal["menu_callback"]
     chat_id: int
@@ -87,6 +98,7 @@ RoutingDecision = (
     | UnsupportedDecision
     | SetLanguageDecision
     | OpenMenuDecision
+    | OpenScreenDecision
     | MenuCallbackDecision
 )
 
@@ -132,6 +144,13 @@ def route_update(update: TelegramUpdate) -> RoutingDecision:
         # /menu command
         if _MENU_CMD_RE.match(stripped):
             return OpenMenuDecision(action="open_menu", chat_id=chat_id)
+        # /settings, /billing, /help — open the corresponding menu screen directly
+        if _SETTINGS_CMD_RE.match(stripped):
+            return OpenScreenDecision(action="open_screen", chat_id=chat_id, screen="settings")
+        if _BILLING_CMD_RE.match(stripped):
+            return OpenScreenDecision(action="open_screen", chat_id=chat_id, screen="billing")
+        if _HELP_CMD_RE.match(stripped):
+            return OpenScreenDecision(action="open_screen", chat_id=chat_id, screen="help")
         # /language command
         m = _LANGUAGE_CMD_RE.match(stripped)
         if m:
