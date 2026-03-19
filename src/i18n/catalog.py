@@ -86,4 +86,5 @@ def get_string(key: str, lang: Language) -> str:
     entry = _CATALOG.get(key)
     if entry is None:
         raise KeyError(f"Unknown i18n key: {key!r}")
-    return entry.get(lang) or entry[DEFAULT_LANGUAGE]
+    value = entry.get(lang)
+    return value if value is not None else entry[DEFAULT_LANGUAGE]

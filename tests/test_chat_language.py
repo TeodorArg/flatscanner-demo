@@ -110,53 +110,6 @@ class TestSetChatLanguage:
 
 
 # ---------------------------------------------------------------------------
-# ORM model: TelegramChatPreferenceRow
-# ---------------------------------------------------------------------------
-
-
-class TestTelegramChatPreferenceRow:
-    def test_table_registered_in_metadata(self):
-        import sqlalchemy as sa
-
-        from src.storage.models import Base
-
-        assert "telegram_chat_preferences" in Base.metadata.tables
-
-    def test_primary_key_is_chat_id(self):
-        from src.storage.models import TelegramChatPreferenceRow
-
-        table = TelegramChatPreferenceRow.__table__  # type: ignore[attr-defined]
-        pk_cols = {c.name for c in table.primary_key}
-        assert pk_cols == {"chat_id"}
-
-    def test_language_column_exists_and_not_nullable(self):
-        import sqlalchemy as sa
-
-        from src.storage.models import TelegramChatPreferenceRow
-
-        table = TelegramChatPreferenceRow.__table__  # type: ignore[attr-defined]
-        col = table.c["language"]
-        assert not col.nullable
-
-    def test_language_default_is_ru(self):
-        from src.storage.models import TelegramChatPreferenceRow
-
-        table = TelegramChatPreferenceRow.__table__  # type: ignore[attr-defined]
-        col = table.c["language"]
-        assert col.default is not None
-        assert col.default.arg == "ru"
-
-    def test_chat_id_uses_biginteger(self):
-        import sqlalchemy as sa
-
-        from src.storage.models import TelegramChatPreferenceRow
-
-        table = TelegramChatPreferenceRow.__table__  # type: ignore[attr-defined]
-        col = table.c["chat_id"]
-        assert issubclass(type(col.type), sa.BigInteger)
-
-
-# ---------------------------------------------------------------------------
 # Router integration: language snapshotted onto AnalysisJob
 # ---------------------------------------------------------------------------
 

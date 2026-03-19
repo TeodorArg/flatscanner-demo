@@ -5,6 +5,7 @@
 - [x] Define the canonical-English plus translated-output architecture
 - [x] Capture the supported languages and default-language behavior
 - [x] Record the language snapshot requirement for queued jobs
+- [x] Record the approved decision: translated outputs are generated on demand and not persisted as cache artifacts
 
 ## Design
 
@@ -16,11 +17,11 @@
 
 ## Implementation
 
-- [x] Add `src/i18n/` with language types, catalog, and translator helper
-- [x] Add a Telegram chat language preference model/repository
-- [x] Extend `AnalysisJob` with `language`
+- [x] Add `src/i18n/` with language types, catalog, and `get_string` helper
+- [x] Add `src/storage/chat_preferences.py` — Redis-backed chat language preference repository
+- [x] Extend `AnalysisJob` with `language` (defaults to `DEFAULT_LANGUAGE`)
 - [x] Snapshot the effective language when enqueueing an analysis job
-- [x] Localize immediate Telegram replies (`help`, `unsupported`, `analysing`, language-change acknowledgements)
+- [x] Localize immediate Telegram replies (`help`, `unsupported`, `analysing`) via i18n catalog
 - [ ] Keep `AnalysisService` canonical output in English for generated freeform blocks
 - [ ] Add a translation service for structured freeform result blocks
 - [ ] Keep translated output ephemeral; do not persist it as a multilingual cache artifact

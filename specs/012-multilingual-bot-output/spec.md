@@ -56,8 +56,11 @@ This keeps the analysis pipeline unified while still allowing user-facing locali
 - A Russian or Spanish response is produced by translating the canonical English freeform blocks and combining them with localized formatter labels
 - Tests cover language preference persistence, job-language snapshotting, translation-stage behavior, formatter localization, and fallback behavior
 
+## Decisions Made
+
+- Translated outputs are generated on demand and are not persisted as translation cache artifacts; only canonical English analysis results are cached.
+
 ## Open Questions
 
 - Whether translation should use the same primary analysis model or a cheaper dedicated translation model
-- Whether translated results should be persisted in PostgreSQL, Redis, or both
 - Whether language switching UX should be command-based, button-based, or hybrid
