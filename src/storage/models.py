@@ -125,8 +125,30 @@ class AnalysisJobRow(Base):
 
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # Language snapshotted at enqueue time; defaults to Russian.
+    language: Mapped[str] = mapped_column(String(8), nullable=False, default="ru")
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=_utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow
+    )
+
+
+class TelegramChatPreferenceRow(Base):
+    """Persisted language preference for a Telegram chat.
+
+    Keyed by ``chat_id`` (Telegram's stable numeric identifier).  A row is
+    created the first time a chat explicitly sets a language; chats without a
+    row default to Russian at runtime.
+    """
+
+    __tablename__ = "telegram_chat_preferences"
+
+    chat_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    language: Mapped[str] = mapped_column(
+        String(8), nullable=False, default="ru"
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow

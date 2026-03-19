@@ -439,8 +439,12 @@ class TestWebhookEndpoint:
         assert call_args[1] == 1001
         assert "airbnb.com/rooms/123" in call_args[2]
 
+    @patch("src.telegram.router.get_chat_language", new_callable=AsyncMock)
     @patch("src.telegram.router.send_message", new_callable=AsyncMock)
-    def test_webhook_plain_text_triggers_help_reply(self, mock_send):
+    def test_webhook_plain_text_triggers_help_reply(self, mock_send, mock_get_lang):
+        from src.i18n.types import Language
+
+        mock_get_lang.return_value = Language.RU
         client = self._client()
         payload = self._update_payload("What listing platforms do you support?")
         response = client.post("/telegram/webhook", json=payload)
@@ -448,7 +452,7 @@ class TestWebhookEndpoint:
         assert response.json() == {"ok": True}
         mock_send.assert_awaited_once()
         call_args = mock_send.call_args[0]
-        assert "URL" in call_args[2] or "url" in call_args[2].lower()
+        assert "ссыл" in call_args[2].lower() or "airbnb" in call_args[2].lower()
 
     @patch("src.telegram.router.send_message", new_callable=AsyncMock)
     def test_webhook_no_text_returns_ok_without_send(self, mock_send):
@@ -485,8 +489,12 @@ class TestWebhookEndpoint:
         # Full URL including query string must appear verbatim in the reply text
         assert url_with_params in call_args[2]
 
+    @patch("src.telegram.router.get_chat_language", new_callable=AsyncMock)
     @patch("src.telegram.router.send_message", new_callable=AsyncMock)
-    def test_webhook_unsupported_url_sends_unsupported_reply(self, mock_send):
+    def test_webhook_unsupported_url_sends_unsupported_reply(self, mock_send, mock_get_lang):
+        from src.i18n.types import Language
+
+        mock_get_lang.return_value = Language.RU
         client = self._client()
         payload = self._update_payload("https://www.booking.com/hotel/xyz", chat_id=1001)
         response = client.post("/telegram/webhook", json=payload)
@@ -497,7 +505,7 @@ class TestWebhookEndpoint:
         assert call_args[1] == 1001
         # Must not claim analysis has started
         assert "looking at" not in call_args[2]
-        assert "support" in call_args[2].lower() or "provider" in call_args[2].lower()
+        assert "поддерж" in call_args[2].lower() or "airbnb" in call_args[2].lower()
 
     @patch("src.telegram.router.send_message", new_callable=AsyncMock)
     def test_webhook_returns_non_2xx_when_send_message_raises(self, mock_send):

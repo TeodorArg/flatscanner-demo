@@ -7,7 +7,9 @@ import redis.asyncio as aioredis
 from fastapi import APIRouter, HTTPException, Request
 
 from src.domain.listing import AnalysisJob
+from src.i18n import DEFAULT_LANGUAGE, get_string
 from src.jobs.queue import enqueue_analysis_job
+from src.storage.chat_preferences import get_chat_language
 from src.telegram.dispatcher import route_update
 from src.telegram.models import TelegramUpdate
 from src.telegram.sender import send_message
@@ -15,16 +17,6 @@ from src.telegram.sender import send_message
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/telegram", tags=["telegram"])
-
-_MSG_ANALYSING = (
-    "Got it! I'm looking at the listing at {url} — I'll get back to you shortly."
-)
-_MSG_UNSUPPORTED = (
-    "Sorry, I don't support that listing provider yet. Please send an Airbnb link."
-)
-_MSG_HELP = (
-    "Please send a rental listing URL (e.g. an Airbnb link) and I'll analyse it for you."
-)
 
 
 @router.post("/webhook")
@@ -56,6 +48,15 @@ async def webhook(request: Request) -> dict:
     if decision["action"] == "ignore":
         return {"ok": True}
 
+    # Determine the effective language for this chat.  Best-effort: if Redis is
+    # not yet available (e.g. during startup) we fall back to the default
+    # language so non-analyse paths can still reply.
+    redis = request.app.state.redis
+    if redis is not None:
+        lang = await get_chat_language(redis, decision["chat_id"])
+    else:
+        lang = DEFAULT_LANGUAGE
+
     if decision["action"] == "analyse":
         if update.message is None:
             # Defensive: route_update only returns 'analyse' when a message is present.
@@ -64,7 +65,6 @@ async def webhook(request: Request) -> dict:
                 "route_update returned 'analyse' but update.message is None; dropping update"
             )
             return {"ok": True}
-        redis = request.app.state.redis
         if redis is None:
             logger.warning(
                 "Redis unavailable; cannot enqueue job for chat_id=%s — returning 502 for retry",
@@ -76,6 +76,7 @@ async def webhook(request: Request) -> dict:
             provider=decision["provider"],
             telegram_chat_id=decision["chat_id"],
             telegram_message_id=update.message.message_id,
+            language=lang,
         )
         try:
             await enqueue_analysis_job(redis, job)
@@ -87,11 +88,11 @@ async def webhook(request: Request) -> dict:
                 exc,
             )
             raise HTTPException(status_code=502, detail="Queue unavailable; please retry")
-        text = _MSG_ANALYSING.format(url=decision["url"])
+        text = get_string("msg.analysing", lang).format(url=decision["url"])
     elif decision["action"] == "unsupported":
-        text = _MSG_UNSUPPORTED
+        text = get_string("msg.unsupported", lang)
     else:
-        text = _MSG_HELP
+        text = get_string("msg.help", lang)
 
     try:
         await send_message(settings.telegram_bot_token, decision["chat_id"], text)

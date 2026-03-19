@@ -14,6 +14,8 @@ from enum import Enum
 
 from pydantic import BaseModel, Field
 
+from src.i18n.types import DEFAULT_LANGUAGE, Language
+
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
@@ -125,6 +127,10 @@ class AnalysisJob(BaseModel):
 
     telegram_chat_id: int
     telegram_message_id: int
+
+    # Language snapshotted at enqueue time so in-flight jobs are stable even
+    # if the chat preference changes before the job completes.
+    language: Language = DEFAULT_LANGUAGE
 
     error_message: str | None = None
 
