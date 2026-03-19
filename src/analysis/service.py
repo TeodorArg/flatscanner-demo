@@ -29,10 +29,10 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 _SYSTEM_PROMPT = (
-    "Ты аналитик по аренде жилья. "
-    "Отвечай ТОЛЬКО корректным JSON-объектом без markdown и без пояснений вне JSON. "
-    "Все текстовые поля ответа пиши на русском языке. "
-    "Используй схему из пользовательского сообщения."
+    "You are a rental listing analyst. "
+    "Reply ONLY with a valid JSON object, no markdown, no text outside the JSON. "
+    "Write all text fields in English. "
+    "Use the schema from the user message."
 )
 
 _JSON_SCHEMA_HINT = """\
@@ -64,70 +64,70 @@ def build_prompt(
         appended as a structured nearby-context section so the model
         can factor in transport access and local amenities.
     """
-    lines: list[str] = ["Проанализируй это объявление об аренде.\n"]
+    lines: list[str] = ["Analyse this rental listing.\n"]
 
-    lines.append(f"Название: {listing.title}")
+    lines.append(f"Title: {listing.title}")
 
     if listing.description:
         snippet = listing.description[:600]
         if len(listing.description) > 600:
             snippet += "..."
-        lines.append(f"Описание: {snippet}")
+        lines.append(f"Description: {snippet}")
 
     loc = listing.location
     location_parts = [p for p in [loc.neighbourhood, loc.city, loc.country] if p]
     if location_parts:
-        lines.append(f"Локация: {', '.join(location_parts)}")
+        lines.append(f"Location: {', '.join(location_parts)}")
 
     if listing.price is not None:
         p = listing.price
-        lines.append(f"Цена: {p.amount} {p.currency} за {p.period}")
+        lines.append(f"Price: {p.amount} {p.currency} per {p.period}")
         if p.cleaning_fee is not None:
-            lines.append(f"Плата за уборку: {p.cleaning_fee} {p.currency}")
+            lines.append(f"Cleaning fee: {p.cleaning_fee} {p.currency}")
 
     if listing.bedrooms is not None:
-        lines.append(f"Спальни: {listing.bedrooms}")
+        lines.append(f"Bedrooms: {listing.bedrooms}")
     if listing.bathrooms is not None:
-        lines.append(f"Ванные: {listing.bathrooms}")
+        lines.append(f"Bathrooms: {listing.bathrooms}")
     if listing.max_guests is not None:
-        lines.append(f"Макс. гостей: {listing.max_guests}")
+        lines.append(f"Max guests: {listing.max_guests}")
 
     if listing.amenities:
-        lines.append(f"Удобства: {', '.join(listing.amenities[:15])}")
+        lines.append(f"Amenities: {', '.join(listing.amenities[:15])}")
 
     if listing.rating is not None:
-        lines.append(f"Рейтинг: {listing.rating:.2f} / 5")
+        lines.append(f"Rating: {listing.rating:.2f} / 5")
     if listing.review_count is not None:
-        lines.append(f"Отзывы: {listing.review_count}")
+        lines.append(f"Reviews: {listing.review_count}")
 
     if listing.host_name:
-        host_line = f"Хозяин: {listing.host_name}"
+        host_line = f"Host: {listing.host_name}"
         if listing.host_is_superhost:
-            host_line += " (Суперхост)"
+            host_line += " (Superhost)"
         lines.append(host_line)
 
     if enrichment and enrichment.successes:
-        lines.append("\nКонтекст рядом с жильем (из enrichment):")
+        lines.append("\nNearby context (from enrichment):")
         for result in enrichment.successes:
             data = result.data or {}
             if result.name == "transport":
                 count = data.get("count", 0)
-                parts = [f"{count} остановок общественного транспорта в радиусе 500 м"]
+                parts = [f"{count} public transport stops within 500 m"]
                 nearest = data.get("nearest_name")
                 if nearest:
-                    parts.append(f"ближайшая: {nearest!r}")
-                lines.append(f"  Транспорт: {', '.join(parts)}")
+                    parts.append(f"nearest: {nearest!r}")
+                lines.append(f"  Transport: {', '.join(parts)}")
             elif result.name == "nearby_places":
                 count = data.get("count", 0)
                 by_cat = data.get("by_category", {})
                 cat_str = ", ".join(f"{k}: {v}" for k, v in by_cat.items())
-                line = f"  Места рядом: {count} всего в радиусе 500 м"
+                line = f"  Nearby places: {count} total within 500 m"
                 if cat_str:
                     line += f" ({cat_str})"
                 lines.append(line)
 
     lines.append(
-        f"\nОтветь ТОЛЬКО JSON-объектом, который соответствует этой схеме:\n{_JSON_SCHEMA_HINT}"
+        f"\nReply ONLY with a JSON object matching this schema:\n{_JSON_SCHEMA_HINT}"
     )
 
     return "\n".join(lines)

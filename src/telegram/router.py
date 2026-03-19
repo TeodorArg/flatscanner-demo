@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException, Request
 from src.domain.listing import AnalysisJob
 from src.i18n import DEFAULT_LANGUAGE, get_string
 from src.jobs.queue import enqueue_analysis_job
-from src.storage.chat_preferences import get_chat_language
+from src.storage.chat_preferences import get_chat_language, set_chat_language
 from src.telegram.dispatcher import route_update
 from src.telegram.models import TelegramUpdate
 from src.telegram.sender import send_message
@@ -89,6 +89,24 @@ async def webhook(request: Request) -> dict:
             )
             raise HTTPException(status_code=502, detail="Queue unavailable; please retry")
         text = get_string("msg.analysing", lang).format(url=decision["url"])
+    elif decision["action"] == "set_language":
+        target_lang = decision["language"]
+        if target_lang is None:
+            # Unrecognised or missing language code — reply in the current chat language.
+            text = get_string("msg.language_invalid", lang)
+        else:
+            if redis is not None:
+                try:
+                    await set_chat_language(redis, decision["chat_id"], target_lang)
+                except aioredis.RedisError as exc:
+                    logger.error(
+                        "Redis error while saving language for chat_id=%s: %s",
+                        decision["chat_id"],
+                        exc,
+                    )
+                    raise HTTPException(status_code=502, detail="Queue unavailable; please retry")
+            # Confirm in the new language so the user sees immediate feedback.
+            text = get_string("msg.language_set", target_lang)
     elif decision["action"] == "unsupported":
         text = get_string("msg.unsupported", lang)
     else:
