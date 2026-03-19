@@ -35,4 +35,3 @@ The target environment is a remote Ubuntu VPS that already runs Docker and an ng
 - A container command can start the Redis worker loop
 - `docker compose -f deploy/docker-compose.vps.yml config` is valid
 - The deployment docs list required secrets and the first rollout sequence
-

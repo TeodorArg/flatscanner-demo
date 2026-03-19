@@ -25,4 +25,3 @@ Prepare the repository for a Docker-first VPS deployment where `flatscanner` run
 - Run `python -m pytest -q`
 - Run `docker compose -f deploy/docker-compose.vps.yml config`
 - Run `python -m src.jobs.cli` import-level validation without letting it block indefinitely
-

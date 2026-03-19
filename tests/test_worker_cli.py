@@ -45,4 +45,3 @@ class TestRunWorkerProcess:
         mock_from_url.assert_called_once_with("redis://redis:6379/0", decode_responses=True)
         mock_run.assert_awaited_once_with(redis, settings)
         redis.aclose.assert_awaited_once()
-
