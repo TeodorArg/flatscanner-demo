@@ -22,8 +22,12 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$repoRoot = (git rev-parse --show-toplevel).Trim()
-$agentFile = Join-Path $repoRoot '.codex\implementation-agent'
+# Resolve agent file from the target worktree, not the caller's checkout.
+$targetRepoRoot = (git -C $WorktreePath rev-parse --show-toplevel 2>&1).Trim()
+if (-not $targetRepoRoot -or $LASTEXITCODE -ne 0) {
+    throw "Cannot determine repo root from WorktreePath '$WorktreePath'."
+}
+$agentFile = Join-Path $targetRepoRoot '.codex\implementation-agent'
 
 $agent = 'claude'
 if (Test-Path $agentFile) {

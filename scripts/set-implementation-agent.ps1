@@ -2,7 +2,9 @@
 param(
     [Parameter(Mandatory = $true)]
     [ValidateSet('claude', 'codex')]
-    [string]$Agent
+    [string]$Agent,
+
+    [string]$Repo
 )
 
 $ErrorActionPreference = 'Stop'
@@ -22,7 +24,12 @@ if ($PSCmdlet.ShouldProcess($agentFile, "Write implementation agent '$Agent'")) 
 }
 
 if ($PSCmdlet.ShouldProcess('AI_REVIEW_AGENT', "Set repo variable to '$Agent'")) {
-    gh variable set AI_REVIEW_AGENT --body $Agent
+    $ghArgs = @('variable', 'set', 'AI_REVIEW_AGENT', '--body', $Agent)
+    if ($Repo) {
+        $ghArgs += '--repo'
+        $ghArgs += $Repo
+    }
+    & gh @ghArgs
     if ($LASTEXITCODE -ne 0) {
         throw "gh variable set failed with exit code $LASTEXITCODE"
     }
