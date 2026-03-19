@@ -4,7 +4,7 @@ This is the canonical PR-loop document for implementation, AI review, and merge 
 
 ## Roles
 
-- Claude writes product code and updates the active feature folder.
+- The selected implementation agent writes product code and updates the active feature folder. Claude is the default; Codex may be selected manually at task start via `scripts/set-implementation-agent.ps1`.
 - Codex owns architecture, review policy, and CI/CD health.
 - GitHub Actions runs required checks.
 - A human remains the final merge authority.
@@ -13,7 +13,7 @@ This is the canonical PR-loop document for implementation, AI review, and merge 
 
 1. Start from current `main`.
 2. Work from an active `specs/<feature-id>/` folder.
-3. Claude implements on a feature branch, either manually or through the local worker orchestration flow.
+3. The implementation agent implements on a feature branch, either manually or through the local worker orchestration flow.
 4. The PR updates `tasks.md`, tests, and any required durable docs.
 5. GitHub runs `baseline-checks`, `guard`, and `AI Review`.
 6. The selected reviewer posts or updates one sticky comment marked `<!-- ai-review -->`.
