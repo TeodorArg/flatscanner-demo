@@ -30,6 +30,12 @@
 - [x] Add stub billing screen designed for future plans and checkout flows
 - [x] Add i18n strings for menu labels, buttons, and navigation feedback
   (all `menu.*` keys added to `src/i18n/catalog.py`)
+- [x] Add command entry points for `/settings`, `/billing`, and `/help`
+- [x] Register Telegram command picker entries for `menu`, `language`,
+  `settings`, `billing`, and `help`
+- [x] Add localized command descriptions for `ru`, `en`, and `es`
+- [x] Add an operational script or documented runtime path to push command
+  definitions to Telegram (`scripts/register_telegram_commands.py`)
 
 ## Validation
 
@@ -44,7 +50,11 @@
 - [x] Add tests for `ChatSettings` persistence (`tests/test_menu.py::TestChatSettings`)
 - [x] Add tests for settings/billing stub screens and back navigation
   (`tests/test_menu.py::TestWebhookMenuCallback`)
-- [x] Run `python -m pytest -q` — 645 passed
+- [x] Add tests for command routing of `/settings`, `/billing`, and `/help`
+  (`tests/test_menu_routing.py::TestScreenCommandDispatch`, `TestWebhookScreenCommands`)
+- [x] Add tests for localized Telegram command-definition payloads
+  (`tests/test_command_registration.py`)
+- [x] Run `python -m pytest -q` - 675 passed
 
 ## Follow-Up
 

@@ -45,7 +45,9 @@ Optional:
 6. Reload nginx.
 7. Ensure the certificate covers `flatscanner.godmodetools.com`.
 8. Set the Telegram webhook to the public HTTPS URL.
-9. Send one live Airbnb link and verify:
+9. Register Telegram command picker entries:
+   `python scripts/register_telegram_commands.py`
+10. Send one live Airbnb link and verify:
    - webhook ingress
    - Redis enqueue
    - worker processing
@@ -59,3 +61,6 @@ Optional:
 - On the current VPS, the shared ingress network is `app_app_network`.
 - The default Airbnb actor is `curious_coder~airbnb-scraper` because it accepts listing detail URLs; actors that only support search-result URLs will fail for the Telegram MVP flow.
 - If `flatscanner.godmodetools.com` is proxied through Cloudflare, webhook POST requests may be blocked by Cloudflare WAF/bot rules. For the first live MVP test, prefer DNS-only mode on that subdomain or add an explicit allow rule for Telegram webhook traffic.
+- Telegram command picker descriptions are localized for `ru`, `en`, and `es`.
+  Re-run `python scripts/register_telegram_commands.py` after command text
+  changes or after rotating the bot token.

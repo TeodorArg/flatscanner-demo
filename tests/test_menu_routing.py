@@ -14,6 +14,7 @@ from src.storage.chat_settings import ChatSettings
 from src.telegram.dispatcher import (
     MenuCallbackDecision,
     OpenMenuDecision,
+    OpenScreenDecision,
     route_update,
 )
 from src.telegram.menu.callback import build_callback
@@ -380,3 +381,190 @@ class TestWebhookMenuLanguageSelection:
         response = client.post("/telegram/webhook", json=_callback_payload(data))
         assert response.status_code == 200
         mock_save.assert_not_awaited()
+
+
+# ---------------------------------------------------------------------------
+# Dispatcher: /settings, /billing, /help command routing
+# ---------------------------------------------------------------------------
+
+
+class TestScreenCommandDispatch:
+    def test_settings_command_returns_open_screen_settings(self):
+        update = _make_message_update("/settings")
+        decision = route_update(update)
+        assert decision["action"] == "open_screen"
+        assert decision["screen"] == "settings"
+        assert decision["chat_id"] == 1001
+
+    def test_billing_command_returns_open_screen_billing(self):
+        update = _make_message_update("/billing")
+        decision = route_update(update)
+        assert decision["action"] == "open_screen"
+        assert decision["screen"] == "billing"
+
+    def test_help_command_returns_open_screen_help(self):
+        update = _make_message_update("/help")
+        decision = route_update(update)
+        assert decision["action"] == "open_screen"
+        assert decision["screen"] == "help"
+
+    def test_settings_command_case_insensitive(self):
+        update = _make_message_update("/Settings")
+        decision = route_update(update)
+        assert decision["action"] == "open_screen"
+        assert decision["screen"] == "settings"
+
+    def test_billing_command_case_insensitive(self):
+        update = _make_message_update("/BILLING")
+        decision = route_update(update)
+        assert decision["action"] == "open_screen"
+        assert decision["screen"] == "billing"
+
+    def test_help_command_case_insensitive(self):
+        update = _make_message_update("/Help")
+        decision = route_update(update)
+        assert decision["action"] == "open_screen"
+        assert decision["screen"] == "help"
+
+    def test_settings_command_with_trailing_space(self):
+        update = _make_message_update("/settings ")
+        decision = route_update(update)
+        assert decision["action"] == "open_screen"
+        assert decision["screen"] == "settings"
+
+    def test_menu_still_returns_open_menu(self):
+        update = _make_message_update("/menu")
+        decision = route_update(update)
+        assert decision["action"] == "open_menu"
+
+    def test_unknown_command_returns_help_decision(self):
+        update = _make_message_update("/start")
+        decision = route_update(update)
+        assert decision["action"] == "help"
+
+
+# ---------------------------------------------------------------------------
+# Webhook integration: /settings, /billing, /help open the correct screens
+# ---------------------------------------------------------------------------
+
+
+def _screen_payload(command: str, chat_id: int = 1001) -> dict:
+    return {
+        "update_id": 20,
+        "message": {
+            "message_id": 1,
+            "from": {"id": 42, "first_name": "Alice"},
+            "chat": {"id": chat_id, "type": "private"},
+            "text": command,
+        },
+    }
+
+
+class TestWebhookScreenCommands:
+    @patch("src.telegram.router.send_message", new_callable=AsyncMock)
+    @patch("src.telegram.router.get_chat_settings", new_callable=AsyncMock)
+    def test_settings_command_sends_settings_screen(self, mock_get_settings, mock_send):
+        mock_get_settings.return_value = ChatSettings(language=Language.EN)
+
+        app = create_app(settings=_test_settings())
+        app.state.redis = MagicMock()
+        client = TestClient(app, raise_server_exceptions=True)
+
+        response = client.post("/telegram/webhook", json=_screen_payload("/settings"))
+        assert response.status_code == 200
+        mock_send.assert_awaited_once()
+        sent_text = mock_send.call_args[0][2]
+        assert "Settings" in sent_text
+
+    @patch("src.telegram.router.send_message", new_callable=AsyncMock)
+    @patch("src.telegram.router.get_chat_settings", new_callable=AsyncMock)
+    def test_billing_command_sends_billing_screen(self, mock_get_settings, mock_send):
+        mock_get_settings.return_value = ChatSettings(language=Language.EN)
+
+        app = create_app(settings=_test_settings())
+        app.state.redis = MagicMock()
+        client = TestClient(app, raise_server_exceptions=True)
+
+        response = client.post("/telegram/webhook", json=_screen_payload("/billing"))
+        assert response.status_code == 200
+        mock_send.assert_awaited_once()
+        sent_text = mock_send.call_args[0][2]
+        assert "Billing" in sent_text
+
+    @patch("src.telegram.router.send_message", new_callable=AsyncMock)
+    @patch("src.telegram.router.get_chat_settings", new_callable=AsyncMock)
+    def test_help_command_sends_help_screen(self, mock_get_settings, mock_send):
+        mock_get_settings.return_value = ChatSettings(language=Language.EN)
+
+        app = create_app(settings=_test_settings())
+        app.state.redis = MagicMock()
+        client = TestClient(app, raise_server_exceptions=True)
+
+        response = client.post("/telegram/webhook", json=_screen_payload("/help"))
+        assert response.status_code == 200
+        mock_send.assert_awaited_once()
+        sent_text = mock_send.call_args[0][2]
+        assert "Help" in sent_text
+
+    @patch("src.telegram.router.send_message", new_callable=AsyncMock)
+    @patch("src.telegram.router.get_chat_settings", new_callable=AsyncMock)
+    def test_screen_command_uses_chat_language(self, mock_get_settings, mock_send):
+        mock_get_settings.return_value = ChatSettings(language=Language.RU)
+
+        app = create_app(settings=_test_settings())
+        app.state.redis = MagicMock()
+        client = TestClient(app, raise_server_exceptions=True)
+
+        response = client.post("/telegram/webhook", json=_screen_payload("/settings"))
+        assert response.status_code == 200
+        sent_text = mock_send.call_args[0][2]
+        assert "Настройки" in sent_text
+
+    @patch("src.telegram.router.send_message", new_callable=AsyncMock)
+    def test_screen_command_returns_502_when_redis_unavailable(self, mock_send):
+        app = create_app(settings=_test_settings())
+        client = TestClient(app)
+
+        response = client.post("/telegram/webhook", json=_screen_payload("/settings"))
+        assert response.status_code == 502
+        mock_send.assert_not_awaited()
+
+    @patch("src.telegram.router.send_message", new_callable=AsyncMock)
+    @patch("src.telegram.router.get_chat_settings", new_callable=AsyncMock)
+    def test_screen_command_sends_inline_keyboard(self, mock_get_settings, mock_send):
+        mock_get_settings.return_value = ChatSettings(language=Language.EN)
+
+        app = create_app(settings=_test_settings())
+        app.state.redis = MagicMock()
+        client = TestClient(app, raise_server_exceptions=True)
+
+        response = client.post("/telegram/webhook", json=_screen_payload("/help"))
+        assert response.status_code == 200
+        # send_message should be called with reply_markup keyword argument
+        call_kwargs = mock_send.call_args[1]
+        assert "reply_markup" in call_kwargs
+        markup = call_kwargs["reply_markup"]
+        assert "inline_keyboard" in markup
+
+    @patch("src.telegram.router.send_message", new_callable=AsyncMock)
+    @patch(
+        "src.telegram.router.route_update",
+        return_value=OpenScreenDecision(
+            action="open_screen",
+            chat_id=1001,
+            screen="help",
+        ),
+    )
+    @patch("src.telegram.router.SCREEN_RENDERERS", {"settings": MagicMock()})
+    def test_unknown_screen_is_ignored(
+        self,
+        _mock_route_update,
+        mock_send,
+    ):
+        app = create_app(settings=_test_settings())
+        app.state.redis = MagicMock()
+        client = TestClient(app, raise_server_exceptions=True)
+
+        response = client.post("/telegram/webhook", json=_screen_payload("/help"))
+        assert response.status_code == 200
+        mock_send.assert_not_awaited()
