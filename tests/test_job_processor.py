@@ -20,9 +20,11 @@ from src.domain.listing import (
     NormalizedListing,
     PriceInfo,
 )
+from src.i18n.types import Language
 from src.jobs.processor import UnsupportedProviderError, process_job
 from src.jobs.queue import QUEUE_KEY, dequeue_analysis_job
 from src.jobs.worker import process_once, run_worker
+from src.translation.service import TranslationError
 
 
 # ---------------------------------------------------------------------------
@@ -371,6 +373,43 @@ class TestProcessJobSendFailure:
                 analysis_service=mock_service,
                 translation_service=_make_passthrough_ts(),
             )
+
+
+class TestProcessJobTranslationFallback:
+    @pytest.mark.asyncio
+    async def test_translation_error_falls_back_to_english_reply(self):
+        job = _make_job(language=Language.RU)
+        listing = _make_listing()
+        result = _make_result()
+        settings = _make_settings()
+
+        mock_adapter = MagicMock()
+        mock_adapter.fetch = AsyncMock(return_value=listing)
+        mock_service = MagicMock(spec=AnalysisService)
+        mock_service.analyse = AsyncMock(return_value=result)
+
+        mock_translation_service = MagicMock()
+        mock_translation_service.translate = AsyncMock(
+            side_effect=TranslationError("model returned invalid JSON")
+        )
+
+        sent_texts: list[str] = []
+
+        async def fake_send(token, chat_id, text, *, client=None):
+            sent_texts.append(text)
+
+        with patch("src.jobs.processor.send_message", side_effect=fake_send):
+            await process_job(
+                job,
+                settings,
+                adapter=mock_adapter,
+                analysis_service=mock_service,
+                translation_service=mock_translation_service,
+            )
+
+        assert sent_texts
+        assert "A pleasant flat in central Berlin." in sent_texts[0]
+        assert "Price:" in sent_texts[0]
 
 
 # ---------------------------------------------------------------------------

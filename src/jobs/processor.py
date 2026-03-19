@@ -24,12 +24,14 @@ from typing import TYPE_CHECKING
 import httpx
 
 from src.adapters.registry import resolve_adapter
+from src.analysis.openrouter_client import OpenRouterError
 from src.analysis.service import AnalysisService
 from src.domain.listing import AnalysisJob
 from src.enrichment.runner import EnrichmentOutcome, EnrichmentProvider, run_enrichments
+from src.i18n.types import Language
 from src.telegram.formatter import format_analysis_message
 from src.telegram.sender import send_message
-from src.translation.service import TranslationService
+from src.translation.service import TranslationError, TranslationService
 
 if TYPE_CHECKING:
     from src.adapters.base import ListingAdapter
@@ -131,13 +133,26 @@ async def process_job(
     # freeform blocks are translated just-in-time; translated output is never
     # persisted as a cache artifact.
     t_service = translation_service or TranslationService(settings)
-    translated_result = await t_service.translate(result, job.language)
-    logger.debug(
-        "Translation stage complete for job %s (language=%s)", job.id, job.language.value
-    )
+    render_language = job.language
+    try:
+        translated_result = await t_service.translate(result, job.language)
+        logger.debug(
+            "Translation stage complete for job %s (language=%s)",
+            job.id,
+            job.language.value,
+        )
+    except (TranslationError, OpenRouterError) as exc:
+        logger.warning(
+            "Translation failed for job %s (requested_language=%s); falling back to English: %s",
+            job.id,
+            job.language.value,
+            exc,
+        )
+        translated_result = result
+        render_language = Language.EN
 
     # --- 4. Format -----------------------------------------------------------
-    text = format_analysis_message(listing, translated_result, job.language)
+    text = format_analysis_message(listing, translated_result, render_language)
 
     # --- 5. Send -------------------------------------------------------------
     await send_message(

@@ -126,7 +126,7 @@ def _parse_translation_response(raw: str, original: AnalysisResult) -> AnalysisR
     # Strip optional ```json ... ``` fences that models sometimes add.
     if text.startswith("```"):
         lines = text.splitlines()
-        inner = lines[1:] if lines[0].startswith("```") else lines
+        inner = lines[1:]
         if inner and inner[-1].strip() == "```":
             inner = inner[:-1]
         text = "\n".join(inner).strip()

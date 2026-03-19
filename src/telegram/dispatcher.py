@@ -5,7 +5,7 @@ from typing import Literal, TypedDict
 
 from src.adapters.registry import detect_provider
 from src.domain.listing import ListingProvider
-from src.i18n.types import Language, SUPPORTED_LANGUAGES
+from src.i18n.types import Language
 from src.telegram.models import TelegramUpdate
 
 _URL_RE = re.compile(r"https?://\S+", re.IGNORECASE)
