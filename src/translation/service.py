@@ -18,15 +18,11 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import TYPE_CHECKING
 
 from src.analysis.openrouter_client import OpenRouterClient, OpenRouterError
 from src.analysis.result import AnalysisResult
 from src.app.config import Settings
 from src.i18n.types import Language
-
-if TYPE_CHECKING:
-    pass
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +63,38 @@ def _build_translation_prompt(result: AnalysisResult, language: Language) -> str
         f"Input:\n{json.dumps(source, ensure_ascii=False, indent=2)}\n\n"
         f"Output schema:\n{_TRANSLATION_SCHEMA_HINT}"
     )
+
+
+def _coerce_translated_list(
+    field_name: str,
+    value: object,
+    fallback: list[str],
+) -> list[str]:
+    """Return a sanitized translated text list, logging lossy fallbacks."""
+    if not isinstance(value, list):
+        logger.warning(
+            "Translation response field '%s' was %s; using original list",
+            field_name,
+            type(value).__name__,
+        )
+        return fallback
+
+    invalid_items = [item for item in value if not isinstance(item, str)]
+    if invalid_items:
+        logger.warning(
+            "Translation response field '%s' contained %s non-string item(s); dropping them",
+            field_name,
+            len(invalid_items),
+        )
+
+    sanitized = [item for item in value if isinstance(item, str)]
+    if not sanitized and value:
+        logger.warning(
+            "Translation response field '%s' had no usable string items; using original list",
+            field_name,
+        )
+        return fallback
+    return sanitized
 
 
 def _parse_translation_response(raw: str, original: AnalysisResult) -> AnalysisResult:
@@ -118,15 +146,17 @@ def _parse_translation_response(raw: str, original: AnalysisResult) -> AnalysisR
         logger.warning("Translation response missing 'summary'; using original")
         summary = original.summary
 
-    strengths_raw = data.get("strengths", original.strengths)
-    if not isinstance(strengths_raw, list):
-        strengths_raw = original.strengths
-    strengths = [str(s) for s in strengths_raw if isinstance(s, str)]
+    strengths = _coerce_translated_list(
+        "strengths",
+        data.get("strengths", original.strengths),
+        original.strengths,
+    )
 
-    risks_raw = data.get("risks", original.risks)
-    if not isinstance(risks_raw, list):
-        risks_raw = original.risks
-    risks = [str(r) for r in risks_raw if isinstance(r, str)]
+    risks = _coerce_translated_list(
+        "risks",
+        data.get("risks", original.risks),
+        original.risks,
+    )
 
     price_explanation = data.get("price_explanation", original.price_explanation)
     if not isinstance(price_explanation, str):

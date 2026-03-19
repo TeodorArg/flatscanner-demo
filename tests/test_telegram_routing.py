@@ -840,3 +840,29 @@ class TestWebhookLanguageSwitching:
         mock_set_lang.assert_not_awaited()
         # Should mention valid options
         assert "ru" in reply_text or "language" in reply_text.lower()
+
+    @patch("src.telegram.router.send_message", new_callable=AsyncMock)
+    def test_language_change_returns_502_when_redis_unavailable(self, mock_send):
+        app = create_app(settings=_test_settings())
+        client = TestClient(app)
+        response = client.post("/telegram/webhook", json=self._language_payload("/language en"))
+        assert response.status_code == 502
+        assert "language preference" in response.json()["detail"].lower()
+        mock_send.assert_not_awaited()
+
+    @patch("src.telegram.router.set_chat_language", new_callable=AsyncMock)
+    @patch("src.telegram.router.get_chat_language", new_callable=AsyncMock)
+    @patch("src.telegram.router.send_message", new_callable=AsyncMock)
+    def test_language_change_redis_error_returns_specific_502(
+        self,
+        mock_send,
+        mock_get_lang,
+        mock_set_lang,
+    ):
+        mock_get_lang.return_value = Language.RU
+        mock_set_lang.side_effect = aioredis.RedisError("connection reset")
+        client = self._client()
+        response = client.post("/telegram/webhook", json=self._language_payload("/language en"))
+        assert response.status_code == 502
+        assert response.json()["detail"] == "Could not save language preference; please retry"
+        mock_send.assert_not_awaited()

@@ -95,16 +95,27 @@ async def webhook(request: Request) -> dict:
             # Unrecognised or missing language code — reply in the current chat language.
             text = get_string("msg.language_invalid", lang)
         else:
-            if redis is not None:
-                try:
-                    await set_chat_language(redis, decision["chat_id"], target_lang)
-                except aioredis.RedisError as exc:
-                    logger.error(
-                        "Redis error while saving language for chat_id=%s: %s",
-                        decision["chat_id"],
-                        exc,
-                    )
-                    raise HTTPException(status_code=502, detail="Queue unavailable; please retry")
+            if redis is None:
+                logger.warning(
+                    "Redis unavailable; cannot save language for chat_id=%s",
+                    decision["chat_id"],
+                )
+                raise HTTPException(
+                    status_code=502,
+                    detail="Language preference storage unavailable; please retry",
+                )
+            try:
+                await set_chat_language(redis, decision["chat_id"], target_lang)
+            except aioredis.RedisError as exc:
+                logger.error(
+                    "Redis error while saving language for chat_id=%s: %s",
+                    decision["chat_id"],
+                    exc,
+                )
+                raise HTTPException(
+                    status_code=502,
+                    detail="Could not save language preference; please retry",
+                )
             # Confirm in the new language so the user sees immediate feedback.
             text = get_string("msg.language_set", target_lang)
     elif decision["action"] == "unsupported":

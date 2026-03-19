@@ -175,6 +175,17 @@ class TestParseTranslationResponse:
         result = _parse_translation_response(json.dumps(payload), original)
         assert result.risks == original.risks
 
+    def test_falls_back_to_original_strengths_when_all_items_invalid(self):
+        payload = {
+            "summary": "Translated.",
+            "strengths": [1, 2, 3],
+            "risks": [],
+            "price_explanation": "y",
+        }
+        original = self._original()
+        result = _parse_translation_response(json.dumps(payload), original)
+        assert result.strengths == original.strengths
+
 
 # ---------------------------------------------------------------------------
 # TranslationService.translate — English passthrough
