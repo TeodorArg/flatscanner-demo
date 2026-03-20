@@ -25,7 +25,11 @@ from typing import TYPE_CHECKING
 import httpx
 
 from src.adapters.registry import resolve_adapter
+from src.analysis.context import AnalysisContext
+from src.analysis.modules.ai_summary import AISummaryModule, AISummaryResult
 from src.analysis.openrouter_client import OpenRouterError
+from src.analysis.registry import ModuleRegistry
+from src.analysis.runner import ModuleRunner
 from src.analysis.service import AnalysisService
 from src.domain.listing import AnalysisJob
 from src.domain.raw_payload import RawPayload
@@ -123,15 +127,16 @@ async def process_job(
     logger.debug("Fetched listing %s for job %s", listing.id, job.id)
 
     # --- 2a. Persist raw payload (best-effort) --------------------------------
+    _raw_payload: RawPayload | None = None
     if raw_payload_repo is not None:
+        _raw_payload = RawPayload(
+            provider=job.provider.value,
+            source_url=job.source_url,
+            source_id=listing.source_id or None,
+            payload=adapter_result.raw,
+        )
         try:
-            raw_payload = RawPayload(
-                provider=job.provider.value,
-                source_url=job.source_url,
-                source_id=listing.source_id or None,
-                payload=adapter_result.raw,
-            )
-            await raw_payload_repo.save(raw_payload)
+            await raw_payload_repo.save(_raw_payload)
         except Exception:
             logger.warning(
                 "Failed to persist raw payload for job %s; continuing without capture",
@@ -150,9 +155,25 @@ async def process_job(
                 job.id,
             )
 
-    # --- 3. Analyse ----------------------------------------------------------
+    # --- 3. Analyse (via module framework) -----------------------------------
     service = analysis_service or AnalysisService(settings)
-    result = await service.analyse(listing, enrichment_outcome)
+    registry = ModuleRegistry()
+    registry.register(AISummaryModule(service))
+    runner = ModuleRunner(registry)
+    ctx = AnalysisContext(
+        listing=listing,
+        enrichment=enrichment_outcome,
+        raw_payload=_raw_payload,
+    )
+    module_results = await runner.run(ctx)
+    ai_summary = next(
+        (r for r in module_results if isinstance(r, AISummaryResult)), None
+    )
+    if ai_summary is None:
+        raise RuntimeError(
+            f"AISummaryModule produced no result for job {job.id}"
+        )
+    result = ai_summary.analysis_result
     result = result.model_copy(update={"display_title": listing.title})
     logger.debug("Analysis complete for job %s", job.id)
 

@@ -839,3 +839,165 @@ class TestRunWorker:
             await run_worker(redis, settings)
 
         mock_requeue.assert_awaited_once()
+
+
+# ---------------------------------------------------------------------------
+# process_job — framework integration (018)
+# ---------------------------------------------------------------------------
+
+
+class TestProcessJobFrameworkIntegration:
+    """Prove that process_job routes analysis through the module framework."""
+
+    @pytest.mark.asyncio
+    async def test_module_runner_invoked_with_analysis_context(self):
+        """process_job runs analysis via ModuleRunner, not a direct service call."""
+        from src.analysis.context import AnalysisContext
+        from src.analysis.runner import ModuleRunner
+
+        job = _make_job()
+        listing = _make_listing()
+        result = _make_result()
+        settings = _make_settings()
+
+        mock_adapter = MagicMock()
+        mock_adapter.fetch = AsyncMock(return_value=_make_adapter_result(listing))
+        mock_service = MagicMock(spec=AnalysisService)
+        mock_service.analyse = AsyncMock(return_value=result)
+
+        captured_ctxs: list[AnalysisContext] = []
+        original_run = ModuleRunner.run
+
+        async def spy_run(self, ctx):  # type: ignore[override]
+            captured_ctxs.append(ctx)
+            return await original_run(self, ctx)
+
+        with (
+            patch.object(ModuleRunner, "run", spy_run),
+            patch("src.jobs.processor.send_message", new_callable=AsyncMock),
+        ):
+            await process_job(
+                job,
+                settings,
+                adapter=mock_adapter,
+                analysis_service=mock_service,
+                translation_service=_make_passthrough_ts(),
+            )
+
+        assert len(captured_ctxs) == 1
+        ctx = captured_ctxs[0]
+        assert isinstance(ctx, AnalysisContext)
+        assert ctx.listing is listing
+
+    @pytest.mark.asyncio
+    async def test_analysis_result_extracted_correctly_from_framework(self):
+        """AnalysisResult coming through the framework matches the service output."""
+        job = _make_job()
+        listing = _make_listing()
+        result = _make_result()
+        settings = _make_settings()
+
+        mock_adapter = MagicMock()
+        mock_adapter.fetch = AsyncMock(return_value=_make_adapter_result(listing))
+        mock_service = MagicMock(spec=AnalysisService)
+        mock_service.analyse = AsyncMock(return_value=result)
+
+        sent_texts: list[str] = []
+
+        async def fake_send(token, chat_id, text, *, client=None):
+            sent_texts.append(text)
+
+        with patch("src.jobs.processor.send_message", side_effect=fake_send):
+            await process_job(
+                job,
+                settings,
+                adapter=mock_adapter,
+                analysis_service=mock_service,
+                translation_service=_make_passthrough_ts(),
+            )
+
+        assert sent_texts
+        assert result.summary in sent_texts[0]
+
+    @pytest.mark.asyncio
+    async def test_raw_payload_present_in_context_when_repo_provided(self):
+        """AnalysisContext.raw_payload is set when raw_payload_repo is injected."""
+        from src.analysis.context import AnalysisContext
+        from src.analysis.runner import ModuleRunner
+        from src.domain.raw_payload import RawPayload
+
+        job = _make_job()
+        listing = _make_listing()
+        result = _make_result()
+        settings = _make_settings()
+
+        adapter_result = _make_adapter_result(listing)
+        mock_adapter = MagicMock()
+        mock_adapter.fetch = AsyncMock(return_value=adapter_result)
+        mock_service = MagicMock(spec=AnalysisService)
+        mock_service.analyse = AsyncMock(return_value=result)
+        mock_repo = AsyncMock()
+
+        captured_ctxs: list[AnalysisContext] = []
+        original_run = ModuleRunner.run
+
+        async def spy_run(self, ctx):  # type: ignore[override]
+            captured_ctxs.append(ctx)
+            return await original_run(self, ctx)
+
+        with (
+            patch.object(ModuleRunner, "run", spy_run),
+            patch("src.jobs.processor.send_message", new_callable=AsyncMock),
+        ):
+            await process_job(
+                job,
+                settings,
+                adapter=mock_adapter,
+                analysis_service=mock_service,
+                translation_service=_make_passthrough_ts(),
+                raw_payload_repo=mock_repo,
+            )
+
+        assert len(captured_ctxs) == 1
+        ctx = captured_ctxs[0]
+        assert isinstance(ctx.raw_payload, RawPayload)
+        assert ctx.raw_payload.provider == "airbnb"
+        assert ctx.raw_payload.source_url == job.source_url
+
+    @pytest.mark.asyncio
+    async def test_raw_payload_absent_in_context_when_no_repo(self):
+        """AnalysisContext.raw_payload is None when no raw_payload_repo is provided."""
+        from src.analysis.context import AnalysisContext
+        from src.analysis.runner import ModuleRunner
+
+        job = _make_job()
+        listing = _make_listing()
+        result = _make_result()
+        settings = _make_settings()
+
+        mock_adapter = MagicMock()
+        mock_adapter.fetch = AsyncMock(return_value=_make_adapter_result(listing))
+        mock_service = MagicMock(spec=AnalysisService)
+        mock_service.analyse = AsyncMock(return_value=result)
+
+        captured_ctxs: list[AnalysisContext] = []
+        original_run = ModuleRunner.run
+
+        async def spy_run(self, ctx):  # type: ignore[override]
+            captured_ctxs.append(ctx)
+            return await original_run(self, ctx)
+
+        with (
+            patch.object(ModuleRunner, "run", spy_run),
+            patch("src.jobs.processor.send_message", new_callable=AsyncMock),
+        ):
+            await process_job(
+                job,
+                settings,
+                adapter=mock_adapter,
+                analysis_service=mock_service,
+                translation_service=_make_passthrough_ts(),
+                raw_payload_repo=None,
+            )
+
+        assert captured_ctxs[0].raw_payload is None

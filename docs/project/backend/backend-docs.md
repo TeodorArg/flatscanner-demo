@@ -22,21 +22,21 @@
 
 See ADR 004 for the full decision. The planned layers in execution order:
 
-1. **Ingestion & Adapter Layer** — URL detection, provider selection, adapter execution, raw payload capture
-2. **Normalization Layer** — adapter output → `ListingSnapshot`
-3. **Analysis Module Framework** — module registry and runner; provider-specific + generic fallback per module
-4. **Enrichment Layer** — transport, nearby places, safety (future), comparable prices (future)
-5. **Result Assembly** — score aggregation, analysis cache lookup/write
-6. **Formatter / Delivery Layer** — Telegram formatter; future channels
-7. **Persistence Layer** — six bounded areas: Users, ChatSettings, Billing, AnalysisCache, RawPayloads, AnalysisResults
+1. **Ingestion & Adapter Layer** - URL detection, provider selection, adapter execution, raw payload capture
+2. **Normalization Layer** - adapter output -> `ListingSnapshot`
+3. **Analysis Module Framework** - module registry and runner; provider-specific + generic fallback per module. P3 now fronts the live analysis stage with a generic `AISummaryModule`, so future specialist modules can be added without replacing the delivery path again.
+4. **Enrichment Layer** - transport, nearby places, safety (future), comparable prices (future)
+5. **Result Assembly** - score aggregation, analysis cache lookup/write
+6. **Formatter / Delivery Layer** - Telegram formatter; future channels
+7. **Persistence Layer** - six bounded areas: Users, ChatSettings, Billing, AnalysisCache, RawPayloads, AnalysisResults
 
-Migration is broken into phases P1–P7 in `specs/015-post-mvp-architecture-foundation/spec.md`.
+Migration is broken into phases P1-P7 in `specs/015-post-mvp-architecture-foundation/spec.md`.
 
 ## Integration Direction
 
 - Airbnb is the first provider, but parsing must stay adapter-based.
 - Apify is the default extraction source where supported.
-  - Default Airbnb actor: `dtrungtin~airbnb-scraper` (overridable via `APIFY_AIRBNB_ACTOR_ID`).
+  - Default Airbnb actor: `curious_coder~airbnb-scraper` (overridable via `APIFY_AIRBNB_ACTOR_ID`).
   - `APIFY_API_TOKEN` is required in all non-development/testing environments and validated at startup.
   - The client authenticates using an `Authorization: Bearer <token>` header (not a query parameter).
 - OpenRouter is the model gateway.
@@ -67,7 +67,7 @@ Migration is broken into phases P1–P7 in `specs/015-post-mvp-architecture-foun
 
 ## Open Decisions
 
-- Redis worker library (deferred to P3 analysis module framework spec)
+- Redis worker library (still deferred; analysis module framework landed in P3)
 - Regional safety providers (safety enrichment deferred from MVP)
 - Raw/source payload retention policy: TTL, archival, or deletion strategy (storage backend was chosen in P2 as PostgreSQL-backed JSON payload storage)
 - Comparable-listing strategy for price fairness (deferred to reviews/price module specs)
