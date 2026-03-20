@@ -965,18 +965,21 @@ class TestProcessJobFrameworkIntegration:
         assert ctx.raw_payload.source_url == job.source_url
 
     @pytest.mark.asyncio
-    async def test_raw_payload_absent_in_context_when_no_repo(self):
-        """AnalysisContext.raw_payload is None when no raw_payload_repo is provided."""
+    async def test_raw_payload_present_in_context_even_without_repo(self):
+        """AnalysisContext.raw_payload is populated from adapter_result.raw even when
+        raw_payload_repo is None (no DB persistence requested)."""
         from src.analysis.context import AnalysisContext
         from src.analysis.runner import ModuleRunner
+        from src.domain.raw_payload import RawPayload
 
         job = _make_job()
         listing = _make_listing()
         result = _make_result()
         settings = _make_settings()
 
+        adapter_result = _make_adapter_result(listing)
         mock_adapter = MagicMock()
-        mock_adapter.fetch = AsyncMock(return_value=_make_adapter_result(listing))
+        mock_adapter.fetch = AsyncMock(return_value=adapter_result)
         mock_service = MagicMock(spec=AnalysisService)
         mock_service.analyse = AsyncMock(return_value=result)
 
@@ -1000,4 +1003,183 @@ class TestProcessJobFrameworkIntegration:
                 raw_payload_repo=None,
             )
 
-        assert captured_ctxs[0].raw_payload is None
+        ctx = captured_ctxs[0]
+        assert isinstance(ctx.raw_payload, RawPayload)
+        assert ctx.raw_payload.payload == adapter_result.raw
+
+
+# ---------------------------------------------------------------------------
+# process_job — reviews module integration (019)
+# ---------------------------------------------------------------------------
+
+
+class TestProcessJobReviewsModuleIntegration:
+    """Prove that process_job registers reviews modules and their results
+    appear in module_results alongside AISummaryResult."""
+
+    @pytest.mark.asyncio
+    async def test_reviews_result_present_in_module_results(self):
+        """process_job registers reviews modules; ReviewsResult appears in output."""
+        from src.analysis.modules.reviews import ReviewsResult
+        from src.analysis.modules.ai_summary import AISummaryResult
+        from src.analysis.runner import ModuleRunner
+
+        job = _make_job()
+        listing = _make_listing()
+        result = _make_result()
+        settings = _make_settings()
+
+        mock_adapter = MagicMock()
+        mock_adapter.fetch = AsyncMock(return_value=_make_adapter_result(listing))
+        mock_service = MagicMock(spec=AnalysisService)
+        mock_service.analyse = AsyncMock(return_value=result)
+
+        captured_results: list = []
+        original_run = ModuleRunner.run
+
+        async def spy_run(self, ctx):  # type: ignore[override]
+            results = await original_run(self, ctx)
+            captured_results.extend(results)
+            return results
+
+        with (
+            patch.object(ModuleRunner, "run", spy_run),
+            patch("src.jobs.processor.send_message", new_callable=AsyncMock),
+        ):
+            await process_job(
+                job,
+                settings,
+                adapter=mock_adapter,
+                analysis_service=mock_service,
+                translation_service=_make_passthrough_ts(),
+            )
+
+        result_types = {type(r) for r in captured_results}
+        assert AISummaryResult in result_types
+        assert ReviewsResult in result_types
+
+    @pytest.mark.asyncio
+    async def test_airbnb_reviews_module_registered_for_airbnb_listing(self):
+        """AirbnbReviewsModule is resolved for Airbnb provider in process_job."""
+        from src.analysis.modules.reviews import AirbnbReviewsModule, ReviewsResult
+        from src.analysis.runner import ModuleRunner
+
+        job = _make_job(provider=ListingProvider.AIRBNB)
+        listing = _make_listing()
+        result = _make_result()
+        settings = _make_settings()
+
+        mock_adapter = MagicMock()
+        mock_adapter.fetch = AsyncMock(return_value=_make_adapter_result(listing))
+        mock_service = MagicMock(spec=AnalysisService)
+        mock_service.analyse = AsyncMock(return_value=result)
+
+        captured_results: list = []
+        original_run = ModuleRunner.run
+
+        async def spy_run(self, ctx):  # type: ignore[override]
+            results = await original_run(self, ctx)
+            captured_results.extend(results)
+            return results
+
+        with (
+            patch.object(ModuleRunner, "run", spy_run),
+            patch("src.jobs.processor.send_message", new_callable=AsyncMock),
+        ):
+            await process_job(
+                job,
+                settings,
+                adapter=mock_adapter,
+                analysis_service=mock_service,
+                translation_service=_make_passthrough_ts(),
+            )
+
+        reviews_results = [r for r in captured_results if isinstance(r, ReviewsResult)]
+        assert len(reviews_results) == 1
+        # Module name must be "reviews"
+        assert reviews_results[0].module_name == "reviews"
+
+    @pytest.mark.asyncio
+    async def test_airbnb_reviews_use_raw_payload_without_repo(self):
+        """AirbnbReviewsModule can extract reviews from raw payload even when
+        raw_payload_repo=None (no DB persistence).  ReviewsResult should reflect
+        the review count from the adapter's raw payload."""
+        from src.analysis.modules.reviews import ReviewsResult
+        from src.analysis.runner import ModuleRunner
+
+        job = _make_job(provider=ListingProvider.AIRBNB)
+        listing = _make_listing()
+        result = _make_result()
+        settings = _make_settings()
+
+        # Adapter returns a raw payload that contains Airbnb review data.
+        raw_with_reviews = {
+            "id": listing.source_id,
+            "name": listing.title,
+            "reviews": [{"comments": "Lovely place!"}],
+            "reviewsCount": 7,
+            "starRating": 4.8,
+        }
+        from src.adapters.base import AdapterResult
+        adapter_result = AdapterResult(raw=raw_with_reviews, listing=listing)
+        mock_adapter = MagicMock()
+        mock_adapter.fetch = AsyncMock(return_value=adapter_result)
+        mock_service = MagicMock(spec=AnalysisService)
+        mock_service.analyse = AsyncMock(return_value=result)
+
+        captured_results: list = []
+        original_run = ModuleRunner.run
+
+        async def spy_run(self, ctx):  # type: ignore[override]
+            results = await original_run(self, ctx)
+            captured_results.extend(results)
+            return results
+
+        with (
+            patch.object(ModuleRunner, "run", spy_run),
+            patch("src.jobs.processor.send_message", new_callable=AsyncMock),
+        ):
+            await process_job(
+                job,
+                settings,
+                adapter=mock_adapter,
+                analysis_service=mock_service,
+                translation_service=_make_passthrough_ts(),
+                raw_payload_repo=None,  # no DB — raw_payload must still be available
+            )
+
+        reviews_results = [r for r in captured_results if isinstance(r, ReviewsResult)]
+        assert len(reviews_results) == 1
+        # The module saw the raw payload and extracted the count from it.
+        assert reviews_results[0].review_count == 7
+
+    @pytest.mark.asyncio
+    async def test_telegram_output_unchanged_with_reviews_module_registered(self):
+        """Registering reviews modules does not change the Telegram message content."""
+        job = _make_job()
+        listing = _make_listing()
+        result = _make_result()
+        settings = _make_settings()
+
+        mock_adapter = MagicMock()
+        mock_adapter.fetch = AsyncMock(return_value=_make_adapter_result(listing))
+        mock_service = MagicMock(spec=AnalysisService)
+        mock_service.analyse = AsyncMock(return_value=result)
+
+        sent_texts: list[str] = []
+
+        async def fake_send(token, chat_id, text, *, client=None):
+            sent_texts.append(text)
+
+        with patch("src.jobs.processor.send_message", side_effect=fake_send):
+            await process_job(
+                job,
+                settings,
+                adapter=mock_adapter,
+                analysis_service=mock_service,
+                translation_service=_make_passthrough_ts(),
+            )
+
+        assert sent_texts
+        assert "Cozy flat in Berlin" in sent_texts[0]
+        assert "A pleasant flat in central Berlin." in sent_texts[0]

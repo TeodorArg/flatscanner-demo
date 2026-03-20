@@ -27,8 +27,10 @@ import httpx
 from src.adapters.registry import resolve_adapter
 from src.analysis.context import AnalysisContext
 from src.analysis.modules.ai_summary import AISummaryModule, AISummaryResult
+from src.analysis.modules.reviews import AirbnbReviewsModule, GenericReviewsModule
 from src.analysis.openrouter_client import OpenRouterError
 from src.analysis.registry import ModuleRegistry
+from src.analysis.reviews.service import ReviewAnalysisService
 from src.analysis.runner import ModuleRunner
 from src.analysis.service import AnalysisService
 from src.domain.listing import AnalysisJob
@@ -126,15 +128,14 @@ async def process_job(
     listing = adapter_result.listing
     logger.debug("Fetched listing %s for job %s", listing.id, job.id)
 
-    # --- 2a. Persist raw payload (best-effort) --------------------------------
-    _raw_payload: RawPayload | None = None
+    # --- 2a. Build raw payload object; persist if a repo was provided --------
+    _raw_payload = RawPayload(
+        provider=job.provider.value,
+        source_url=job.source_url,
+        source_id=listing.source_id or None,
+        payload=adapter_result.raw,
+    )
     if raw_payload_repo is not None:
-        _raw_payload = RawPayload(
-            provider=job.provider.value,
-            source_url=job.source_url,
-            source_id=listing.source_id or None,
-            payload=adapter_result.raw,
-        )
         try:
             await raw_payload_repo.save(_raw_payload)
         except Exception:
@@ -157,8 +158,11 @@ async def process_job(
 
     # --- 3. Analyse (via module framework) -----------------------------------
     service = analysis_service or AnalysisService(settings)
+    review_service = ReviewAnalysisService(settings)
     registry = ModuleRegistry()
     registry.register(AISummaryModule(service))
+    registry.register(AirbnbReviewsModule(review_service))
+    registry.register(GenericReviewsModule())
     runner = ModuleRunner(registry)
     ctx = AnalysisContext(
         listing=listing,
