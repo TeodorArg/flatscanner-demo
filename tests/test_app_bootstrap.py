@@ -259,3 +259,33 @@ class TestHealthEndpoint:
         with TestClient(app) as client:
             response = client.get("/health")
         assert response.json() == {"status": "ok"}
+
+
+class TestDBEngineLifespan:
+    def test_engine_set_on_app_state_after_startup(self):
+        """Lifespan must populate app.state.engine with an AsyncEngine."""
+        from sqlalchemy.ext.asyncio import AsyncEngine
+
+        app = create_app(settings=_test_settings())
+        with TestClient(app) as client:
+            client.get("/health")  # ensure lifespan has run
+            assert isinstance(app.state.engine, AsyncEngine)
+
+    def test_session_factory_set_on_app_state_after_startup(self):
+        """Lifespan must populate app.state.session_factory."""
+        from sqlalchemy.ext.asyncio import async_sessionmaker
+
+        app = create_app(settings=_test_settings())
+        with TestClient(app) as client:
+            client.get("/health")
+            assert isinstance(app.state.session_factory, async_sessionmaker)
+
+    def test_engine_is_none_before_startup(self):
+        """app.state.engine must default to None before lifespan runs."""
+        app = create_app(settings=_test_settings())
+        assert app.state.engine is None
+
+    def test_session_factory_is_none_before_startup(self):
+        """app.state.session_factory must default to None before lifespan runs."""
+        app = create_app(settings=_test_settings())
+        assert app.state.session_factory is None

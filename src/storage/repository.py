@@ -11,6 +11,8 @@ import uuid
 from typing import Protocol
 
 from src.domain.listing import AnalysisJob, NormalizedListing
+from src.domain.user import TelegramUser
+from src.storage.chat_settings import ChatSettings
 
 
 class ListingRepository(Protocol):
@@ -40,4 +42,32 @@ class AnalysisJobRepository(Protocol):
 
     async def get_by_id(self, job_id: uuid.UUID) -> AnalysisJob | None:
         """Return the job with the given primary key, or ``None``."""
+        ...
+
+
+class UserRepository(Protocol):
+    """Read/write access to persisted ``TelegramUser`` records."""
+
+    async def save(self, user: TelegramUser) -> None:
+        """Persist a new or updated user (upsert by ``id``)."""
+        ...
+
+    async def get_by_id(self, user_id: uuid.UUID) -> TelegramUser | None:
+        """Return the user with the given primary key, or ``None``."""
+        ...
+
+    async def get_by_telegram_id(self, telegram_user_id: int) -> TelegramUser | None:
+        """Return a user by their Telegram int64 user ID, or ``None``."""
+        ...
+
+
+class ChatSettingsRepository(Protocol):
+    """Read/write access to persisted per-chat bot settings."""
+
+    async def save(self, chat_id: int, settings: ChatSettings) -> None:
+        """Persist settings for *chat_id* (upsert)."""
+        ...
+
+    async def get(self, chat_id: int) -> ChatSettings | None:
+        """Return persisted settings for *chat_id*, or ``None`` if absent."""
         ...

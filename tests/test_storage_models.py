@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import sqlalchemy as sa
 
-from src.storage.models import AnalysisJobRow, Base, ListingRow
+from src.storage.models import AnalysisJobRow, Base, ChatSettingsRow, ListingRow, UserRow
 
 
 # ---------------------------------------------------------------------------
@@ -33,6 +33,12 @@ class TestBaseMetadata:
 
     def test_analysis_jobs_table_registered(self):
         assert "analysis_jobs" in Base.metadata.tables
+
+    def test_users_table_registered(self):
+        assert "users" in Base.metadata.tables
+
+    def test_chat_settings_table_registered(self):
+        assert "chat_settings" in Base.metadata.tables
 
 
 # ---------------------------------------------------------------------------
@@ -141,3 +147,73 @@ class TestListingRowConstraints:
             and {col.name for col in c.columns} == {"provider", "source_id"}
         ]
         assert matching, "Missing UniqueConstraint on (provider, source_id) in listings table"
+
+
+# ---------------------------------------------------------------------------
+# UserRow columns
+# ---------------------------------------------------------------------------
+
+
+class TestUserRowColumns:
+    _table: sa.Table = UserRow.__table__  # type: ignore[attr-defined]
+
+    def test_primary_key_is_id(self):
+        pk_cols = {c.name for c in self._table.primary_key}
+        assert pk_cols == {"id"}
+
+    def test_telegram_user_id_exists_and_not_nullable(self):
+        col = _col(self._table, "telegram_user_id")
+        assert not col.nullable
+
+    def test_telegram_user_id_is_biginteger(self):
+        assert issubclass(type(_col(self._table, "telegram_user_id").type), sa.BigInteger)
+
+    def test_telegram_user_id_unique_constraint_exists(self):
+        """get_by_telegram_id() requires at most one row per telegram_user_id."""
+        # Unique constraint can be declared as a UniqueConstraint or an inline
+        # column-level unique=True (which SQLAlchemy also surfaces as a constraint).
+        col = _col(self._table, "telegram_user_id")
+        has_unique_col = col.unique
+        has_unique_constraint = any(
+            isinstance(c, sa.UniqueConstraint)
+            and {col_.name for col_ in c.columns} == {"telegram_user_id"}
+            for c in self._table.constraints
+        )
+        assert has_unique_col or has_unique_constraint
+
+    def test_optional_profile_columns_are_nullable(self):
+        for col_name in ("telegram_username", "first_name", "last_name"):
+            col = _col(self._table, col_name)
+            assert col.nullable, f"Expected {col_name} to be nullable"
+
+    def test_timestamp_columns_exist_and_not_nullable(self):
+        assert not _col(self._table, "created_at").nullable
+        assert not _col(self._table, "updated_at").nullable
+
+
+# ---------------------------------------------------------------------------
+# ChatSettingsRow columns
+# ---------------------------------------------------------------------------
+
+
+class TestChatSettingsRowColumns:
+    _table: sa.Table = ChatSettingsRow.__table__  # type: ignore[attr-defined]
+
+    def test_primary_key_is_chat_id(self):
+        pk_cols = {c.name for c in self._table.primary_key}
+        assert pk_cols == {"chat_id"}
+
+    def test_chat_id_is_biginteger(self):
+        assert issubclass(type(_col(self._table, "chat_id").type), sa.BigInteger)
+
+    def test_language_column_not_nullable(self):
+        assert not _col(self._table, "language").nullable
+
+    def test_language_default_is_ru(self):
+        col = _col(self._table, "language")
+        assert col.default is not None
+        assert col.default.arg == "ru"
+
+    def test_timestamp_columns_exist_and_not_nullable(self):
+        assert not _col(self._table, "created_at").nullable
+        assert not _col(self._table, "updated_at").nullable
