@@ -10,4 +10,4 @@
 | 4 | Extend translation stage for review block fields | done |
 | 5 | Render a localized review section in Telegram output | done |
 | 6 | Add focused processor / formatter / translation tests | done |
-| 7 | All tests pass and PR checks are green | in-progress |
+| 7 | All tests pass and PR checks are green | done |
