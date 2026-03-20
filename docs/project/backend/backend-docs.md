@@ -9,7 +9,7 @@
 - Database: PostgreSQL
 - Queue/cache: Redis
 
-## Core Backend Shape
+## Core Backend Shape (MVP)
 
 - `src/telegram/`: message intake and response formatting
 - `src/adapters/`: provider detection and source adapters
@@ -17,6 +17,20 @@
 - `src/enrichment/`: external context providers
 - `src/analysis/`: AI summarization and price-fairness logic
 - `src/jobs/` and `src/storage/`: async execution and persistence
+
+## Target Post-MVP Layer Model
+
+See ADR 004 for the full decision. The planned layers in execution order:
+
+1. **Ingestion & Adapter Layer** — URL detection, provider selection, adapter execution, raw payload capture
+2. **Normalization Layer** — adapter output → `ListingSnapshot`
+3. **Analysis Module Framework** — module registry and runner; provider-specific + generic fallback per module
+4. **Enrichment Layer** — transport, nearby places, safety (future), comparable prices (future)
+5. **Result Assembly** — score aggregation, analysis cache lookup/write
+6. **Formatter / Delivery Layer** — Telegram formatter; future channels
+7. **Persistence Layer** — six bounded areas: Users, ChatSettings, Billing, AnalysisCache, RawPayloads, AnalysisResults
+
+Migration is broken into phases P1–P7 in `specs/015-post-mvp-architecture-foundation/spec.md`.
 
 ## Integration Direction
 
@@ -53,7 +67,9 @@
 
 ## Open Decisions
 
-- Redis worker library
+- Redis worker library (deferred to P3 analysis module framework spec)
 - Regional safety providers (safety enrichment deferred from MVP)
-- Long-term source payload retention
-- Comparable-listing strategy for price fairness
+- Raw payload storage backend: PostgreSQL JSONB vs. object storage (decided in P2 spec)
+- Raw/source payload retention policy: TTL, archival, or deletion strategy (open; separate from storage backend choice)
+- Comparable-listing strategy for price fairness (deferred to reviews/price module specs)
+- Payment provider selection: Telegram Payments vs. external checkout (decided in P7 spec)
