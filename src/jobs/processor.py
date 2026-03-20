@@ -4,7 +4,8 @@
 through the full pipeline:
 
 1. Resolve the adapter for the job's listing provider.
-2. Fetch and normalise the listing via the adapter.
+2. Fetch raw + normalised listing via the adapter (``AdapterResult``).
+2a. Optionally persist the raw payload via ``raw_payload_repo`` (best-effort).
 3. Run AI analysis through ``AnalysisService`` (canonical English output).
 4. Translate freeform result blocks via ``TranslationService`` when the job
    language is not English.  Translated output is ephemeral and never persisted.
@@ -12,8 +13,8 @@ through the full pipeline:
 6. Send the Telegram reply via ``send_message``.
 
 Dependencies can be injected for unit testing (adapter, analysis_service,
-translation_service, http_client).  When not supplied, production defaults
-are used.
+translation_service, http_client, raw_payload_repo).  When not supplied,
+production defaults are used.
 """
 
 from __future__ import annotations
@@ -27,6 +28,7 @@ from src.adapters.registry import resolve_adapter
 from src.analysis.openrouter_client import OpenRouterError
 from src.analysis.service import AnalysisService
 from src.domain.listing import AnalysisJob
+from src.domain.raw_payload import RawPayload
 from src.enrichment.runner import EnrichmentOutcome, EnrichmentProvider, run_enrichments
 from src.i18n.types import Language
 from src.telegram.formatter import format_analysis_message
@@ -36,6 +38,7 @@ from src.translation.service import TranslationError, TranslationService
 if TYPE_CHECKING:
     from src.adapters.base import ListingAdapter
     from src.app.config import Settings
+    from src.storage.repository import RawPayloadRepository
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +56,7 @@ async def process_job(
     translation_service: TranslationService | None = None,
     http_client: httpx.AsyncClient | None = None,
     enrichment_providers: list[EnrichmentProvider] | None = None,
+    raw_payload_repo: "RawPayloadRepository | None" = None,
 ) -> None:
     """Process one queued analysis job end-to-end.
 
@@ -80,6 +84,11 @@ async def process_job(
         Optional list of enrichment providers to run after the listing is
         fetched.  Failures are recorded but never propagate; an empty list
         or ``None`` skips enrichment entirely.
+    raw_payload_repo:
+        Optional repository for persisting the raw adapter response.  When
+        provided, the raw payload is saved before the normalised listing
+        proceeds through the analysis pipeline.  Save errors are logged and
+        swallowed — they never block the analysis.
 
     Raises
     ------
@@ -108,9 +117,27 @@ async def process_job(
         job.telegram_chat_id,
     )
 
-    # --- 2. Fetch listing ----------------------------------------------------
-    listing = await adapter.fetch(job.source_url)
+    # --- 2. Fetch listing (raw + normalised) ---------------------------------
+    adapter_result = await adapter.fetch(job.source_url)
+    listing = adapter_result.listing
     logger.debug("Fetched listing %s for job %s", listing.id, job.id)
+
+    # --- 2a. Persist raw payload (best-effort) --------------------------------
+    if raw_payload_repo is not None:
+        try:
+            raw_payload = RawPayload(
+                provider=job.provider.value,
+                source_url=job.source_url,
+                source_id=listing.source_id or None,
+                payload=adapter_result.raw,
+            )
+            await raw_payload_repo.save(raw_payload)
+        except Exception:
+            logger.warning(
+                "Failed to persist raw payload for job %s; continuing without capture",
+                job.id,
+                exc_info=True,
+            )
 
     # --- 2b. Enrich (optional, tolerant) -------------------------------------
     enrichment_outcome: EnrichmentOutcome | None = None

@@ -9,8 +9,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
-from src.analysis.openrouter_client import OpenRouterError
 from src.adapters.apify_client import ApifyError
+from src.adapters.base import AdapterResult
+from src.analysis.openrouter_client import OpenRouterError
 from src.analysis.result import AnalysisResult, PriceVerdict
 from src.analysis.service import AnalysisService
 from src.domain.listing import (
@@ -51,6 +52,13 @@ def _make_listing() -> NormalizedListing:
         title="Cozy flat in Berlin",
         price=PriceInfo(amount=Decimal("80"), currency="EUR"),
     )
+
+
+def _make_adapter_result(listing: NormalizedListing | None = None) -> AdapterResult:
+    """Return an ``AdapterResult`` wrapping *listing* (or a default listing)."""
+    if listing is None:
+        listing = _make_listing()
+    return AdapterResult(raw={"id": listing.source_id, "name": listing.title}, listing=listing)
 
 
 def _make_result() -> AnalysisResult:
@@ -101,7 +109,7 @@ class TestProcessJobSuccess:
         settings = _make_settings()
 
         mock_adapter = MagicMock()
-        mock_adapter.fetch = AsyncMock(return_value=listing)
+        mock_adapter.fetch = AsyncMock(return_value=_make_adapter_result(listing))
 
         mock_service = MagicMock(spec=AnalysisService)
         mock_service.analyse = AsyncMock(return_value=result)
@@ -134,7 +142,7 @@ class TestProcessJobSuccess:
         settings = _make_settings()
 
         mock_adapter = MagicMock()
-        mock_adapter.fetch = AsyncMock(return_value=listing)
+        mock_adapter.fetch = AsyncMock(return_value=_make_adapter_result(listing))
 
         mock_service = MagicMock(spec=AnalysisService)
         mock_service.analyse = AsyncMock(return_value=result)
@@ -158,7 +166,7 @@ class TestProcessJobSuccess:
         settings = _make_settings()
 
         mock_adapter = MagicMock()
-        mock_adapter.fetch = AsyncMock(return_value=listing)
+        mock_adapter.fetch = AsyncMock(return_value=_make_adapter_result(listing))
 
         mock_service = MagicMock(spec=AnalysisService)
         mock_service.analyse = AsyncMock(return_value=result)
@@ -183,7 +191,7 @@ class TestProcessJobSuccess:
         settings = _make_settings(telegram_bot_token="my-secret-token")
 
         mock_adapter = MagicMock()
-        mock_adapter.fetch = AsyncMock(return_value=listing)
+        mock_adapter.fetch = AsyncMock(return_value=_make_adapter_result(listing))
         mock_service = MagicMock(spec=AnalysisService)
         mock_service.analyse = AsyncMock(return_value=result)
 
@@ -212,7 +220,7 @@ class TestProcessJobSuccess:
         settings = _make_settings()
 
         mock_adapter = MagicMock()
-        mock_adapter.fetch = AsyncMock(return_value=listing)
+        mock_adapter.fetch = AsyncMock(return_value=_make_adapter_result(listing))
 
         mock_service = MagicMock(spec=AnalysisService)
         mock_service.analyse = AsyncMock(return_value=result)
@@ -305,7 +313,7 @@ class TestProcessJobAnalysisFailure:
         settings = _make_settings()
 
         mock_adapter = MagicMock()
-        mock_adapter.fetch = AsyncMock(return_value=listing)
+        mock_adapter.fetch = AsyncMock(return_value=_make_adapter_result(listing))
 
         mock_service = MagicMock(spec=AnalysisService)
         mock_service.analyse = AsyncMock(
@@ -327,7 +335,7 @@ class TestProcessJobAnalysisFailure:
         settings = _make_settings()
 
         mock_adapter = MagicMock()
-        mock_adapter.fetch = AsyncMock(return_value=listing)
+        mock_adapter.fetch = AsyncMock(return_value=_make_adapter_result(listing))
 
         mock_service = MagicMock(spec=AnalysisService)
         mock_service.analyse = AsyncMock(
@@ -352,7 +360,7 @@ class TestProcessJobSendFailure:
         settings = _make_settings()
 
         mock_adapter = MagicMock()
-        mock_adapter.fetch = AsyncMock(return_value=listing)
+        mock_adapter.fetch = AsyncMock(return_value=_make_adapter_result(listing))
         mock_service = MagicMock(spec=AnalysisService)
         mock_service.analyse = AsyncMock(return_value=result)
 
@@ -385,7 +393,7 @@ class TestProcessJobTranslationFallback:
         settings = _make_settings()
 
         mock_adapter = MagicMock()
-        mock_adapter.fetch = AsyncMock(return_value=listing)
+        mock_adapter.fetch = AsyncMock(return_value=_make_adapter_result(listing))
         mock_service = MagicMock(spec=AnalysisService)
         mock_service.analyse = AsyncMock(return_value=result)
 
@@ -422,7 +430,7 @@ class TestProcessJobLocalizedTitle:
         settings = _make_settings()
 
         mock_adapter = MagicMock()
-        mock_adapter.fetch = AsyncMock(return_value=listing)
+        mock_adapter.fetch = AsyncMock(return_value=_make_adapter_result(listing))
         mock_service = MagicMock(spec=AnalysisService)
         mock_service.analyse = AsyncMock(return_value=result)
 
@@ -520,7 +528,7 @@ class TestProcessOnce:
         redis.brpop.return_value = (QUEUE_KEY, job.model_dump_json())
 
         mock_adapter = MagicMock()
-        mock_adapter.fetch = AsyncMock(return_value=listing)
+        mock_adapter.fetch = AsyncMock(return_value=_make_adapter_result(listing))
         mock_service = MagicMock(spec=AnalysisService)
         mock_service.analyse = AsyncMock(return_value=result_obj)
 
