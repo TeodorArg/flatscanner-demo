@@ -27,9 +27,10 @@ import httpx
 from src.adapters.registry import resolve_adapter
 from src.analysis.context import AnalysisContext
 from src.analysis.modules.ai_summary import AISummaryModule, AISummaryResult
-from src.analysis.modules.reviews import AirbnbReviewsModule, GenericReviewsModule
+from src.analysis.modules.reviews import AirbnbReviewsModule, GenericReviewsModule, ReviewsResult
 from src.analysis.openrouter_client import OpenRouterError
 from src.analysis.registry import ModuleRegistry
+from src.analysis.result import ReviewInsightsBlock
 from src.analysis.reviews.service import ReviewAnalysisService
 from src.analysis.runner import ModuleRunner
 from src.analysis.service import AnalysisService
@@ -51,6 +52,39 @@ logger = logging.getLogger(__name__)
 
 class UnsupportedProviderError(Exception):
     """Raised when no adapter is registered for the job's listing provider."""
+
+
+def _map_reviews_result(rv: ReviewsResult | None) -> ReviewInsightsBlock | None:
+    """Map a ``ReviewsResult`` module output into a ``ReviewInsightsBlock``.
+
+    Returns ``None`` when *rv* is ``None`` (no reviews module produced a
+    result).  List fields typed as ``list[dict]`` in ``ReviewsResult`` have
+    their ``"summary"`` key extracted; the same guard is applied to the
+    ``list[str]`` fields so that unexpected dict payloads from the AI are
+    handled safely.
+    """
+    if rv is None:
+        return None
+
+    def _extract(items: list) -> list[str]:
+        result = []
+        for item in items:
+            text = item.get("summary", "") if isinstance(item, dict) else str(item)
+            if text:
+                result.append(text)
+        return result
+
+    return ReviewInsightsBlock(
+        overall_assessment=rv.overall_assessment or "",
+        overall_risk_level=rv.overall_risk_level or "",
+        review_count=rv.review_count,
+        average_rating=rv.average_rating,
+        critical_red_flags=_extract(rv.critical_red_flags),
+        recurring_issues=_extract(rv.recurring_issues),
+        conflicts_or_disputes=_extract(rv.conflicts_or_disputes),
+        positive_signals=_extract(rv.positive_signals),
+        window_view_summary=rv.window_view_summary or "",
+    )
 
 
 async def process_job(
@@ -178,10 +212,17 @@ async def process_job(
             f"AISummaryModule produced no result for job {job.id}"
         )
     result = ai_summary.analysis_result
-    result = result.model_copy(update={"display_title": listing.title})
+
+    # --- 3b. Map ReviewsResult into ReviewInsightsBlock ----------------------
+    reviews_module_result = next(
+        (r for r in module_results if isinstance(r, ReviewsResult)), None
+    )
+    review_insights = _map_reviews_result(reviews_module_result)
+
+    result = result.model_copy(update={"display_title": listing.title, "review_insights": review_insights})
     logger.debug("Analysis complete for job %s", job.id)
 
-    # --- 3b. Translate (on demand, ephemeral) --------------------------------
+    # --- 4. Translate (on demand, ephemeral) ---------------------------------
     # English jobs use the canonical result directly.  For other languages the
     # freeform blocks are translated just-in-time; translated output is never
     # persisted as a cache artifact.
@@ -204,10 +245,10 @@ async def process_job(
         translated_result = result
         render_language = Language.EN
 
-    # --- 4. Format -----------------------------------------------------------
+    # --- 5. Format -----------------------------------------------------------
     text = format_analysis_message(listing, translated_result, render_language)
 
-    # --- 5. Send -------------------------------------------------------------
+    # --- 6. Send -------------------------------------------------------------
     await send_message(
         settings.telegram_bot_token,
         job.telegram_chat_id,

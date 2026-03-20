@@ -22,6 +22,25 @@ class PriceVerdict(str, Enum):
     UNKNOWN = "unknown"
 
 
+class ReviewInsightsBlock(BaseModel):
+    """Compact review insights carried with ``AnalysisResult`` for rendering.
+
+    Populated by the job processor from ``ReviewsResult``.  All freeform text
+    fields are in canonical English and translated together with the rest of
+    the analysis result before the formatter receives them.
+    """
+
+    overall_assessment: str = ""
+    overall_risk_level: str = ""
+    review_count: int | None = None
+    average_rating: float | None = None
+    critical_red_flags: list[str] = Field(default_factory=list)
+    recurring_issues: list[str] = Field(default_factory=list)
+    conflicts_or_disputes: list[str] = Field(default_factory=list)
+    positive_signals: list[str] = Field(default_factory=list)
+    window_view_summary: str = ""
+
+
 class AnalysisResult(BaseModel):
     """Structured output from the AI analysis stage.
 
@@ -55,4 +74,8 @@ class AnalysisResult(BaseModel):
     price_explanation: str = Field(
         default="",
         description="One sentence explaining the price assessment.",
+    )
+    review_insights: ReviewInsightsBlock | None = Field(
+        default=None,
+        description="Compact review insights block; None when no review data is available.",
     )
