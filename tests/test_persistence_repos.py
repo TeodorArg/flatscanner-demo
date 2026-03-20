@@ -139,6 +139,38 @@ class TestSQLAlchemyUserRepository:
         assert fetched.first_name is None
         assert fetched.last_name is None
 
+    async def test_save_with_different_uuid_same_telegram_id_does_not_raise(
+        self, session: AsyncSession
+    ):
+        """Saving a fresh TelegramUser with the same telegram_user_id but a
+        different UUID must not raise a UNIQUE constraint violation.  The
+        original row identity (UUID, created_at) must be preserved."""
+        repo = SQLAlchemyUserRepository(session)
+
+        first = TelegramUser(telegram_user_id=555, first_name="First")
+        await repo.save(first)
+        await session.commit()
+        original_id = first.id
+
+        # Simulate a second message from the same Telegram user arriving with
+        # a freshly-constructed domain model (new UUID, updated name).
+        second = TelegramUser(telegram_user_id=555, first_name="Second")
+        assert second.id != original_id  # sanity: different UUID
+
+        await repo.save(second)  # must not raise
+        await session.commit()
+
+        # The row fetched by the *original* UUID still exists and is updated.
+        fetched = await repo.get_by_id(original_id)
+        assert fetched is not None
+        assert fetched.telegram_user_id == 555
+        assert fetched.first_name == "Second"
+
+        # No duplicate rows — fetching by telegram_id returns the same row.
+        by_tg = await repo.get_by_telegram_id(555)
+        assert by_tg is not None
+        assert by_tg.id == original_id
+
 
 # ---------------------------------------------------------------------------
 # SQLAlchemyChatSettingsRepository

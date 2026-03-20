@@ -86,11 +86,25 @@ class SQLAlchemyUserRepository:
     async def save(self, user: TelegramUser) -> None:
         """Upsert *user* into the ``users`` table.
 
-        Uses ``session.merge()`` which performs a SELECT followed by an
-        INSERT or UPDATE depending on whether the primary key exists.
+        ``telegram_user_id`` is the natural key for Telegram identities.  When
+        a row for this Telegram user already exists we update it in-place so
+        that the stable ``id`` (UUID) and ``created_at`` are preserved and the
+        caller does not need to hold onto the original UUID.  If no row exists
+        yet, ``session.merge()`` performs the initial INSERT using the UUID
+        carried by *user*.
         """
-        row = _user_to_row(user)
-        await self._session.merge(row)
+        stmt = sa.select(UserRow).where(UserRow.telegram_user_id == user.telegram_user_id)
+        result = await self._session.execute(stmt)
+        existing = result.scalar_one_or_none()
+
+        if existing is not None:
+            existing.telegram_username = user.telegram_username
+            existing.first_name = user.first_name
+            existing.last_name = user.last_name
+            existing.updated_at = _utcnow()
+        else:
+            row = _user_to_row(user)
+            await self._session.merge(row)
 
     async def get_by_id(self, user_id: uuid.UUID) -> TelegramUser | None:
         """Return the user with the given UUID primary key, or ``None``."""
