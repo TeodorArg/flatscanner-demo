@@ -131,3 +131,47 @@ class AnalysisJobRow(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow
     )
+
+
+class UserRow(Base):
+    """Persisted form of a ``TelegramUser``.
+
+    Stores the Telegram-linked user identity.  ``telegram_user_id`` is
+    Telegram's own stable int64 identifier and must be unique across rows.
+    """
+
+    __tablename__ = "users"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    telegram_user_id: Mapped[int] = mapped_column(BigInteger, nullable=False, unique=True)
+    telegram_username: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    first_name: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    last_name: Mapped[str | None] = mapped_column(String(256), nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow
+    )
+
+
+class ChatSettingsRow(Base):
+    """Persisted per-chat bot settings.
+
+    ``chat_id`` is the Telegram chat identifier and serves as the natural
+    primary key — no surrogate UUID is needed.  Language is stored as its
+    string value (e.g. ``"ru"``, ``"en"``).
+    """
+
+    __tablename__ = "chat_settings"
+
+    chat_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    language: Mapped[str] = mapped_column(String(8), nullable=False, default="ru")
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow
+    )

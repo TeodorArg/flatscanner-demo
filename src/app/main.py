@@ -5,18 +5,26 @@ from fastapi import FastAPI
 from redis.asyncio import Redis
 
 from src.app.config import Settings
+from src.storage.db import make_engine, make_session_factory
 from src.telegram.router import router as telegram_router
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings: Settings = app.state.settings
+
     redis = Redis.from_url(settings.redis_url, decode_responses=True)
     app.state.redis = redis
+
+    engine = make_engine(settings.database_url)
+    app.state.engine = engine
+    app.state.session_factory = make_session_factory(engine)
+
     try:
         yield
     finally:
         await redis.aclose()
+        await engine.dispose()
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -32,8 +40,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
 
     app.state.settings = settings
-    # Default to None; overwritten by lifespan on startup.
+    # Defaults to None; overwritten by lifespan on startup.
     app.state.redis = None
+    app.state.engine = None
+    app.state.session_factory = None
 
     @app.get("/health", tags=["meta"])
     async def health() -> dict:
