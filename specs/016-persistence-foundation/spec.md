@@ -1,7 +1,7 @@
 # Spec 016 — Persistence Foundation
 
 ## Status
-Active — implementation in progress
+Active — PR #33 open; all checks passed; awaiting human approval to merge
 
 ## Context
 Feature 015 documented a phased migration from the MVP monolith to a layered

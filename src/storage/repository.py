@@ -49,7 +49,13 @@ class UserRepository(Protocol):
     """Read/write access to persisted ``TelegramUser`` records."""
 
     async def save(self, user: TelegramUser) -> None:
-        """Persist a new or updated user (upsert by ``id``)."""
+        """Upsert a user by the ``telegram_user_id`` natural key.
+
+        If a row with the same ``telegram_user_id`` already exists, its
+        mutable fields (username, first_name, last_name, updated_at) are
+        updated while the stable UUID ``id`` and ``created_at`` are
+        preserved.  If no such row exists, a new row is inserted.
+        """
         ...
 
     async def get_by_id(self, user_id: uuid.UUID) -> TelegramUser | None:

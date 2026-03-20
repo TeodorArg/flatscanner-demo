@@ -30,5 +30,5 @@
 
 ## PR
 
-- [ ] Open PR against `main`
-- [ ] Wait for `baseline-checks`, `guard`, and `AI Review`
+- [x] Open PR against `main` — PR #33
+- [x] Wait for `baseline-checks`, `guard`, `python-checks`, and `AI Review` — all passed on current head SHA
