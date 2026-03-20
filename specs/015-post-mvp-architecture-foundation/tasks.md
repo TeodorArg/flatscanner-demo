@@ -10,7 +10,8 @@
 - [x] Write `specs/015-post-mvp-architecture-foundation/tasks.md`
 - [x] Write `docs/adr/004-post-mvp-layered-architecture.md`
 - [x] Update `docs/project/backend/backend-docs.md`
-- [x] Commit and open PR
+- [x] Commit changes locally
+- [ ] Open PR (pending orchestration)
 
 ## Follow-Up Specs (not in this task)
 
