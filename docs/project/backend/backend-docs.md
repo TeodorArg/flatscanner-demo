@@ -70,5 +70,6 @@ Migration is broken into phases P1–P7 in `specs/015-post-mvp-architecture-foun
 - Redis worker library (deferred to P3 analysis module framework spec)
 - Regional safety providers (safety enrichment deferred from MVP)
 - Raw payload storage backend: PostgreSQL JSONB vs. object storage (decided in P2 spec)
+- Raw/source payload retention policy: TTL, archival, or deletion strategy (open; separate from storage backend choice)
 - Comparable-listing strategy for price fairness (deferred to reviews/price module specs)
 - Payment provider selection: Telegram Payments vs. external checkout (decided in P7 spec)
