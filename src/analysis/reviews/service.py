@@ -1,11 +1,12 @@
 """AI-backed review analysis service.
 
-``ReviewAnalysisService`` sends a structured prompt built from ``ReviewsData``
-to OpenRouter and parses the response into a ``ReviewAnalysisOutput``.
+``ReviewAnalysisService`` sends a structured prompt built from a
+``ReviewCorpus`` to OpenRouter and parses the response into a
+``ReviewAnalysisOutput`` using the incident-oriented output schema.
 
 The service is intentionally focused: it only runs when there is at least one
-review text to analyse.  Callers are responsible for checking
-``ReviewsData.reviews`` before calling ``analyse``.
+comment text to analyse.  Callers are responsible for checking
+``ReviewCorpus.comments`` before calling ``analyse``.
 """
 
 from __future__ import annotations
@@ -19,7 +20,7 @@ from src.analysis.reviews.extractor import ReviewAnalysisOutput
 
 if TYPE_CHECKING:
     from src.app.config import Settings
-    from src.domain.review import ReviewsData
+    from src.domain.review_corpus import ReviewCorpus
 
 logger = logging.getLogger(__name__)
 
@@ -31,18 +32,52 @@ _SYSTEM_PROMPT = (
     "You are a rental listing review analyst. "
     "Reply ONLY with a valid JSON object, no markdown, no text outside the JSON. "
     "Write all text fields in English. "
-    "Use the schema from the user message."
+    "Use the schema from the user message. "
+    "Focus on concrete incidents, not generic sentiment. "
+    "Emphasize negative signals, disputes, and unusual situations. "
+    "Do not invent dates or incidents not grounded in the comments."
 )
 
-_MAX_REVIEWS = 10
-_MAX_REVIEW_CHARS = 300
+_MAX_REVIEWS = 20
+_MAX_REVIEW_CHARS = 400
+_MAX_HOST_RESPONSE_CHARS = 200
 
 _JSON_SCHEMA_HINT = """\
 {
-  "sentiment_summary": "<1-2 sentence summary of overall guest sentiment>",
-  "common_themes": ["<positive theme 1>", "<positive theme 2>"],
-  "concerns": ["<concern 1>", "<concern 2>"]
-}"""
+  "overall_assessment": "<1-2 sentence summary>",
+  "overall_risk_level": "low|medium|high",
+  "confidence": "low|medium|high",
+  "incident_timeline": [
+    {
+      "category": "mold_damp_smell",
+      "severity": "low|medium|high",
+      "incident_date": "2026-02-28",
+      "source_comment_index": 3,
+      "summary": "Guest reported mold smell near the bedroom.",
+      "evidence": "There was a damp mold smell near the bed."
+    }
+  ],
+  "recurring_issues": [
+    {
+      "category": "temperature",
+      "count": 4,
+      "summary": "Several guests reported the apartment was too cold."
+    }
+  ],
+  "conflicts_or_disputes": [
+    {
+      "incident_date": "2026-01-10",
+      "summary": "Guest described a refund dispute with the host."
+    }
+  ],
+  "critical_red_flags": ["Cockroach mention in multiple reviews"],
+  "positive_signals": ["Great natural light", "Pleasant window view"],
+  "window_view_summary": "Mixed: some guests praised the city view, one said it faced a noisy courtyard."
+}
+
+Categories: pests, damage, missing_essentials, mold_damp_smell, temperature, cleanliness, \
+safety, host_conflict, listing_mismatch, noise, checkin_access, window_view.
+Use empty lists, not nulls. Always include window_view_summary (empty string if no evidence)."""
 
 
 # ---------------------------------------------------------------------------
@@ -50,27 +85,40 @@ _JSON_SCHEMA_HINT = """\
 # ---------------------------------------------------------------------------
 
 
-def build_reviews_prompt(reviews_data: "ReviewsData") -> str:
-    """Return a user-turn prompt for the given reviews data.
+def build_reviews_prompt(corpus: "ReviewCorpus") -> str:
+    """Return a user-turn prompt for the given review corpus.
 
-    Includes aggregate metadata and up to ``_MAX_REVIEWS`` review texts,
+    Includes aggregate metadata and up to ``_MAX_REVIEWS`` comment texts,
     each capped at ``_MAX_REVIEW_CHARS`` characters to control token cost.
+    Comments are numbered so the model can reference them via
+    ``source_comment_index`` in the output.
     """
     lines: list[str] = ["Analyse these guest reviews for a rental listing.\n"]
 
-    lines.append(f"Total reviews: {reviews_data.total_count}")
-    if reviews_data.average_rating is not None:
-        lines.append(f"Average rating: {reviews_data.average_rating:.2f} / 5")
+    if corpus.total_review_count is not None:
+        lines.append(f"Total reviews: {corpus.total_review_count}")
+    if corpus.average_rating is not None:
+        lines.append(f"Average rating: {corpus.average_rating:.2f} / 5")
 
-    sample = [r for r in reviews_data.reviews if r.text][:_MAX_REVIEWS]
+    sample = [c for c in corpus.comments if c.comment_text][:_MAX_REVIEWS]
     if sample:
-        lines.append("\nSample reviews:")
-        for i, review in enumerate(sample, 1):
-            text = review.text or ""
+        lines.append("\nSample reviews (numbered for reference):")
+        for i, comment in enumerate(sample, 1):
+            parts: list[str] = [f"  {i}."]
+            if comment.review_date:
+                parts.append(f"[{comment.review_date}]")
+            if comment.rating is not None:
+                parts.append(f"[{comment.rating:.1f}★]")
+            text = comment.comment_text
             if len(text) > _MAX_REVIEW_CHARS:
                 text = text[:_MAX_REVIEW_CHARS] + "..."
-            rating_suffix = f" [{review.rating:.1f}★]" if review.rating is not None else ""
-            lines.append(f"  {i}. {text!r}{rating_suffix}")
+            parts.append(repr(text))
+            lines.append(" ".join(parts))
+            if comment.host_response_text:
+                host_text = comment.host_response_text
+                if len(host_text) > _MAX_HOST_RESPONSE_CHARS:
+                    host_text = host_text[:_MAX_HOST_RESPONSE_CHARS] + "..."
+                lines.append(f"     Host response: {host_text!r}")
 
     lines.append(
         f"\nReply ONLY with a JSON object matching this schema:\n{_JSON_SCHEMA_HINT}"
@@ -82,6 +130,18 @@ def build_reviews_prompt(reviews_data: "ReviewsData") -> str:
 # ---------------------------------------------------------------------------
 # Response parsing
 # ---------------------------------------------------------------------------
+
+
+def _parse_list_of_dicts(data: object) -> list[dict]:
+    if not isinstance(data, list):
+        return []
+    return [item for item in data if isinstance(item, dict)]
+
+
+def _parse_list_of_str(data: object) -> list[str]:
+    if not isinstance(data, list):
+        return []
+    return [str(item) for item in data if isinstance(item, str)]
 
 
 def parse_reviews_response(raw: str) -> ReviewAnalysisOutput:
@@ -124,20 +184,32 @@ def parse_reviews_response(raw: str) -> ReviewAnalysisOutput:
             f"Expected a JSON object from review analysis, got {type(data).__name__}"
         )
 
-    sentiment_summary = data.get("sentiment_summary", "")
-    if not isinstance(sentiment_summary, str):
-        sentiment_summary = ""
+    overall_assessment = data.get("overall_assessment", "")
+    if not isinstance(overall_assessment, str):
+        overall_assessment = ""
 
-    raw_themes = data.get("common_themes", [])
-    common_themes = [str(t) for t in raw_themes if isinstance(t, str)] if isinstance(raw_themes, list) else []
+    overall_risk_level = data.get("overall_risk_level", "")
+    if not isinstance(overall_risk_level, str):
+        overall_risk_level = ""
 
-    raw_concerns = data.get("concerns", [])
-    concerns = [str(c) for c in raw_concerns if isinstance(c, str)] if isinstance(raw_concerns, list) else []
+    confidence = data.get("confidence", "")
+    if not isinstance(confidence, str):
+        confidence = ""
+
+    window_view_summary = data.get("window_view_summary", "")
+    if not isinstance(window_view_summary, str):
+        window_view_summary = ""
 
     return ReviewAnalysisOutput(
-        sentiment_summary=sentiment_summary,
-        common_themes=common_themes,
-        concerns=concerns,
+        overall_assessment=overall_assessment,
+        overall_risk_level=overall_risk_level,
+        confidence=confidence,
+        incident_timeline=_parse_list_of_dicts(data.get("incident_timeline")),
+        recurring_issues=_parse_list_of_dicts(data.get("recurring_issues")),
+        conflicts_or_disputes=_parse_list_of_dicts(data.get("conflicts_or_disputes")),
+        critical_red_flags=_parse_list_of_str(data.get("critical_red_flags")),
+        positive_signals=_parse_list_of_str(data.get("positive_signals")),
+        window_view_summary=window_view_summary,
     )
 
 
@@ -147,7 +219,7 @@ def parse_reviews_response(raw: str) -> ReviewAnalysisOutput:
 
 
 class ReviewAnalysisService:
-    """Orchestrates AI analysis of extracted review data.
+    """Orchestrates AI analysis of a unified review corpus.
 
     Parameters
     ----------
@@ -169,15 +241,16 @@ class ReviewAnalysisService:
             model=settings.openrouter_model,
         )
 
-    async def analyse(self, reviews_data: "ReviewsData") -> ReviewAnalysisOutput:
-        """Run AI analysis on *reviews_data* and return structured output.
+    async def analyse(self, corpus: "ReviewCorpus") -> ReviewAnalysisOutput:
+        """Run AI analysis on *corpus* and return structured output.
 
         Parameters
         ----------
-        reviews_data:
-            Extracted reviews with aggregate metadata.  At least one review
-            with a non-empty ``text`` should be present for a meaningful
-            analysis; the caller is responsible for this check.
+        corpus:
+            Unified review corpus with aggregate metadata and comment list.
+            At least one comment with a non-empty ``comment_text`` should be
+            present for a meaningful analysis; the caller is responsible for
+            this check.
 
         Returns
         -------
@@ -191,15 +264,15 @@ class ReviewAnalysisService:
             If the model's response cannot be parsed as a valid
             ``ReviewAnalysisOutput``.
         """
-        prompt = build_reviews_prompt(reviews_data)
+        prompt = build_reviews_prompt(corpus)
         messages = [
             {"role": "system", "content": _SYSTEM_PROMPT},
             {"role": "user", "content": prompt},
         ]
 
         logger.debug(
-            "Sending review analysis request (%d reviews) to OpenRouter",
-            len(reviews_data.reviews),
+            "Sending review analysis request (%d comments) to OpenRouter",
+            len(corpus.comments),
         )
         raw = await self._client.chat(messages)
 

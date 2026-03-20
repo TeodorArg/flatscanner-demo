@@ -1,22 +1,22 @@
-"""Tests for the P4 reviews analysis module.
+"""Tests for the reviews analysis module (P4 baseline + P023 updates).
 
 Covers:
-- Review / ReviewsData domain models
-- AirbnbReviewExtractor: field mapping, fallbacks, empty/missing data
-- GenericReviewExtractor: listing metadata mapping
-- build_reviews_prompt: content and structure
-- parse_reviews_response: valid JSON, code fences, missing fields, invalid input
-- ReviewAnalysisService: delegates to OpenRouter, propagates errors
+- Review / ReviewsData legacy domain models (unchanged)
+- AirbnbReviewExtractor: field mapping, fallbacks, empty/missing data (unchanged)
+- GenericReviewExtractor: listing metadata mapping (unchanged)
+- build_reviews_prompt: accepts ReviewCorpus, content and structure
+- parse_reviews_response: incident-oriented schema, code fences, missing fields, invalid input
+- ReviewAnalysisService: delegates to OpenRouter with ReviewCorpus, propagates errors
 - AirbnbReviewsModule: name/providers contract, run() with and without raw payload,
-  AI call skipped when no review texts
+  AI call skipped when no comment texts, incident-oriented output fields
 - GenericReviewsModule: name/providers contract, run() metadata-only result
 - End-to-end roundtrip through registry + runner
+- AirbnbReviewsModule non-blocking degradation on AI failure
 """
 
 from __future__ import annotations
 
-from decimal import Decimal
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -39,6 +39,7 @@ from src.analysis.reviews.service import (
 from src.domain.listing import ListingProvider, NormalizedListing
 from src.domain.raw_payload import RawPayload
 from src.domain.review import Review, ReviewsData
+from src.domain.review_corpus import ReviewCorpus, UnifiedReviewComment
 
 
 # ---------------------------------------------------------------------------
@@ -70,21 +71,40 @@ def _raw_payload(payload: dict) -> RawPayload:
     )
 
 
+def _make_corpus(
+    comments: list[UnifiedReviewComment] | None = None,
+    total_review_count: int = 5,
+    average_rating: float | None = 4.5,
+) -> ReviewCorpus:
+    return ReviewCorpus(
+        source_provider="airbnb",
+        total_review_count=total_review_count,
+        average_rating=average_rating,
+        comments=comments or [],
+    )
+
+
 def _make_review_service(output: ReviewAnalysisOutput | None = None) -> ReviewAnalysisService:
     svc = MagicMock(spec=ReviewAnalysisService)
     svc.analyse = AsyncMock(
         return_value=output
         or ReviewAnalysisOutput(
-            sentiment_summary="Guests love it.",
-            common_themes=["Clean", "Location"],
-            concerns=["Noise"],
+            overall_assessment="Generally positive stay.",
+            overall_risk_level="low",
+            confidence="medium",
+            incident_timeline=[],
+            recurring_issues=[],
+            conflicts_or_disputes=[],
+            critical_red_flags=[],
+            positive_signals=["Clean", "Good location"],
+            window_view_summary="City view mentioned by several guests.",
         )
     )
     return svc
 
 
 # ---------------------------------------------------------------------------
-# Review domain models
+# Review legacy domain models (unchanged)
 # ---------------------------------------------------------------------------
 
 
@@ -118,7 +138,7 @@ class TestReviewDomainModels:
 
 
 # ---------------------------------------------------------------------------
-# AirbnbReviewExtractor
+# AirbnbReviewExtractor (legacy — still present for backward compat)
 # ---------------------------------------------------------------------------
 
 
@@ -170,7 +190,6 @@ class TestAirbnbReviewExtractor:
     def test_total_count_falls_back_to_listing(self):
         payload = {"reviews": [{"comments": "Good."}]}
         rd = self.extractor.extract(payload, _listing(review_count=99))
-        # reviewsCount absent → falls back to listing.review_count
         assert rd.total_count == 99
 
     def test_total_count_falls_back_to_len_reviews(self):
@@ -219,7 +238,7 @@ class TestAirbnbReviewExtractor:
 
 
 # ---------------------------------------------------------------------------
-# GenericReviewExtractor
+# GenericReviewExtractor (legacy — still present for backward compat)
 # ---------------------------------------------------------------------------
 
 
@@ -248,94 +267,181 @@ class TestGenericReviewExtractor:
         assert rd.average_rating is None
 
     def test_payload_ignored(self):
-        # payload parameter is ignored by the generic extractor
         rd = self.extractor.extract({"reviews": [{"comments": "Irrelevant"}]}, _listing(review_count=5))
         assert rd.reviews == []
         assert rd.total_count == 5
 
 
 # ---------------------------------------------------------------------------
-# build_reviews_prompt
+# build_reviews_prompt (now accepts ReviewCorpus)
 # ---------------------------------------------------------------------------
 
 
 class TestBuildReviewsPrompt:
     def test_includes_total_count(self):
-        rd = ReviewsData(total_count=20, average_rating=4.5)
-        prompt = build_reviews_prompt(rd)
+        corpus = _make_corpus(total_review_count=20)
+        prompt = build_reviews_prompt(corpus)
         assert "Total reviews: 20" in prompt
 
     def test_includes_average_rating(self):
-        rd = ReviewsData(average_rating=4.75)
-        prompt = build_reviews_prompt(rd)
+        corpus = _make_corpus(average_rating=4.75)
+        prompt = build_reviews_prompt(corpus)
         assert "4.75" in prompt
 
     def test_omits_rating_when_none(self):
-        rd = ReviewsData(average_rating=None)
-        prompt = build_reviews_prompt(rd)
+        corpus = _make_corpus(average_rating=None)
+        prompt = build_reviews_prompt(corpus)
         assert "Average rating" not in prompt
 
-    def test_includes_sample_review_texts(self):
-        rd = ReviewsData(
-            reviews=[Review(text="Brilliant stay!"), Review(text="Would revisit.")],
-            total_count=2,
-        )
-        prompt = build_reviews_prompt(rd)
+    def test_includes_sample_comment_texts(self):
+        comments = [
+            UnifiedReviewComment(source_provider="airbnb", comment_text="Brilliant stay!"),
+            UnifiedReviewComment(source_provider="airbnb", comment_text="Would revisit."),
+        ]
+        corpus = _make_corpus(comments=comments, total_review_count=2)
+        prompt = build_reviews_prompt(corpus)
         assert "Brilliant stay!" in prompt
         assert "Would revisit." in prompt
 
-    def test_skips_reviews_without_text(self):
-        rd = ReviewsData(reviews=[Review(text=None), Review(text="")], total_count=2)
-        prompt = build_reviews_prompt(rd)
+    def test_skips_comments_without_text(self):
+        comments = [UnifiedReviewComment(source_provider="airbnb", comment_text="")]
+        corpus = _make_corpus(comments=comments)
+        prompt = build_reviews_prompt(corpus)
         assert "Sample reviews" not in prompt
 
-    def test_truncates_long_review_text(self):
-        long_text = "A" * 400
-        rd = ReviewsData(reviews=[Review(text=long_text)])
-        prompt = build_reviews_prompt(rd)
-        assert "A" * 300 in prompt
+    def test_truncates_long_comment_text(self):
+        long_text = "A" * 500
+        comments = [UnifiedReviewComment(source_provider="airbnb", comment_text=long_text)]
+        corpus = _make_corpus(comments=comments)
+        prompt = build_reviews_prompt(corpus)
+        assert "A" * 400 in prompt
         assert "..." in prompt
 
-    def test_caps_at_ten_reviews(self):
-        rd = ReviewsData(
-            reviews=[Review(text=f"Review {i}") for i in range(15)],
-        )
-        prompt = build_reviews_prompt(rd)
-        # Only reviews 0-9 should appear
-        assert "Review 9" in prompt
-        assert "Review 10" not in prompt
+    def test_caps_at_twenty_reviews(self):
+        comments = [
+            UnifiedReviewComment(source_provider="airbnb", comment_text=f"Review {i}")
+            for i in range(25)
+        ]
+        corpus = _make_corpus(comments=comments)
+        prompt = build_reviews_prompt(corpus)
+        assert "Review 19" in prompt
+        assert "Review 20" not in prompt
 
-    def test_includes_json_schema_hint(self):
-        rd = ReviewsData()
-        prompt = build_reviews_prompt(rd)
-        assert "sentiment_summary" in prompt
-        assert "common_themes" in prompt
-        assert "concerns" in prompt
+    def test_includes_incident_oriented_schema_fields(self):
+        corpus = _make_corpus()
+        prompt = build_reviews_prompt(corpus)
+        assert "overall_assessment" in prompt
+        assert "incident_timeline" in prompt
+        assert "overall_risk_level" in prompt
+        assert "window_view_summary" in prompt
+
+    def test_includes_comment_date_in_prompt(self):
+        comments = [
+            UnifiedReviewComment(
+                source_provider="airbnb",
+                comment_text="Great!",
+                review_date="2024-06-01",
+            )
+        ]
+        corpus = _make_corpus(comments=comments)
+        prompt = build_reviews_prompt(corpus)
+        assert "2024-06-01" in prompt
+
+    def test_includes_host_response_in_prompt(self):
+        comments = [
+            UnifiedReviewComment(
+                source_provider="airbnb",
+                comment_text="Some issues.",
+                host_response_text="Sorry to hear that!",
+            )
+        ]
+        corpus = _make_corpus(comments=comments)
+        prompt = build_reviews_prompt(corpus)
+        assert "Host response" in prompt
+        assert "Sorry to hear that!" in prompt
 
 
 # ---------------------------------------------------------------------------
-# parse_reviews_response
+# parse_reviews_response (incident-oriented schema)
 # ---------------------------------------------------------------------------
 
 
 class TestParseReviewsResponse:
-    def test_valid_json(self):
-        raw = '{"sentiment_summary": "Great!", "common_themes": ["Clean"], "concerns": ["Noisy"]}'
+    def _valid_json(self, **overrides) -> str:
+        import json
+        base = {
+            "overall_assessment": "Generally positive.",
+            "overall_risk_level": "low",
+            "confidence": "medium",
+            "incident_timeline": [],
+            "recurring_issues": [],
+            "conflicts_or_disputes": [],
+            "critical_red_flags": [],
+            "positive_signals": ["Clean"],
+            "window_view_summary": "City view.",
+        }
+        base.update(overrides)
+        return json.dumps(base)
+
+    def test_valid_json_all_fields(self):
+        raw = self._valid_json()
         out = parse_reviews_response(raw)
-        assert out.sentiment_summary == "Great!"
-        assert out.common_themes == ["Clean"]
-        assert out.concerns == ["Noisy"]
+        assert out.overall_assessment == "Generally positive."
+        assert out.overall_risk_level == "low"
+        assert out.confidence == "medium"
+        assert out.positive_signals == ["Clean"]
+        assert out.window_view_summary == "City view."
+
+    def test_incident_timeline_parsed(self):
+        incident = {
+            "category": "pests",
+            "severity": "high",
+            "incident_date": "2024-05-01",
+            "source_comment_index": 2,
+            "summary": "Cockroach sighted.",
+            "evidence": "I saw a cockroach in the kitchen.",
+        }
+        raw = self._valid_json(incident_timeline=[incident])
+        out = parse_reviews_response(raw)
+        assert len(out.incident_timeline) == 1
+        assert out.incident_timeline[0]["category"] == "pests"
+        assert out.incident_timeline[0]["severity"] == "high"
+
+    def test_recurring_issues_parsed(self):
+        issue = {"category": "noise", "count": 3, "summary": "Noisy street."}
+        raw = self._valid_json(recurring_issues=[issue])
+        out = parse_reviews_response(raw)
+        assert len(out.recurring_issues) == 1
+        assert out.recurring_issues[0]["count"] == 3
+
+    def test_conflicts_or_disputes_parsed(self):
+        dispute = {"incident_date": "2024-01-10", "summary": "Refund dispute."}
+        raw = self._valid_json(conflicts_or_disputes=[dispute])
+        out = parse_reviews_response(raw)
+        assert len(out.conflicts_or_disputes) == 1
+
+    def test_critical_red_flags_parsed(self):
+        raw = self._valid_json(critical_red_flags=["Cockroach mention in multiple reviews"])
+        out = parse_reviews_response(raw)
+        assert out.critical_red_flags == ["Cockroach mention in multiple reviews"]
 
     def test_strips_code_fences(self):
-        raw = '```json\n{"sentiment_summary": "Good.", "common_themes": [], "concerns": []}\n```'
+        inner = self._valid_json()
+        raw = f"```json\n{inner}\n```"
         out = parse_reviews_response(raw)
-        assert out.sentiment_summary == "Good."
+        assert out.overall_assessment == "Generally positive."
 
     def test_missing_fields_use_defaults(self):
-        raw = '{"sentiment_summary": "Fine."}'
+        raw = '{"overall_assessment": "OK."}'
         out = parse_reviews_response(raw)
-        assert out.common_themes == []
-        assert out.concerns == []
+        assert out.overall_risk_level == ""
+        assert out.confidence == ""
+        assert out.incident_timeline == []
+        assert out.recurring_issues == []
+        assert out.conflicts_or_disputes == []
+        assert out.critical_red_flags == []
+        assert out.positive_signals == []
+        assert out.window_view_summary == ""
 
     def test_invalid_json_raises(self):
         with pytest.raises(ValueError, match="not valid JSON"):
@@ -346,55 +452,98 @@ class TestParseReviewsResponse:
             parse_reviews_response("[1, 2, 3]")
 
     def test_invalid_list_fields_default_to_empty(self):
-        raw = '{"sentiment_summary": "OK.", "common_themes": "string not list", "concerns": 42}'
+        import json
+        raw = json.dumps({
+            "overall_assessment": "OK.",
+            "incident_timeline": "should be list",
+            "critical_red_flags": 42,
+        })
         out = parse_reviews_response(raw)
-        assert out.common_themes == []
-        assert out.concerns == []
+        assert out.incident_timeline == []
+        assert out.critical_red_flags == []
 
-    def test_non_string_sentiment_defaults_to_empty(self):
-        raw = '{"sentiment_summary": 123}'
+    def test_non_string_overall_assessment_defaults_to_empty(self):
+        import json
+        raw = json.dumps({"overall_assessment": 123})
         out = parse_reviews_response(raw)
-        assert out.sentiment_summary == ""
+        assert out.overall_assessment == ""
+
+    def test_non_dict_items_in_timeline_excluded(self):
+        import json
+        raw = json.dumps({
+            "overall_assessment": "OK.",
+            "incident_timeline": [{"category": "pests"}, "not a dict", None],
+        })
+        out = parse_reviews_response(raw)
+        assert len(out.incident_timeline) == 1
 
 
 # ---------------------------------------------------------------------------
-# ReviewAnalysisService
+# ReviewAnalysisService (now uses ReviewCorpus)
 # ---------------------------------------------------------------------------
 
 
 class TestReviewAnalysisService:
     @pytest.mark.asyncio
     async def test_calls_openrouter_and_returns_output(self):
+        import json
         from src.analysis.openrouter_client import OpenRouterClient
 
+        response_json = json.dumps({
+            "overall_assessment": "Lovely.",
+            "overall_risk_level": "low",
+            "confidence": "high",
+            "incident_timeline": [],
+            "recurring_issues": [],
+            "conflicts_or_disputes": [],
+            "critical_red_flags": [],
+            "positive_signals": ["Quiet"],
+            "window_view_summary": "",
+        })
         mock_client = MagicMock(spec=OpenRouterClient)
-        mock_client.chat = AsyncMock(
-            return_value='{"sentiment_summary": "Lovely.", "common_themes": ["Quiet"], "concerns": []}'
-        )
+        mock_client.chat = AsyncMock(return_value=response_json)
         settings = MagicMock()
         svc = ReviewAnalysisService(settings=settings, client=mock_client)
-        rd = ReviewsData(
-            reviews=[Review(text="Very nice place!")],
-            total_count=1,
+        corpus = ReviewCorpus(
+            source_provider="airbnb",
+            total_review_count=1,
             average_rating=5.0,
+            comments=[
+                UnifiedReviewComment(source_provider="airbnb", comment_text="Very nice place!")
+            ],
         )
-        out = await svc.analyse(rd)
-        assert out.sentiment_summary == "Lovely."
-        assert out.common_themes == ["Quiet"]
+        out = await svc.analyse(corpus)
+        assert out.overall_assessment == "Lovely."
+        assert out.overall_risk_level == "low"
+        assert out.positive_signals == ["Quiet"]
         mock_client.chat.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_prompt_sent_as_user_message(self):
+    async def test_prompt_sent_as_user_message_with_corpus(self):
+        import json
         from src.analysis.openrouter_client import OpenRouterClient
 
+        response_json = json.dumps({
+            "overall_assessment": "OK.",
+            "overall_risk_level": "low",
+            "confidence": "medium",
+            "incident_timeline": [],
+            "recurring_issues": [],
+            "conflicts_or_disputes": [],
+            "critical_red_flags": [],
+            "positive_signals": [],
+            "window_view_summary": "",
+        })
         mock_client = MagicMock(spec=OpenRouterClient)
-        mock_client.chat = AsyncMock(
-            return_value='{"sentiment_summary": "OK.", "common_themes": [], "concerns": []}'
-        )
+        mock_client.chat = AsyncMock(return_value=response_json)
         settings = MagicMock()
         svc = ReviewAnalysisService(settings=settings, client=mock_client)
-        rd = ReviewsData(reviews=[Review(text="Fine.")], total_count=1)
-        await svc.analyse(rd)
+        corpus = ReviewCorpus(
+            source_provider="airbnb",
+            total_review_count=1,
+            comments=[UnifiedReviewComment(source_provider="airbnb", comment_text="Fine.")],
+        )
+        await svc.analyse(corpus)
         messages = mock_client.chat.call_args[0][0]
         assert messages[0]["role"] == "system"
         assert messages[1]["role"] == "user"
@@ -408,9 +557,12 @@ class TestReviewAnalysisService:
         mock_client.chat = AsyncMock(side_effect=OpenRouterError("API down"))
         settings = MagicMock()
         svc = ReviewAnalysisService(settings=settings, client=mock_client)
-        rd = ReviewsData(reviews=[Review(text="Test.")])
+        corpus = ReviewCorpus(
+            source_provider="airbnb",
+            comments=[UnifiedReviewComment(source_provider="airbnb", comment_text="Test.")],
+        )
         with pytest.raises(OpenRouterError, match="API down"):
-            await svc.analyse(rd)
+            await svc.analyse(corpus)
 
     @pytest.mark.asyncio
     async def test_propagates_parse_error(self):
@@ -420,9 +572,12 @@ class TestReviewAnalysisService:
         mock_client.chat = AsyncMock(return_value="not json at all")
         settings = MagicMock()
         svc = ReviewAnalysisService(settings=settings, client=mock_client)
-        rd = ReviewsData(reviews=[Review(text="Test.")])
+        corpus = ReviewCorpus(
+            source_provider="airbnb",
+            comments=[UnifiedReviewComment(source_provider="airbnb", comment_text="Test.")],
+        )
         with pytest.raises(ValueError):
-            await svc.analyse(rd)
+            await svc.analyse(corpus)
 
 
 # ---------------------------------------------------------------------------
@@ -444,7 +599,7 @@ class TestAirbnbReviewsModule:
         assert isinstance(mod, AnalysisModule)
 
     @pytest.mark.asyncio
-    async def test_run_with_raw_payload_and_reviews_calls_ai(self):
+    async def test_run_with_raw_payload_and_comments_calls_ai(self):
         svc = _make_review_service()
         mod = AirbnbReviewsModule(service=svc)
         payload = {"reviews": [{"comments": "Excellent!"}], "reviewsCount": 1, "starRating": 5.0}
@@ -455,8 +610,9 @@ class TestAirbnbReviewsModule:
         result = await mod.run(ctx)
         assert isinstance(result, ReviewsResult)
         assert result.module_name == "reviews"
-        assert result.sentiment_summary == "Guests love it."
-        assert result.common_themes == ["Clean", "Location"]
+        assert result.overall_assessment == "Generally positive stay."
+        assert result.overall_risk_level == "low"
+        assert result.positive_signals == ["Clean", "Good location"]
         svc.analyse.assert_awaited_once()
 
     @pytest.mark.asyncio
@@ -465,16 +621,15 @@ class TestAirbnbReviewsModule:
         mod = AirbnbReviewsModule(service=svc)
         ctx = AnalysisContext(listing=_listing(review_count=5, rating=4.0))
         result = await mod.run(ctx)
-        # No review texts → no AI call
+        # No comment texts → no AI call
         svc.analyse.assert_not_awaited()
         assert result.review_count == 5
         assert result.average_rating == pytest.approx(4.0)
 
     @pytest.mark.asyncio
-    async def test_run_skips_ai_when_no_review_texts(self):
+    async def test_run_skips_ai_when_no_comment_texts(self):
         svc = _make_review_service()
         mod = AirbnbReviewsModule(service=svc)
-        # raw_payload with empty reviews list
         payload = {"reviews": [], "reviewsCount": 0}
         ctx = AnalysisContext(
             listing=_listing(),
@@ -482,7 +637,7 @@ class TestAirbnbReviewsModule:
         )
         result = await mod.run(ctx)
         svc.analyse.assert_not_awaited()
-        assert result.sentiment_summary is None
+        assert result.overall_assessment is None
 
     @pytest.mark.asyncio
     async def test_run_returns_review_count_from_payload(self):
@@ -495,6 +650,15 @@ class TestAirbnbReviewsModule:
         )
         result = await mod.run(ctx)
         assert result.review_count == 42
+
+    @pytest.mark.asyncio
+    async def test_run_returns_window_view_summary(self):
+        svc = _make_review_service()
+        mod = AirbnbReviewsModule(service=svc)
+        payload = {"reviews": [{"comments": "Nice view."}], "reviewsCount": 1}
+        ctx = AnalysisContext(listing=_listing(), raw_payload=_raw_payload(payload))
+        result = await mod.run(ctx)
+        assert result.window_view_summary == "City view mentioned by several guests."
 
 
 # ---------------------------------------------------------------------------
@@ -524,9 +688,9 @@ class TestGenericReviewsModule:
         assert result.module_name == "reviews"
         assert result.review_count == 20
         assert result.average_rating == pytest.approx(4.2)
-        assert result.sentiment_summary is None
-        assert result.common_themes == []
-        assert result.concerns == []
+        assert result.overall_assessment is None
+        assert result.incident_timeline == []
+        assert result.critical_red_flags == []
 
     @pytest.mark.asyncio
     async def test_run_with_none_listing_metadata(self):
@@ -573,9 +737,7 @@ class TestReviewsModuleRoundtrip:
     async def test_runner_returns_reviews_result(self):
         from src.analysis.runner import ModuleRunner
 
-        svc = _make_review_service()
         mod = GenericReviewsModule()
-
         registry = ModuleRegistry()
         registry.register(mod)
         runner = ModuleRunner(registry)
@@ -597,7 +759,6 @@ class TestAirbnbReviewsModuleDegradation:
 
     @pytest.mark.asyncio
     async def test_degrades_on_openrouter_error(self):
-        """OpenRouterError from analyse() → metadata-only ReviewsResult, no re-raise."""
         from src.analysis.openrouter_client import OpenRouterError
 
         svc = MagicMock(spec=ReviewAnalysisService)
@@ -611,33 +772,31 @@ class TestAirbnbReviewsModuleDegradation:
 
         assert isinstance(result, ReviewsResult)
         assert result.module_name == "reviews"
-        # AI fields absent — degraded to metadata-only
-        assert result.sentiment_summary is None
-        assert result.common_themes == []
-        assert result.concerns == []
-        # Metadata from payload still present
+        assert result.overall_assessment is None
+        assert result.incident_timeline == []
+        assert result.critical_red_flags == []
         assert result.review_count == 5
         assert result.average_rating == pytest.approx(4.5)
 
     @pytest.mark.asyncio
     async def test_degrades_on_parse_error(self):
-        """ValueError from analyse() (bad JSON) → metadata-only ReviewsResult."""
         svc = MagicMock(spec=ReviewAnalysisService)
         svc.analyse = AsyncMock(side_effect=ValueError("not valid JSON"))
         mod = AirbnbReviewsModule(service=svc)
 
         payload = {"reviews": [{"comments": "Nice spot."}], "reviewsCount": 3}
-        ctx = AnalysisContext(listing=_listing(review_count=3, rating=4.0), raw_payload=_raw_payload(payload))
+        ctx = AnalysisContext(
+            listing=_listing(review_count=3, rating=4.0), raw_payload=_raw_payload(payload)
+        )
 
         result = await mod.run(ctx)
 
         assert isinstance(result, ReviewsResult)
-        assert result.sentiment_summary is None
-        assert result.common_themes == []
+        assert result.overall_assessment is None
+        assert result.incident_timeline == []
 
     @pytest.mark.asyncio
     async def test_job_not_blocked_when_reviews_fail(self):
-        """ModuleRunner propagates a ReviewsResult even when AI raises."""
         from src.analysis.openrouter_client import OpenRouterError
         from src.analysis.runner import ModuleRunner
 
@@ -655,4 +814,4 @@ class TestAirbnbReviewsModuleDegradation:
         results = await runner.run(ctx)
         assert len(results) == 1
         assert isinstance(results[0], ReviewsResult)
-        assert results[0].sentiment_summary is None
+        assert results[0].overall_assessment is None

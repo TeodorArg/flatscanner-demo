@@ -56,6 +56,7 @@ Migration is broken into phases P1-P7 in `specs/015-post-mvp-architecture-founda
 - Prefer explainable scoring over LLM-only judgment.
 - Keep cost-sensitive dependencies visible.
 - Record durable backend changes in `docs/adr/`.
+- Reusable analysis guidance belongs in repository skills under `skills/`; provider normalizers should feed unified corpus contracts before AI analysis runs.
 
 ## Delivery Infrastructure
 
