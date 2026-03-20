@@ -11,3 +11,4 @@
 | 5 | Render a localized review section in Telegram output | done |
 | 6 | Add focused processor / formatter / translation tests | done |
 | 7 | All tests pass and PR checks are green | done |
+| 8 | AI Review follow-up: extract mapping helper, fix step labels, normalize positive_signals | done |

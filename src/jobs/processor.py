@@ -54,6 +54,39 @@ class UnsupportedProviderError(Exception):
     """Raised when no adapter is registered for the job's listing provider."""
 
 
+def _map_reviews_result(rv: ReviewsResult | None) -> ReviewInsightsBlock | None:
+    """Map a ``ReviewsResult`` module output into a ``ReviewInsightsBlock``.
+
+    Returns ``None`` when *rv* is ``None`` (no reviews module produced a
+    result).  List fields typed as ``list[dict]`` in ``ReviewsResult`` have
+    their ``"summary"`` key extracted; the same guard is applied to the
+    ``list[str]`` fields so that unexpected dict payloads from the AI are
+    handled safely.
+    """
+    if rv is None:
+        return None
+
+    def _extract(items: list) -> list[str]:
+        result = []
+        for item in items:
+            text = item.get("summary", "") if isinstance(item, dict) else str(item)
+            if text:
+                result.append(text)
+        return result
+
+    return ReviewInsightsBlock(
+        overall_assessment=rv.overall_assessment or "",
+        overall_risk_level=rv.overall_risk_level or "",
+        review_count=rv.review_count,
+        average_rating=rv.average_rating,
+        critical_red_flags=_extract(rv.critical_red_flags),
+        recurring_issues=_extract(rv.recurring_issues),
+        conflicts_or_disputes=_extract(rv.conflicts_or_disputes),
+        positive_signals=_extract(rv.positive_signals),
+        window_view_summary=rv.window_view_summary or "",
+    )
+
+
 async def process_job(
     job: AnalysisJob,
     settings: "Settings",
@@ -184,36 +217,12 @@ async def process_job(
     reviews_module_result = next(
         (r for r in module_results if isinstance(r, ReviewsResult)), None
     )
-    review_insights: ReviewInsightsBlock | None = None
-    if reviews_module_result is not None:
-        rv = reviews_module_result
-        # Extract plain-text summaries from the dict-typed list fields.
-        recurring = [
-            item.get("summary", "") if isinstance(item, dict) else str(item)
-            for item in rv.recurring_issues
-            if (item.get("summary", "") if isinstance(item, dict) else str(item))
-        ]
-        disputes = [
-            item.get("summary", "") if isinstance(item, dict) else str(item)
-            for item in rv.conflicts_or_disputes
-            if (item.get("summary", "") if isinstance(item, dict) else str(item))
-        ]
-        review_insights = ReviewInsightsBlock(
-            overall_assessment=rv.overall_assessment or "",
-            overall_risk_level=rv.overall_risk_level or "",
-            review_count=rv.review_count,
-            average_rating=rv.average_rating,
-            critical_red_flags=rv.critical_red_flags,
-            recurring_issues=recurring,
-            conflicts_or_disputes=disputes,
-            positive_signals=rv.positive_signals,
-            window_view_summary=rv.window_view_summary or "",
-        )
+    review_insights = _map_reviews_result(reviews_module_result)
 
     result = result.model_copy(update={"display_title": listing.title, "review_insights": review_insights})
     logger.debug("Analysis complete for job %s", job.id)
 
-    # --- 3b. Translate (on demand, ephemeral) --------------------------------
+    # --- 4. Translate (on demand, ephemeral) ---------------------------------
     # English jobs use the canonical result directly.  For other languages the
     # freeform blocks are translated just-in-time; translated output is never
     # persisted as a cache artifact.
@@ -236,10 +245,10 @@ async def process_job(
         translated_result = result
         render_language = Language.EN
 
-    # --- 4. Format -----------------------------------------------------------
+    # --- 5. Format -----------------------------------------------------------
     text = format_analysis_message(listing, translated_result, render_language)
 
-    # --- 5. Send -------------------------------------------------------------
+    # --- 6. Send -------------------------------------------------------------
     await send_message(
         settings.telegram_bot_token,
         job.telegram_chat_id,

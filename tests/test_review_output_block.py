@@ -18,6 +18,7 @@ from src.analysis.modules.reviews import ReviewsResult
 from src.analysis.result import AnalysisResult, PriceVerdict, ReviewInsightsBlock
 from src.domain.listing import ListingProvider, NormalizedListing
 from src.i18n.types import Language
+from src.jobs.processor import _map_reviews_result
 from src.telegram.formatter import _format_review_insights, format_analysis_message
 from src.translation.service import (
     TranslationService,
@@ -77,28 +78,9 @@ class TestProcessorMapping:
     """Test that ReviewsResult fields map correctly into ReviewInsightsBlock."""
 
     def _map(self, rv: ReviewsResult) -> ReviewInsightsBlock:
-        """Replicate the processor mapping logic under test."""
-        recurring = [
-            item.get("summary", "") if isinstance(item, dict) else str(item)
-            for item in rv.recurring_issues
-            if (item.get("summary", "") if isinstance(item, dict) else str(item))
-        ]
-        disputes = [
-            item.get("summary", "") if isinstance(item, dict) else str(item)
-            for item in rv.conflicts_or_disputes
-            if (item.get("summary", "") if isinstance(item, dict) else str(item))
-        ]
-        return ReviewInsightsBlock(
-            overall_assessment=rv.overall_assessment or "",
-            overall_risk_level=rv.overall_risk_level or "",
-            review_count=rv.review_count,
-            average_rating=rv.average_rating,
-            critical_red_flags=rv.critical_red_flags,
-            recurring_issues=recurring,
-            conflicts_or_disputes=disputes,
-            positive_signals=rv.positive_signals,
-            window_view_summary=rv.window_view_summary or "",
-        )
+        result = _map_reviews_result(rv)
+        assert result is not None
+        return result
 
     def test_metadata_fields_pass_through(self):
         rv = ReviewsResult(module_name="reviews", review_count=20, average_rating=4.2)
