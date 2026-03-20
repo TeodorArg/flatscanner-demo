@@ -28,6 +28,12 @@ $cases = @(
         ExpectedNotes = 1
     },
     @{
+        Name = 'review_decision field is normalized to verdict'
+        RawText = '{"review_decision":"approve","summary":"ok","findings":[]}'
+        ExpectedVerdict = 'approve'
+        ExpectedNotes = 1
+    },
+    @{
         Name = 'nested review object is unwrapped'
         RawText = '{"review":{"verdict":"comment","summary":"ok","findings":[]}}'
         ExpectedVerdict = 'comment'
