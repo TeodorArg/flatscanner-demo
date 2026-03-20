@@ -1,7 +1,7 @@
-# Spec 017 — Raw Payload Capture (P2)
+# Spec 017 - Raw Payload Capture (P2)
 
 ## Status
-Active — implementation in progress on branch `codex/claude-017-raw-payload-capture-raw-payload-capture`
+Active - PR #34 open; all required checks passed; awaiting human approval to merge
 
 ## Context
 Feature 015 defined a phased migration from the MVP monolith to a layered
@@ -12,9 +12,9 @@ debugging, schema changes, or reanalysis without re-fetching from Apify.
 Feature 016 (P1) delivered the DB engine, session factory, and repository
 patterns for Users and ChatSettings. P2 builds on that foundation.
 
-The storage backend decision (open in 015/backend-docs): **PostgreSQL JSONB**
-via the same SQLAlchemy async infrastructure established in P1.  Object storage
-(S3/R2) is deferred until payload volumes justify it.
+The storage backend decision for this phase is PostgreSQL-backed JSON payload
+storage via the same SQLAlchemy async infrastructure established in P1. Object
+storage (S3/R2) is deferred until payload volumes justify it.
 
 ## Goals
 1. Dedicated `raw_payloads` table with a UUID PK, provider, source URL,
@@ -28,8 +28,10 @@ via the same SQLAlchemy async infrastructure established in P1.  Object storage
 6. `process_job` in `src/jobs/processor.py` accepts an optional
    `raw_payload_repo` parameter and persists the raw payload after fetch when
    the repo is present.
-7. All existing tests continue to pass; new focused tests cover the ORM model,
-   repository, adapter contract, and processor wiring.
+7. The real worker runtime wires a DB-backed raw payload repository into job
+   processing without per-job engine churn.
+8. All existing tests continue to pass; new focused tests cover the ORM model,
+   repository, adapter contract, processor wiring, and worker/CLI wiring.
 
 ## Out of scope
 - Analysis module framework (P3, feature 018).
@@ -38,14 +40,13 @@ via the same SQLAlchemy async infrastructure established in P1.  Object storage
 - Any changes to billing or enrichment layers.
 
 ## Storage decision
-Raw payloads are stored in PostgreSQL (JSONB via SQLAlchemy `JSON` column),
-matching the existing storage stack. Object storage is not introduced in this
-phase.
+Raw payloads are stored in PostgreSQL-backed JSON payload storage, matching the
+existing storage stack. Object storage is not introduced in this phase.
 
 ## Domain model
 
-### `RawPayload` (src/domain/raw_payload.py)
-```
+### `RawPayload` (`src/domain/raw_payload.py`)
+```text
 id:          UUID (PK, default uuid4)
 provider:    str
 source_url:  str
@@ -56,22 +57,22 @@ captured_at: datetime (UTC)
 
 ## Persistence model
 
-### `RawPayloadRow` (table: `raw_payloads`)
-Mirrors `RawPayload`. No foreign key to `listings` — capture happens before
+### `RawPayloadRow` (`raw_payloads`)
+Mirrors `RawPayload`. No foreign key to `listings` - capture happens before
 normalisation so no listing row exists yet.
 
-```
-id:          Uuid  PK
-provider:    String(64)  NOT NULL
-source_url:  Text  NOT NULL
-source_id:   String(256)  nullable
-payload:     JSON  NOT NULL
-captured_at: DateTime(timezone=True)  NOT NULL
+```text
+id:          Uuid PK
+provider:    String(64) NOT NULL
+source_url:  Text NOT NULL
+source_id:   String(256) nullable
+payload:     JSON NOT NULL
+captured_at: DateTime(timezone=True) NOT NULL
 ```
 
 ## Adapter contract
 
-### `AdapterResult` (src/adapters/base.py)
+### `AdapterResult` (`src/adapters/base.py`)
 ```python
 @dataclass
 class AdapterResult:
@@ -86,28 +87,30 @@ class AdapterResult:
 
 ## Repository contract
 
-### RawPayloadRepository (Protocol)
-```
-save(payload: RawPayload) -> None          # insert; no upsert needed
+### `RawPayloadRepository` (Protocol)
+```text
+save(payload: RawPayload) -> None
 get_by_id(payload_id: UUID) -> RawPayload | None
 ```
 
-## Processor wiring
+## Processor and worker wiring
 
-```
-process_job(job, settings, *, ..., raw_payload_repo=None)
-```
+`process_job(job, settings, *, ..., raw_payload_repo=None)`
 
 After `adapter.fetch()`:
 1. Extract `adapter_result.listing` for the analysis pipeline.
-2. If `raw_payload_repo` is not None, construct a `RawPayload` from
+2. If `raw_payload_repo` is not `None`, construct a `RawPayload` from
    `adapter_result.raw` and call `raw_payload_repo.save()`.
-3. Persist errors from `save()` are logged and swallowed (never block
-   the analysis pipeline).
+3. Persist errors from `save()` are logged and swallowed so capture never
+   blocks the analysis pipeline.
+
+The live worker path creates one engine and session factory per worker process,
+then opens one async session per job to persist raw payloads safely.
 
 ## Validation
 - Structural tests for `RawPayloadRow` (metadata inspection, no DB needed).
 - Integration tests for `SQLAlchemyRawPayloadRepository` using SQLite in-memory.
 - Adapter contract tests: `AirbnbAdapter.fetch()` returns `AdapterResult`.
-- Processor tests: raw payload saved when repo provided; skipped when None;
+- Processor tests: raw payload saved when repo provided; skipped when `None`;
   save errors do not propagate.
+- Worker/CLI tests: DB-backed raw payload repo is wired into the real job path.
