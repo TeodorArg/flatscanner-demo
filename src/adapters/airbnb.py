@@ -23,7 +23,7 @@ from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
 from src.adapters.apify_client import ApifyClient, ApifyError
-from src.adapters.base import ListingAdapter
+from src.adapters.base import AdapterResult, ListingAdapter
 from src.domain.listing import (
     ListingLocation,
     ListingProvider,
@@ -304,8 +304,8 @@ class AirbnbAdapter(ListingAdapter):
 
         return False
 
-    async def fetch(self, url: str) -> NormalizedListing:
-        """Fetch the Airbnb listing at *url* via Apify and return a normalised record.
+    async def fetch(self, url: str) -> AdapterResult:
+        """Fetch the Airbnb listing at *url* via Apify and return an ``AdapterResult``.
 
         Parameters
         ----------
@@ -314,8 +314,9 @@ class AirbnbAdapter(ListingAdapter):
 
         Returns
         -------
-        NormalizedListing
-            Provider-agnostic listing representation.
+        AdapterResult
+            Contains the unmodified Apify actor item (``raw``) and the
+            normalised listing (``listing``).
 
         Raises
         ------
@@ -340,4 +341,5 @@ class AirbnbAdapter(ListingAdapter):
                 f"Apify returned an empty dataset for URL: {url!r}. "
                 "The listing may not exist or scraping may have been blocked."
             )
-        return _normalize(url, items[0])
+        raw = items[0]
+        return AdapterResult(raw=raw, listing=_normalize(url, raw))

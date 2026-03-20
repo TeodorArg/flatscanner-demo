@@ -11,6 +11,7 @@ import uuid
 from typing import Protocol
 
 from src.domain.listing import AnalysisJob, NormalizedListing
+from src.domain.raw_payload import RawPayload
 from src.domain.user import TelegramUser
 from src.storage.chat_settings import ChatSettings
 
@@ -76,4 +77,16 @@ class ChatSettingsRepository(Protocol):
 
     async def get(self, chat_id: int) -> ChatSettings | None:
         """Return persisted settings for *chat_id*, or ``None`` if absent."""
+        ...
+
+
+class RawPayloadRepository(Protocol):
+    """Write and read access to captured raw adapter payloads."""
+
+    async def save(self, payload: RawPayload) -> None:
+        """Persist a new raw payload capture (insert; no upsert)."""
+        ...
+
+    async def get_by_id(self, payload_id: uuid.UUID) -> RawPayload | None:
+        """Return the raw payload with the given primary key, or ``None``."""
         ...

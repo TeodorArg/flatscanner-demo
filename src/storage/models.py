@@ -175,3 +175,25 @@ class ChatSettingsRow(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow
     )
+
+
+class RawPayloadRow(Base):
+    """Captured raw provider response, written before normalisation.
+
+    One row is inserted per adapter fetch.  There is no foreign key to
+    ``listings`` because capture happens before a listing row exists.
+    ``source_id`` is nullable — it may not be identifiable from all provider
+    schemas at capture time.
+    """
+
+    __tablename__ = "raw_payloads"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    provider: Mapped[str] = mapped_column(String(64), nullable=False)
+    source_url: Mapped[str] = mapped_column(Text, nullable=False)
+    source_id: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    payload: Mapped[dict] = mapped_column(JSON, nullable=False)
+
+    captured_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow
+    )

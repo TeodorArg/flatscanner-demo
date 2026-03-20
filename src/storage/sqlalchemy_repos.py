@@ -23,10 +23,11 @@ from datetime import datetime, timezone
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.domain.raw_payload import RawPayload
 from src.domain.user import TelegramUser
 from src.i18n.types import Language
 from src.storage.chat_settings import ChatSettings
-from src.storage.models import ChatSettingsRow, UserRow
+from src.storage.models import ChatSettingsRow, RawPayloadRow, UserRow
 
 
 def _utcnow() -> datetime:
@@ -146,3 +147,47 @@ class SQLAlchemyChatSettingsRepository:
         """Return persisted settings for *chat_id*, or ``None`` if absent."""
         row = await self._session.get(ChatSettingsRow, chat_id)
         return _row_to_settings(row) if row is not None else None
+
+
+# ---------------------------------------------------------------------------
+# RawPayloadRepository
+# ---------------------------------------------------------------------------
+
+
+def _raw_payload_to_row(payload: RawPayload) -> RawPayloadRow:
+    return RawPayloadRow(
+        id=payload.id,
+        provider=payload.provider,
+        source_url=payload.source_url,
+        source_id=payload.source_id,
+        payload=payload.payload,
+        captured_at=payload.captured_at,
+    )
+
+
+def _row_to_raw_payload(row: RawPayloadRow) -> RawPayload:
+    return RawPayload(
+        id=row.id,
+        provider=row.provider,
+        source_url=row.source_url,
+        source_id=row.source_id,
+        payload=row.payload,
+        captured_at=row.captured_at,
+    )
+
+
+class SQLAlchemyRawPayloadRepository:
+    """SQLAlchemy-backed implementation of ``RawPayloadRepository``."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def save(self, payload: RawPayload) -> None:
+        """Insert a new raw payload capture row."""
+        row = _raw_payload_to_row(payload)
+        self._session.add(row)
+
+    async def get_by_id(self, payload_id: uuid.UUID) -> RawPayload | None:
+        """Return the raw payload with the given UUID primary key, or ``None``."""
+        row = await self._session.get(RawPayloadRow, payload_id)
+        return _row_to_raw_payload(row) if row is not None else None

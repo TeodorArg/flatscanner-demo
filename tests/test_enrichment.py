@@ -27,6 +27,7 @@ from src.domain.listing import (
     NormalizedListing,
     PriceInfo,
 )
+from src.adapters.base import AdapterResult
 from src.enrichment.runner import (
     EnrichmentOutcome,
     EnrichmentProvider,
@@ -49,6 +50,12 @@ def _make_listing() -> NormalizedListing:
         title="Test flat",
         price=PriceInfo(amount=Decimal("100"), currency="EUR"),
     )
+
+
+def _make_adapter_result(listing: NormalizedListing | None = None) -> AdapterResult:
+    if listing is None:
+        listing = _make_listing()
+    return AdapterResult(raw={"id": listing.source_id, "name": listing.title}, listing=listing)
 
 
 def _make_job() -> AnalysisJob:
@@ -374,7 +381,7 @@ class TestProcessJobEnrichmentIntegration:
         settings = _make_settings()
 
         mock_adapter = MagicMock()
-        mock_adapter.fetch = AsyncMock(return_value=listing)
+        mock_adapter.fetch = AsyncMock(return_value=_make_adapter_result(listing))
 
         mock_service = MagicMock(spec=AnalysisService)
         mock_service.analyse = AsyncMock(return_value=result)
@@ -408,7 +415,7 @@ class TestProcessJobEnrichmentIntegration:
         settings = _make_settings()
 
         mock_adapter = MagicMock()
-        mock_adapter.fetch = AsyncMock(return_value=listing)
+        mock_adapter.fetch = AsyncMock(return_value=_make_adapter_result(listing))
 
         mock_service = MagicMock(spec=AnalysisService)
         mock_service.analyse = AsyncMock(return_value=result)
@@ -448,7 +455,7 @@ class TestProcessJobEnrichmentIntegration:
         settings = _make_settings()
 
         mock_adapter = MagicMock()
-        mock_adapter.fetch = AsyncMock(return_value=listing)
+        mock_adapter.fetch = AsyncMock(return_value=_make_adapter_result(listing))
 
         mock_service = MagicMock(spec=AnalysisService)
         mock_service.analyse = AsyncMock(return_value=result)
@@ -486,7 +493,7 @@ class TestProcessJobEnrichmentIntegration:
         settings = _make_settings()
 
         mock_adapter = MagicMock()
-        mock_adapter.fetch = AsyncMock(return_value=listing)
+        mock_adapter.fetch = AsyncMock(return_value=_make_adapter_result(listing))
 
         mock_service = MagicMock(spec=AnalysisService)
         mock_service.analyse = AsyncMock(return_value=result)
@@ -517,7 +524,7 @@ class TestProcessJobEnrichmentIntegration:
         settings = _make_settings()
 
         mock_adapter = MagicMock()
-        mock_adapter.fetch = AsyncMock(return_value=listing)
+        mock_adapter.fetch = AsyncMock(return_value=_make_adapter_result(listing))
 
         mock_service = MagicMock(spec=AnalysisService)
         mock_service.analyse = AsyncMock(return_value=result)

@@ -12,9 +12,25 @@ listing provider never requires changes outside ``src/adapters/``.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import ClassVar
+from dataclasses import dataclass
+from typing import Any, ClassVar
 
 from src.domain.listing import ListingProvider, NormalizedListing
+
+
+@dataclass
+class AdapterResult:
+    """Raw and normalised output from a single adapter fetch.
+
+    ``raw`` is the unmodified provider response (e.g. the first item returned
+    by the Apify actor).  It is captured to the raw payload store before any
+    transformation so that normalisation can be replayed without re-fetching.
+
+    ``listing`` is the normalised ``NormalizedListing`` produced from ``raw``.
+    """
+
+    raw: dict[str, Any]
+    listing: NormalizedListing
 
 
 class ListingAdapter(ABC):
@@ -36,8 +52,12 @@ class ListingAdapter(ABC):
         """
 
     @abstractmethod
-    async def fetch(self, url: str) -> NormalizedListing:
-        """Fetch the listing at *url* and return a normalized domain object.
+    async def fetch(self, url: str) -> AdapterResult:
+        """Fetch the listing at *url* and return an ``AdapterResult``.
+
+        The result carries both the unmodified provider response (``raw``) and
+        the normalised ``NormalizedListing`` (``listing``).  The raw payload
+        must be captured before any transformation.
 
         Raises ``NotImplementedError`` until the back-end extraction layer for
         this adapter is wired up.

@@ -16,6 +16,7 @@ import pytest
 
 from src.adapters.airbnb import AirbnbAdapter, _build_actor_input, _normalize
 from src.adapters.apify_client import ApifyClient, ApifyError
+from src.adapters.base import AdapterResult
 from src.app.config import Settings
 from src.domain.listing import ListingProvider, NormalizedListing
 
@@ -239,7 +240,7 @@ class TestAirbnbAdapterFetch:
         return AirbnbAdapter(settings=_make_settings())
 
     @pytest.mark.asyncio
-    async def test_fetch_returns_normalized_listing(self):
+    async def test_fetch_returns_adapter_result(self):
         payload = _full_airbnb_payload("12345")
         adapter = self._adapter()
 
@@ -247,11 +248,23 @@ class TestAirbnbAdapterFetch:
             mock_run.return_value = [payload]
             result = await adapter.fetch(self._URL)
 
-        assert isinstance(result, NormalizedListing)
-        assert result.provider == ListingProvider.AIRBNB
-        assert result.source_url == self._URL
-        assert result.source_id == "12345"
-        assert result.title == "Cozy Studio in the Heart of Paris"
+        assert isinstance(result, AdapterResult)
+        assert isinstance(result.listing, NormalizedListing)
+        assert result.listing.provider == ListingProvider.AIRBNB
+        assert result.listing.source_url == self._URL
+        assert result.listing.source_id == "12345"
+        assert result.listing.title == "Cozy Studio in the Heart of Paris"
+
+    @pytest.mark.asyncio
+    async def test_fetch_raw_contains_original_payload(self):
+        payload = _full_airbnb_payload("12345")
+        adapter = self._adapter()
+
+        with patch.object(ApifyClient, "run_and_get_items", new_callable=AsyncMock) as mock_run:
+            mock_run.return_value = [payload]
+            result = await adapter.fetch(self._URL)
+
+        assert result.raw == payload
 
     @pytest.mark.asyncio
     async def test_fetch_passes_url_in_actor_input(self):

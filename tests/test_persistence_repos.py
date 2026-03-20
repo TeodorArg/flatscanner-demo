@@ -14,12 +14,14 @@ import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
+from src.domain.raw_payload import RawPayload
 from src.domain.user import TelegramUser
 from src.i18n.types import Language
 from src.storage.chat_settings import ChatSettings
 from src.storage.db import create_tables, make_engine, make_session_factory
 from src.storage.sqlalchemy_repos import (
     SQLAlchemyChatSettingsRepository,
+    SQLAlchemyRawPayloadRepository,
     SQLAlchemyUserRepository,
 )
 
@@ -223,3 +225,74 @@ class TestSQLAlchemyChatSettingsRepository:
         fetched = await repo.get(chat_id=4001)
         assert fetched is not None
         assert fetched.language == Language.RU
+
+
+# ---------------------------------------------------------------------------
+# SQLAlchemyRawPayloadRepository
+# ---------------------------------------------------------------------------
+
+
+class TestSQLAlchemyRawPayloadRepository:
+    async def test_save_and_get_by_id(self, session: AsyncSession):
+        repo = SQLAlchemyRawPayloadRepository(session)
+        payload = RawPayload(
+            provider="airbnb",
+            source_url="https://www.airbnb.com/rooms/11111",
+            source_id="11111",
+            payload={"id": "11111", "name": "Cozy Flat"},
+        )
+        await repo.save(payload)
+        await session.commit()
+
+        fetched = await repo.get_by_id(payload.id)
+        assert fetched is not None
+        assert fetched.id == payload.id
+        assert fetched.provider == "airbnb"
+        assert fetched.source_url == "https://www.airbnb.com/rooms/11111"
+        assert fetched.source_id == "11111"
+        assert fetched.payload == {"id": "11111", "name": "Cozy Flat"}
+
+    async def test_get_by_id_returns_none_for_unknown(self, session: AsyncSession):
+        repo = SQLAlchemyRawPayloadRepository(session)
+        result = await repo.get_by_id(uuid.uuid4())
+        assert result is None
+
+    async def test_save_with_null_source_id(self, session: AsyncSession):
+        repo = SQLAlchemyRawPayloadRepository(session)
+        payload = RawPayload(
+            provider="airbnb",
+            source_url="https://www.airbnb.com/rooms/22222",
+            source_id=None,
+            payload={"name": "Unknown listing"},
+        )
+        await repo.save(payload)
+        await session.commit()
+
+        fetched = await repo.get_by_id(payload.id)
+        assert fetched is not None
+        assert fetched.source_id is None
+
+    async def test_save_inserts_distinct_rows(self, session: AsyncSession):
+        """Each save call creates a new row (no upsert)."""
+        repo = SQLAlchemyRawPayloadRepository(session)
+        p1 = RawPayload(
+            provider="airbnb",
+            source_url="https://www.airbnb.com/rooms/33333",
+            payload={"name": "First fetch"},
+        )
+        p2 = RawPayload(
+            provider="airbnb",
+            source_url="https://www.airbnb.com/rooms/33333",
+            payload={"name": "Second fetch"},
+        )
+        await repo.save(p1)
+        await repo.save(p2)
+        await session.commit()
+
+        r1 = await repo.get_by_id(p1.id)
+        r2 = await repo.get_by_id(p2.id)
+        assert r1 is not None
+        assert r2 is not None
+        assert r1.id != r2.id
+        assert r1.payload == {"name": "First fetch"}
+        assert r2.payload == {"name": "Second fetch"}

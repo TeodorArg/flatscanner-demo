@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import sqlalchemy as sa
 
-from src.storage.models import AnalysisJobRow, Base, ChatSettingsRow, ListingRow, UserRow
+from src.storage.models import AnalysisJobRow, Base, ChatSettingsRow, ListingRow, RawPayloadRow, UserRow
 
 
 # ---------------------------------------------------------------------------
@@ -39,6 +39,9 @@ class TestBaseMetadata:
 
     def test_chat_settings_table_registered(self):
         assert "chat_settings" in Base.metadata.tables
+
+    def test_raw_payloads_table_registered(self):
+        assert "raw_payloads" in Base.metadata.tables
 
 
 # ---------------------------------------------------------------------------
@@ -217,3 +220,41 @@ class TestChatSettingsRowColumns:
     def test_timestamp_columns_exist_and_not_nullable(self):
         assert not _col(self._table, "created_at").nullable
         assert not _col(self._table, "updated_at").nullable
+
+
+# ---------------------------------------------------------------------------
+# RawPayloadRow columns
+# ---------------------------------------------------------------------------
+
+
+class TestRawPayloadRowColumns:
+    _table: sa.Table = RawPayloadRow.__table__  # type: ignore[attr-defined]
+
+    def test_primary_key_is_id(self):
+        pk_cols = {c.name for c in self._table.primary_key}
+        assert pk_cols == {"id"}
+
+    def test_required_columns_exist(self):
+        for col_name in ("provider", "source_url", "payload", "captured_at"):
+            assert col_name in self._table.c, f"Missing column: {col_name}"
+
+    def test_source_id_is_nullable(self):
+        assert _col(self._table, "source_id").nullable
+
+    def test_provider_not_nullable(self):
+        assert not _col(self._table, "provider").nullable
+
+    def test_source_url_not_nullable(self):
+        assert not _col(self._table, "source_url").nullable
+
+    def test_payload_is_json_and_not_nullable(self):
+        col = _col(self._table, "payload")
+        assert issubclass(type(col.type), sa.JSON)
+        assert not col.nullable
+
+    def test_captured_at_not_nullable(self):
+        assert not _col(self._table, "captured_at").nullable
+
+    def test_no_updated_at_column(self):
+        """raw_payloads rows are write-once; no updated_at column is needed."""
+        assert "updated_at" not in self._table.c
