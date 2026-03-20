@@ -31,14 +31,50 @@ from src.domain.listing import AnalysisJob
 from src.enrichment.providers import build_default_providers
 from src.jobs.processor import UnsupportedProviderError, process_job
 from src.jobs.queue import QUEUE_KEY, dequeue_analysis_job, requeue_raw_payload
+from src.storage.sqlalchemy_repos import SQLAlchemyRawPayloadRepository
 
 if TYPE_CHECKING:
     from redis.asyncio import Redis
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
     from src.app.config import Settings
 
 logger = logging.getLogger(__name__)
 _STATUS_CODE_RE = re.compile(r"\bstatus (\d{3})\b")
+
+
+async def _process_job_with_capture(
+    job: AnalysisJob,
+    settings: "Settings",
+    *,
+    providers: list,
+    session_factory: "async_sessionmaker[AsyncSession]",
+) -> None:
+    """Process *job* with a DB-backed raw payload repository.
+
+    Opens a per-job async session, injects a ``SQLAlchemyRawPayloadRepository``
+    into ``process_job``, then commits the session after processing completes
+    (or after a pipeline failure — so captured payloads are not lost even when
+    downstream analysis fails).  Commit errors are logged and swallowed.
+    """
+    async with session_factory() as session:
+        raw_payload_repo = SQLAlchemyRawPayloadRepository(session)
+        try:
+            await process_job(
+                job,
+                settings,
+                enrichment_providers=providers,
+                raw_payload_repo=raw_payload_repo,
+            )
+        finally:
+            try:
+                await session.commit()
+            except Exception:
+                logger.warning(
+                    "Failed to commit raw payload session for job %s",
+                    job.id,
+                    exc_info=True,
+                )
 
 
 def _extract_status_code(exc: Exception) -> int | None:
@@ -71,7 +107,12 @@ def _is_retryable_error(exc: Exception) -> bool:
     return True
 
 
-async def process_once(redis: "Redis", settings: "Settings") -> bool:
+async def process_once(
+    redis: "Redis",
+    settings: "Settings",
+    *,
+    session_factory: "async_sessionmaker[AsyncSession] | None" = None,
+) -> bool:
     """Dequeue and process one job with a non-blocking timeout.
 
     Parameters
@@ -80,6 +121,11 @@ async def process_once(redis: "Redis", settings: "Settings") -> bool:
         Async Redis client connected to the queue.
     settings:
         Application settings forwarded to ``process_job``.
+    session_factory:
+        Optional SQLAlchemy ``async_sessionmaker``.  When provided, each job
+        is processed with a DB-backed ``SQLAlchemyRawPayloadRepository`` so
+        that raw adapter payloads are persisted.  When ``None``, raw payload
+        capture is skipped (backwards-compatible default).
 
     Returns
     -------
@@ -97,11 +143,21 @@ async def process_once(redis: "Redis", settings: "Settings") -> bool:
     if job is None:
         return False
     providers = build_default_providers(settings)
-    await process_job(job, settings, enrichment_providers=providers)
+    if session_factory is not None:
+        await _process_job_with_capture(
+            job, settings, providers=providers, session_factory=session_factory
+        )
+    else:
+        await process_job(job, settings, enrichment_providers=providers)
     return True
 
 
-async def run_worker(redis: "Redis", settings: "Settings") -> None:
+async def run_worker(
+    redis: "Redis",
+    settings: "Settings",
+    *,
+    session_factory: "async_sessionmaker[AsyncSession] | None" = None,
+) -> None:
     """Continuously dequeue and process analysis jobs until cancelled.
 
     Each iteration blocks for up to 1 second waiting for a job. The raw
@@ -115,6 +171,14 @@ async def run_worker(redis: "Redis", settings: "Settings") -> None:
 
     The loop exits cleanly when ``asyncio.CancelledError`` is raised (e.g.
     from an OS signal or test cancellation).
+
+    Parameters
+    ----------
+    session_factory:
+        Optional SQLAlchemy ``async_sessionmaker``.  When provided, each job
+        is processed with a DB-backed ``SQLAlchemyRawPayloadRepository`` so
+        that raw adapter payloads are persisted.  When ``None``, raw payload
+        capture is skipped (backwards-compatible default).
     """
     providers = build_default_providers(settings)
     logger.info("Worker started - waiting for jobs on queue")
@@ -126,7 +190,12 @@ async def run_worker(redis: "Redis", settings: "Settings") -> None:
                 continue
             _, raw_payload = result
             job = AnalysisJob.model_validate_json(raw_payload)
-            await process_job(job, settings, enrichment_providers=providers)
+            if session_factory is not None:
+                await _process_job_with_capture(
+                    job, settings, providers=providers, session_factory=session_factory
+                )
+            else:
+                await process_job(job, settings, enrichment_providers=providers)
         except asyncio.CancelledError:
             logger.info("Worker cancelled - shutting down")
             break

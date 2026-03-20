@@ -6,6 +6,9 @@ Covers:
 - processor.py persists raw payload when raw_payload_repo is provided
 - processor.py skips persistence when raw_payload_repo is None
 - processor.py swallows and logs save errors without blocking the pipeline
+- process_once wires a DB-backed repo when session_factory is provided
+- run_worker wires a DB-backed repo when session_factory is provided
+- run_worker_process creates engine + session_factory once and passes them
 """
 
 from __future__ import annotations
@@ -304,3 +307,196 @@ class TestProcessorRawPayloadPersistence:
 
         saved: RawPayload = mock_repo.save.call_args.args[0]
         assert saved.source_id is None
+
+
+# ---------------------------------------------------------------------------
+# Worker runtime path: process_once wires the DB repo
+# ---------------------------------------------------------------------------
+
+
+def _make_mock_session_factory():
+    """Return a mock async_sessionmaker whose sessions are AsyncMock objects."""
+    mock_session = AsyncMock()
+    mock_session.commit = AsyncMock()
+    session_factory = MagicMock()
+    session_factory.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+    session_factory.return_value.__aexit__ = AsyncMock(return_value=False)
+    return session_factory, mock_session
+
+
+class TestProcessOnceWorkerWiring:
+    """process_once must pass a SQLAlchemyRawPayloadRepository to process_job
+    when a session_factory is provided, and commit the session afterwards."""
+
+    @pytest.mark.asyncio
+    async def test_process_once_passes_raw_payload_repo_to_process_job(self):
+        """When session_factory is given, process_job receives a repo instance."""
+        from src.domain.listing import AnalysisJob, ListingProvider
+        from src.jobs.worker import process_once
+        from src.storage.sqlalchemy_repos import SQLAlchemyRawPayloadRepository
+
+        job = AnalysisJob(
+            source_url="https://www.airbnb.com/rooms/1",
+            provider=ListingProvider.AIRBNB,
+            telegram_chat_id=1,
+            telegram_message_id=1,
+        )
+        session_factory, mock_session = _make_mock_session_factory()
+        redis = AsyncMock()
+
+        settings = _make_settings()
+
+        captured_kwargs: dict = {}
+
+        async def fake_process_job(j, s, **kwargs):
+            captured_kwargs.update(kwargs)
+
+        with (
+            patch("src.jobs.worker.dequeue_analysis_job", new_callable=AsyncMock, return_value=job),
+            patch("src.jobs.worker.process_job", side_effect=fake_process_job),
+            patch("src.jobs.worker.build_default_providers", return_value=[]),
+        ):
+            result = await process_once(redis, settings, session_factory=session_factory)
+
+        assert result is True
+        assert "raw_payload_repo" in captured_kwargs
+        assert isinstance(captured_kwargs["raw_payload_repo"], SQLAlchemyRawPayloadRepository)
+
+    @pytest.mark.asyncio
+    async def test_process_once_commits_session_after_job(self):
+        """Session is committed after process_job returns."""
+        from src.domain.listing import AnalysisJob, ListingProvider
+        from src.jobs.worker import process_once
+
+        job = AnalysisJob(
+            source_url="https://www.airbnb.com/rooms/2",
+            provider=ListingProvider.AIRBNB,
+            telegram_chat_id=2,
+            telegram_message_id=2,
+        )
+        session_factory, mock_session = _make_mock_session_factory()
+        redis = AsyncMock()
+        settings = _make_settings()
+
+        with (
+            patch("src.jobs.worker.dequeue_analysis_job", new_callable=AsyncMock, return_value=job),
+            patch("src.jobs.worker.process_job", new_callable=AsyncMock),
+            patch("src.jobs.worker.build_default_providers", return_value=[]),
+        ):
+            await process_once(redis, settings, session_factory=session_factory)
+
+        mock_session.commit.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_process_once_without_session_factory_skips_repo(self):
+        """When session_factory is None, process_job receives no raw_payload_repo."""
+        from src.domain.listing import AnalysisJob, ListingProvider
+        from src.jobs.worker import process_once
+
+        job = AnalysisJob(
+            source_url="https://www.airbnb.com/rooms/3",
+            provider=ListingProvider.AIRBNB,
+            telegram_chat_id=3,
+            telegram_message_id=3,
+        )
+        redis = AsyncMock()
+        settings = _make_settings()
+
+        captured_kwargs: dict = {}
+
+        async def fake_process_job(j, s, **kwargs):
+            captured_kwargs.update(kwargs)
+
+        with (
+            patch("src.jobs.worker.dequeue_analysis_job", new_callable=AsyncMock, return_value=job),
+            patch("src.jobs.worker.process_job", side_effect=fake_process_job),
+            patch("src.jobs.worker.build_default_providers", return_value=[]),
+        ):
+            result = await process_once(redis, settings, session_factory=None)
+
+        assert result is True
+        assert captured_kwargs.get("raw_payload_repo") is None
+
+
+# ---------------------------------------------------------------------------
+# CLI: run_worker_process creates engine + session_factory and passes them
+# ---------------------------------------------------------------------------
+
+
+class TestRunWorkerProcessDBWiring:
+    """run_worker_process must create a DB engine and session_factory once,
+    pass session_factory to run_worker, and dispose the engine on exit."""
+
+    @pytest.mark.asyncio
+    async def test_engine_created_from_database_url(self):
+        """make_engine is called with settings.database_url."""
+        from src.jobs.cli import run_worker_process
+
+        settings = _make_settings(database_url="postgresql://user:pw@db:5432/flat")
+        redis = AsyncMock()
+        mock_engine = AsyncMock()
+
+        with (
+            patch("src.jobs.cli.make_engine", return_value=mock_engine) as mock_make_engine,
+            patch("src.jobs.cli.make_session_factory", return_value=MagicMock()),
+            patch("src.jobs.cli.run_worker", new_callable=AsyncMock),
+        ):
+            await run_worker_process(settings=settings, redis=redis)
+
+        mock_make_engine.assert_called_once_with("postgresql://user:pw@db:5432/flat")
+
+    @pytest.mark.asyncio
+    async def test_session_factory_passed_to_run_worker(self):
+        """run_worker is called with the session_factory created from the engine."""
+        from src.jobs.cli import run_worker_process
+
+        settings = _make_settings()
+        redis = AsyncMock()
+        mock_engine = AsyncMock()
+        mock_sf = MagicMock()
+
+        with (
+            patch("src.jobs.cli.make_engine", return_value=mock_engine),
+            patch("src.jobs.cli.make_session_factory", return_value=mock_sf),
+            patch("src.jobs.cli.run_worker", new_callable=AsyncMock) as mock_run_worker,
+        ):
+            await run_worker_process(settings=settings, redis=redis)
+
+        mock_run_worker.assert_awaited_once_with(redis, settings, session_factory=mock_sf)
+
+    @pytest.mark.asyncio
+    async def test_engine_disposed_on_exit(self):
+        """engine.dispose() is called even when run_worker completes normally."""
+        from src.jobs.cli import run_worker_process
+
+        settings = _make_settings()
+        redis = AsyncMock()
+        mock_engine = AsyncMock()
+
+        with (
+            patch("src.jobs.cli.make_engine", return_value=mock_engine),
+            patch("src.jobs.cli.make_session_factory", return_value=MagicMock()),
+            patch("src.jobs.cli.run_worker", new_callable=AsyncMock),
+        ):
+            await run_worker_process(settings=settings, redis=redis)
+
+        mock_engine.dispose.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_engine_disposed_even_on_run_worker_error(self):
+        """engine.dispose() is still called when run_worker raises."""
+        from src.jobs.cli import run_worker_process
+
+        settings = _make_settings()
+        redis = AsyncMock()
+        mock_engine = AsyncMock()
+
+        with (
+            patch("src.jobs.cli.make_engine", return_value=mock_engine),
+            patch("src.jobs.cli.make_session_factory", return_value=MagicMock()),
+            patch("src.jobs.cli.run_worker", new_callable=AsyncMock, side_effect=RuntimeError("boom")),
+        ):
+            with pytest.raises(RuntimeError, match="boom"):
+                await run_worker_process(settings=settings, redis=redis)
+
+        mock_engine.dispose.assert_awaited_once()
