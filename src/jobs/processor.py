@@ -27,9 +27,10 @@ import httpx
 from src.adapters.registry import resolve_adapter
 from src.analysis.context import AnalysisContext
 from src.analysis.modules.ai_summary import AISummaryModule, AISummaryResult
-from src.analysis.modules.reviews import AirbnbReviewsModule, GenericReviewsModule
+from src.analysis.modules.reviews import AirbnbReviewsModule, GenericReviewsModule, ReviewsResult
 from src.analysis.openrouter_client import OpenRouterError
 from src.analysis.registry import ModuleRegistry
+from src.analysis.result import ReviewInsightsBlock
 from src.analysis.reviews.service import ReviewAnalysisService
 from src.analysis.runner import ModuleRunner
 from src.analysis.service import AnalysisService
@@ -178,7 +179,38 @@ async def process_job(
             f"AISummaryModule produced no result for job {job.id}"
         )
     result = ai_summary.analysis_result
-    result = result.model_copy(update={"display_title": listing.title})
+
+    # --- 3b. Map ReviewsResult into ReviewInsightsBlock ----------------------
+    reviews_module_result = next(
+        (r for r in module_results if isinstance(r, ReviewsResult)), None
+    )
+    review_insights: ReviewInsightsBlock | None = None
+    if reviews_module_result is not None:
+        rv = reviews_module_result
+        # Extract plain-text summaries from the dict-typed list fields.
+        recurring = [
+            item.get("summary", "") if isinstance(item, dict) else str(item)
+            for item in rv.recurring_issues
+            if (item.get("summary", "") if isinstance(item, dict) else str(item))
+        ]
+        disputes = [
+            item.get("summary", "") if isinstance(item, dict) else str(item)
+            for item in rv.conflicts_or_disputes
+            if (item.get("summary", "") if isinstance(item, dict) else str(item))
+        ]
+        review_insights = ReviewInsightsBlock(
+            overall_assessment=rv.overall_assessment or "",
+            overall_risk_level=rv.overall_risk_level or "",
+            review_count=rv.review_count,
+            average_rating=rv.average_rating,
+            critical_red_flags=rv.critical_red_flags,
+            recurring_issues=recurring,
+            conflicts_or_disputes=disputes,
+            positive_signals=rv.positive_signals,
+            window_view_summary=rv.window_view_summary or "",
+        )
+
+    result = result.model_copy(update={"display_title": listing.title, "review_insights": review_insights})
     logger.debug("Analysis complete for job %s", job.id)
 
     # --- 3b. Translate (on demand, ephemeral) --------------------------------

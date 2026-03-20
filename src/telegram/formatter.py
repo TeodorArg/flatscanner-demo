@@ -83,6 +83,10 @@ def format_analysis_message(
         lines = [label] + [f"- {risk}" for risk in result.risks]
         parts.append("\n".join(lines))
 
+    reviews_section = _format_review_insights(result, language)
+    if reviews_section:
+        parts.append(reviews_section)
+
     price_label = get_string("fmt.price_label", language)
     verdict_key = _VERDICT_KEY.get(result.price_verdict, "fmt.verdict.unknown")
     verdict_label = get_string(verdict_key, language)
@@ -94,6 +98,72 @@ def format_analysis_message(
 
     message = "\n\n".join(parts)
     return _guard_length(message, language)
+
+
+def _format_review_insights(result: AnalysisResult, language: Language) -> str:
+    """Return a compact localized reviews section, or an empty string to omit it."""
+    ri = result.review_insights
+    if ri is None:
+        return ""
+
+    has_ai = bool(
+        ri.overall_assessment
+        or ri.critical_red_flags
+        or ri.recurring_issues
+        or ri.conflicts_or_disputes
+        or ri.window_view_summary
+    )
+    has_metadata = ri.review_count is not None or ri.average_rating is not None
+
+    if not has_ai and not has_metadata:
+        return ""
+
+    header = get_string("fmt.reviews_label", language)
+    lines: list[str] = []
+
+    # --- Metadata overview ---
+    meta_parts: list[str] = []
+    if ri.review_count is not None:
+        meta_parts.append(str(ri.review_count))
+    if ri.average_rating is not None:
+        meta_parts.append(f"{ri.average_rating:.1f}★")
+    if meta_parts:
+        overview = header + " " + ", ".join(meta_parts)
+    else:
+        overview = header
+    lines.append(overview)
+
+    # --- AI assessment ---
+    if ri.overall_assessment:
+        lines.append(ri.overall_assessment)
+
+    # --- Critical red flags ---
+    if ri.critical_red_flags:
+        label = get_string("fmt.reviews_red_flags_label", language)
+        lines.append(label)
+        for flag in ri.critical_red_flags:
+            lines.append(f"- {flag}")
+
+    # --- Recurring issues ---
+    if ri.recurring_issues:
+        label = get_string("fmt.reviews_recurring_label", language)
+        lines.append(label)
+        for issue in ri.recurring_issues:
+            lines.append(f"- {issue}")
+
+    # --- Conflicts / disputes ---
+    if ri.conflicts_or_disputes:
+        label = get_string("fmt.reviews_disputes_label", language)
+        lines.append(label)
+        for dispute in ri.conflicts_or_disputes:
+            lines.append(f"- {dispute}")
+
+    # --- Window view summary ---
+    if ri.window_view_summary:
+        window_label = get_string("fmt.reviews_window_label", language)
+        lines.append(f"{window_label} {ri.window_view_summary}")
+
+    return "\n".join(lines)
 
 
 def _guard_length(message: str, language: Language = DEFAULT_LANGUAGE) -> str:

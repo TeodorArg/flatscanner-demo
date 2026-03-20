@@ -20,7 +20,7 @@ import json
 import logging
 
 from src.analysis.openrouter_client import OpenRouterClient, OpenRouterError
-from src.analysis.result import AnalysisResult
+from src.analysis.result import AnalysisResult, ReviewInsightsBlock
 from src.app.config import Settings
 from src.i18n.types import Language
 
@@ -39,7 +39,13 @@ _TRANSLATION_SCHEMA_HINT = """\
   "summary": "<translated summary>",
   "strengths": ["<translated strength 1>", "<translated strength 2>"],
   "risks": ["<translated risk 1>", "<translated risk 2>"],
-  "price_explanation": "<translated price explanation>"
+  "price_explanation": "<translated price explanation>",
+  "review_overall_assessment": "<translated overall assessment or empty string>",
+  "review_critical_red_flags": ["<translated red flag 1>"],
+  "review_recurring_issues": ["<translated recurring issue 1>"],
+  "review_conflicts_or_disputes": ["<translated dispute 1>"],
+  "review_positive_signals": ["<translated positive signal 1>"],
+  "review_window_view_summary": "<translated window view summary or empty string>"
 }"""
 
 
@@ -50,13 +56,27 @@ class TranslationError(Exception):
 def _build_translation_prompt(result: AnalysisResult, language: Language) -> str:
     """Return the user-turn prompt for translating *result* into *language*."""
     lang_name = _LANGUAGE_NAME[language]
-    source = {
+    source: dict = {
         "display_title": result.display_title,
         "summary": result.summary,
         "strengths": result.strengths,
         "risks": result.risks,
         "price_explanation": result.price_explanation,
+        "review_overall_assessment": "",
+        "review_critical_red_flags": [],
+        "review_recurring_issues": [],
+        "review_conflicts_or_disputes": [],
+        "review_positive_signals": [],
+        "review_window_view_summary": "",
     }
+    if result.review_insights is not None:
+        ri = result.review_insights
+        source["review_overall_assessment"] = ri.overall_assessment
+        source["review_critical_red_flags"] = ri.critical_red_flags
+        source["review_recurring_issues"] = ri.recurring_issues
+        source["review_conflicts_or_disputes"] = ri.conflicts_or_disputes
+        source["review_positive_signals"] = ri.positive_signals
+        source["review_window_view_summary"] = ri.window_view_summary
     return (
         f"Translate the following rental listing analysis fields into {lang_name}.\n"
         "Return ONLY a JSON object matching the output schema.\n"
@@ -169,6 +189,51 @@ def _parse_translation_response(raw: str, original: AnalysisResult) -> AnalysisR
     if not isinstance(price_explanation, str):
         price_explanation = original.price_explanation
 
+    # --- Review insights block (optional) ---
+    translated_review_insights: ReviewInsightsBlock | None = None
+    if original.review_insights is not None:
+        ori = original.review_insights
+        review_overall_assessment = data.get("review_overall_assessment", ori.overall_assessment)
+        if not isinstance(review_overall_assessment, str):
+            review_overall_assessment = ori.overall_assessment
+
+        review_window_view_summary = data.get("review_window_view_summary", ori.window_view_summary)
+        if not isinstance(review_window_view_summary, str):
+            review_window_view_summary = ori.window_view_summary
+
+        review_critical_red_flags = _coerce_translated_list(
+            "review_critical_red_flags",
+            data.get("review_critical_red_flags", ori.critical_red_flags),
+            ori.critical_red_flags,
+        )
+        review_recurring_issues = _coerce_translated_list(
+            "review_recurring_issues",
+            data.get("review_recurring_issues", ori.recurring_issues),
+            ori.recurring_issues,
+        )
+        review_conflicts_or_disputes = _coerce_translated_list(
+            "review_conflicts_or_disputes",
+            data.get("review_conflicts_or_disputes", ori.conflicts_or_disputes),
+            ori.conflicts_or_disputes,
+        )
+        review_positive_signals = _coerce_translated_list(
+            "review_positive_signals",
+            data.get("review_positive_signals", ori.positive_signals),
+            ori.positive_signals,
+        )
+        translated_review_insights = ReviewInsightsBlock(
+            overall_assessment=review_overall_assessment,
+            # overall_risk_level is a constrained label (low/medium/high) — not translated.
+            overall_risk_level=ori.overall_risk_level,
+            review_count=ori.review_count,
+            average_rating=ori.average_rating,
+            critical_red_flags=review_critical_red_flags,
+            recurring_issues=review_recurring_issues,
+            conflicts_or_disputes=review_conflicts_or_disputes,
+            positive_signals=review_positive_signals,
+            window_view_summary=review_window_view_summary,
+        )
+
     return AnalysisResult(
         display_title=display_title,
         summary=summary,
@@ -177,6 +242,7 @@ def _parse_translation_response(raw: str, original: AnalysisResult) -> AnalysisR
         # price_verdict is language-neutral — never translated.
         price_verdict=original.price_verdict,
         price_explanation=price_explanation,
+        review_insights=translated_review_insights,
     )
 
 

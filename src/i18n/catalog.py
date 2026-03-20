@@ -111,6 +111,32 @@ _CATALOG: dict[str, dict[Language, str]] = {
         Language.EN: "Unknown",
         Language.ES: "Desconocido",
     },
+    # --- Reviews section labels ---
+    "fmt.reviews_label": {
+        Language.RU: "Отзывы:",
+        Language.EN: "Reviews:",
+        Language.ES: "Reseñas:",
+    },
+    "fmt.reviews_red_flags_label": {
+        Language.RU: "Тревожные сигналы:",
+        Language.EN: "Red flags:",
+        Language.ES: "Señales de alerta:",
+    },
+    "fmt.reviews_recurring_label": {
+        Language.RU: "Частые проблемы:",
+        Language.EN: "Recurring issues:",
+        Language.ES: "Problemas recurrentes:",
+    },
+    "fmt.reviews_disputes_label": {
+        Language.RU: "Конфликты:",
+        Language.EN: "Disputes:",
+        Language.ES: "Conflictos:",
+    },
+    "fmt.reviews_window_label": {
+        Language.RU: "Вид из окна:",
+        Language.EN: "Window view:",
+        Language.ES: "Vista desde la ventana:",
+    },
     # --- Formatter system strings ---
     "fmt.truncated": {
         Language.RU: "\n\n[Сообщение обрезано]",
