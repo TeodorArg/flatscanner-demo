@@ -63,7 +63,7 @@ Review agent отвечает за:
 - конкретную нейросеть для review
 - конкретный CI provider
 - конкретный staging/deploy способ
-- конкретные shell scripts
+- конкретные shell scripts и язык локальной automation-обвязки
 
 Но нельзя размывать:
 
@@ -72,3 +72,24 @@ Review agent отвечает за:
 - PR loop
 - merge-ready definition
 
+## Важное правило переносимости
+
+Локальные orchestration scripts не являются канонической частью алгоритма.
+Каноническим является только их поведение.
+
+Это значит:
+
+- scripts из одной среды не нужно механически копировать в другую
+- в новом окружении их нужно написать заново под его OS, shell и toolchain
+- для macOS/Linux это могут быть `bash`, `zsh`, `python`, `make`, `just`,
+  `task` или другой нативный слой automation
+
+При переносе нужно воспроизводить не синтаксис исходных скриптов, а контракт
+действий:
+
+- выбрать implementation agent
+- создать isolated branch/worktree
+- запустить bounded implementation task
+- опубликовать PR
+- дожать PR loop до merge-ready
+- выполнить post-merge sync/deploy/smoke при необходимости

@@ -14,6 +14,8 @@ Important constraints:
 - do not invent automatic failover logic
 - do not add product-specific behavior
 - document the contract even if parts remain manual in v1
+- do not assume the original shell or OS
+- define the behavior contract first, then implement it natively for the target environment
 
 Expected outputs:
 - workflow docs for the orchestration loop
@@ -23,7 +25,17 @@ Expected outputs:
   - start implementation worker
   - publish branch / PR
 
+The resulting implementation may use:
+
+- bash
+- zsh
+- python
+- make / just / task
+- another native automation layer
+
+as long as it preserves the same workflow behavior.
+
 Validation:
 - explain the exact task lifecycle from main to PR
 - explain how multiple agents are kept isolated
-
+- explain how the script contract was adapted to the target OS/environment

@@ -12,6 +12,6 @@ Then do the following:
 
 - summarize the workflow invariants you must preserve
 - explain how you will map the target agent system to the required roles
+- explain how you will map the orchestration contract to the target OS/shell/tooling
 - confirm the order in which you will execute the migration tasks
 - do not touch product code yet
-

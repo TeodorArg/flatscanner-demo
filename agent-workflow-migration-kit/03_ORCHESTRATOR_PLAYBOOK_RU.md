@@ -31,6 +31,29 @@
 17. Синхронизировать `main`.
 18. Если задача затрагивает runtime — выполнить deploy и smoke.
 
+## OS-agnostic правило для orchestration scripts
+
+Оркестратор не должен требовать буквального воспроизведения локальных скриптов
+из другой среды.
+
+Он должен требовать воспроизведения следующих возможностей:
+
+- `set current implementation agent`
+- `create isolated task branch/worktree`
+- `start implementation worker`
+- `publish branch and PR`
+- `run or observe PR review loop`
+- `sync main after merge`
+
+Если новая среда использует:
+
+- `bash` вместо PowerShell
+- `zsh` вместо `bash`
+- `python` launcher вместо shell scripts
+- `make`/`just`/`task` вместо прямых команд
+
+это допустимо, пока behavior contract сохранен.
+
 ## Чего оркестратор не должен делать
 
 - не должен работать из старой feature branch
@@ -38,6 +61,7 @@
 - не должен объявлять задачу завершенной при статусе `checks running`
 - не должен держать критичный контекст только в памяти диалога
 - не должен пропускать update `tasks.md`
+- не должен навязывать Windows-specific automation в Unix-like среде
 
 ## Что оркестратор обязан фиксировать
 
@@ -46,4 +70,3 @@
 - implementation approach — в `plan.md`
 - execution state — в `tasks.md`
 - follow-up work — в том же feature folder или в новом feature spec
-
