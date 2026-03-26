@@ -1,0 +1,29 @@
+You are validating that the newly installed repository workflow actually works end-to-end.
+
+Task:
+- choose a very small non-risky test feature or docs/process change
+- run it through the full workflow
+
+The feature must go through:
+- spec
+- plan
+- tasks
+- isolated implementation branch/worktree
+- local validation
+- PR
+- CI
+- AI review
+- merge-ready state
+- merge
+- post-merge sync
+- deploy/smoke if the repository uses a runtime environment
+
+Requirements:
+- keep the feature intentionally small
+- do not skip any workflow stage
+- record any rough edges found in the workflow itself
+
+Validation:
+- provide a concise report of each stage
+- list any fixes the workflow still needs after this first full-cycle test
+

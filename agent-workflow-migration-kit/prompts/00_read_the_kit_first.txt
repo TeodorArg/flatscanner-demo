@@ -1,0 +1,17 @@
+Before making any changes in the target repository, read and internalize the migration kit documents in this order:
+
+1. `README_RU.md`
+2. `01_OVERVIEW_RU.md`
+3. `02_ADOPTION_PLAN_RU.md`
+4. `03_ORCHESTRATOR_PLAYBOOK_RU.md`
+5. `04_DELIVERY_PLAYBOOK_RU.md`
+6. `05_TASK_SEQUENCE_RU.md`
+7. `06_AGENT_SYSTEM_MAPPING_RU.md`
+
+Then do the following:
+
+- summarize the workflow invariants you must preserve
+- explain how you will map the target agent system to the required roles
+- confirm the order in which you will execute the migration tasks
+- do not touch product code yet
+

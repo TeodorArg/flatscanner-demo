@@ -1,0 +1,25 @@
+You are defining the PR acceptance loop for a repository using AI-assisted development.
+
+Task:
+- define the CI and review gates that must pass before merge
+
+Requirements:
+- define required checks
+- define AI review expectations
+- define what blocks merge
+- define what the orchestrator must do when checks fail or review findings appear
+
+The final contract must make it clear that:
+- code written locally is not enough
+- a PR is only done when the current head SHA is merge-ready
+
+Outputs:
+- one or more workflow docs
+- updates to AGENTS.md or docs if needed
+- optional CI templates if appropriate
+
+Validation:
+- state the required checks
+- state the blocking conditions
+- state the exact merge-ready definition
+

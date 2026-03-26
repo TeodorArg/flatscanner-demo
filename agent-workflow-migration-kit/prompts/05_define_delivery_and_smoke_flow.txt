@@ -1,0 +1,21 @@
+You are defining the post-merge delivery process for a repository with a test or staging environment.
+
+Task:
+- document the delivery flow from merge to deploy to smoke validation
+
+Requirements:
+- describe how to sync main after merge
+- describe how to deploy to a test environment
+- describe how to run smoke checks for a feature
+- describe what operational signals must be checked
+- keep the process neutral so it can be adapted to the target stack
+
+Outputs:
+- a delivery workflow doc
+- a smoke checklist
+- optional deployment/check scripts contract
+
+Validation:
+- explain what counts as a valid smoke test
+- explain when delivery is considered complete
+

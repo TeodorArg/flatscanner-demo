@@ -1,0 +1,22 @@
+# Project Docs
+
+`docs/` stores durable repository memory that should outlive any single feature.
+
+Use `docs/` for:
+
+- product direction
+- stable architecture and stack decisions
+- ADRs
+- durable workflow and operations guidance
+
+Use `specs/` for feature-specific requirements, plans, validation, and task state.
+
+Recommended order:
+
+1. `project-idea.md`
+2. `project/frontend/frontend-docs.md`
+3. `project/backend/backend-docs.md`
+4. `adr/*.md`
+5. workflow docs
+6. glossary if present
+

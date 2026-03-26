@@ -1,0 +1,29 @@
+You are adding the orchestration contract for implementation work in a repository that uses isolated workers.
+
+Task:
+- define or implement the minimal scripts and docs needed to support isolated implementation work
+
+Required capabilities:
+- choose the current implementation agent manually
+- create an isolated branch/worktree from main
+- launch the selected implementation agent against that worktree
+- publish a PR for the resulting branch
+
+Important constraints:
+- keep the design minimal
+- do not invent automatic failover logic
+- do not add product-specific behavior
+- document the contract even if parts remain manual in v1
+
+Expected outputs:
+- workflow docs for the orchestration loop
+- script contract or actual scripts for:
+  - set current implementation agent
+  - create worktree
+  - start implementation worker
+  - publish branch / PR
+
+Validation:
+- explain the exact task lifecycle from main to PR
+- explain how multiple agents are kept isolated
+

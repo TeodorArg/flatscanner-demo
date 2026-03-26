@@ -1,0 +1,29 @@
+You are setting up a new repository to use a spec-driven, AI-assisted development workflow.
+
+Task:
+- create the durable memory structure for the repository
+- do not implement product features
+- keep the setup neutral and project-agnostic
+
+Required outputs:
+- AGENTS.md
+- docs/README.md
+- docs/project-idea.md
+- docs/project/backend/backend-docs.md
+- docs/project/frontend/frontend-docs.md if the repo has frontend
+- docs/adr/ with one starter ADR template or first ADR
+- specs/ with one example feature folder showing spec.md / plan.md / tasks.md structure
+
+Requirements:
+- docs/ must be the durable memory layer
+- specs/<feature-id>/ must be the feature memory layer
+- define a clear read order
+- explain what belongs in docs vs specs
+- do not add product-specific assumptions unless the repo already contains them
+- keep changes scoped to process setup
+
+Validation:
+- summarize what files were created
+- explain the read order
+- explain how a new feature should be started
+

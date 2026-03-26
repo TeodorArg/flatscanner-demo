@@ -1,0 +1,28 @@
+You are formalizing the repository workflow for multi-agent development.
+
+Task:
+- define the roles, boundaries, and completion rules in AGENTS.md and related docs
+
+Required roles:
+- user/owner
+- orchestrator
+- implementation agent
+- review agent
+
+Required rules:
+- every task starts from current main
+- one worker = one isolated worktree
+- one branch and one PR per task slice
+- docs/specs are repository memory, not hidden chat memory
+- behavior or architecture changes must update docs/specs
+- a task is not complete until the PR head SHA has green required checks, no blocking findings, and no merge conflicts
+
+Output:
+- updated AGENTS.md
+- any supporting workflow doc needed to explain the rules
+
+Validation:
+- list the role boundaries
+- list the completion rules
+- explain what “merge-ready” means in this repository
+
