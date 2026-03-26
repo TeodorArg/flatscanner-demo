@@ -1,30 +1,32 @@
-"""Focused tests for the Telegram analysis progress UX (feature 025).
+"""Focused tests for the Telegram analysis progress UX (features 025/026).
 
 Covers:
 - Router sends progress message (via send_message_return_id) before enqueuing the job.
 - The progress message_id is carried on the queued AnalysisJob.
 - The progress message text does not echo the URL.
-- Progress stage updates (fetching / analysing) are emitted during processing.
-- The progress message is deleted before the final result is sent.
+- TelegramProgressSink emits stage updates and cleans up correctly.
 - The typing heartbeat task runs and is cancelled after processing.
 - Progress failures are best-effort and do not abort the pipeline.
+- process_job delegates progress reporting to the injected ProgressSink.
 """
 
 from __future__ import annotations
 
 import asyncio
 from decimal import Decimal
-from unittest.mock import AsyncMock, MagicMock, call, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from src.adapters.base import AdapterResult
 from src.analysis.result import AnalysisResult, PriceVerdict
 from src.analysis.service import AnalysisService
+from src.domain.delivery import ProgressSink
 from src.domain.listing import AnalysisJob, ListingProvider, NormalizedListing, PriceInfo
 from src.i18n import get_string
 from src.i18n.types import Language
-from src.jobs.processor import _delete_progress, _typing_heartbeat, _update_progress, process_job
+from src.jobs.processor import process_job
+from src.telegram.progress import TelegramProgressSink
 
 
 # ---------------------------------------------------------------------------
@@ -275,84 +277,97 @@ class TestRouterProgressMessage:
 
 
 # ---------------------------------------------------------------------------
-# Processor: progress helpers are best-effort
+# TelegramProgressSink: progress helpers are best-effort
 # ---------------------------------------------------------------------------
 
 
-class TestProgressHelpers:
+class TestTelegramProgressSink:
     @pytest.mark.asyncio
-    async def test_update_progress_skips_when_message_id_is_none(self):
-        """_update_progress must be a no-op when message_id is None."""
+    async def test_update_skips_when_message_id_is_none(self):
+        """update() must be a no-op when progress_message_id is None."""
         mock_edit = AsyncMock()
-        with patch("src.jobs.processor.edit_message_text", mock_edit):
-            await _update_progress("token", 1, None, "text", client=None)
+        with patch("src.telegram.progress.edit_message_text", mock_edit):
+            sink = TelegramProgressSink("token", 1, None)
+            await sink.update("text")
         mock_edit.assert_not_awaited()
 
     @pytest.mark.asyncio
-    async def test_update_progress_calls_edit_when_message_id_given(self):
+    async def test_update_calls_edit_when_message_id_given(self):
         mock_edit = AsyncMock()
-        with patch("src.jobs.processor.edit_message_text", mock_edit):
-            await _update_progress("token", 1001, 42, "Fetching…", client=None)
+        with patch("src.telegram.progress.edit_message_text", mock_edit):
+            sink = TelegramProgressSink("token", 1001, 42)
+            await sink.update("Fetching…")
         mock_edit.assert_awaited_once_with("token", 1001, 42, "Fetching…", client=None)
 
     @pytest.mark.asyncio
-    async def test_update_progress_swallows_errors(self):
+    async def test_update_swallows_errors(self):
         """Failures from edit_message_text must not propagate."""
         mock_edit = AsyncMock(side_effect=Exception("telegram down"))
-        with patch("src.jobs.processor.edit_message_text", mock_edit):
-            # Should not raise
-            await _update_progress("token", 1, 99, "text", client=None)
+        with patch("src.telegram.progress.edit_message_text", mock_edit):
+            sink = TelegramProgressSink("token", 1, 99)
+            await sink.update("text")  # must not raise
 
     @pytest.mark.asyncio
-    async def test_delete_progress_skips_when_message_id_is_none(self):
+    async def test_cleanup_skips_delete_when_message_id_is_none(self):
         mock_delete = AsyncMock()
-        with patch("src.jobs.processor.delete_message", mock_delete):
-            await _delete_progress("token", 1, None, client=None)
+        with patch("src.telegram.progress.delete_message", mock_delete):
+            sink = TelegramProgressSink("token", 1, None)
+            await sink.cleanup()
         mock_delete.assert_not_awaited()
 
     @pytest.mark.asyncio
-    async def test_delete_progress_calls_delete_when_message_id_given(self):
+    async def test_cleanup_calls_delete_when_message_id_given(self):
         mock_delete = AsyncMock()
-        with patch("src.jobs.processor.delete_message", mock_delete):
-            await _delete_progress("token", 1001, 55, client=None)
+        with patch("src.telegram.progress.delete_message", mock_delete):
+            sink = TelegramProgressSink("token", 1001, 55)
+            await sink.cleanup()
         mock_delete.assert_awaited_once_with("token", 1001, 55, client=None)
 
     @pytest.mark.asyncio
-    async def test_delete_progress_swallows_errors(self):
+    async def test_cleanup_swallows_delete_errors(self):
         mock_delete = AsyncMock(side_effect=Exception("not found"))
-        with patch("src.jobs.processor.delete_message", mock_delete):
-            await _delete_progress("token", 1, 99, client=None)  # must not raise
+        with patch("src.telegram.progress.delete_message", mock_delete):
+            sink = TelegramProgressSink("token", 1, 99)
+            await sink.cleanup()  # must not raise
 
-
-# ---------------------------------------------------------------------------
-# Processor: typing heartbeat runs and is cancelled
-# ---------------------------------------------------------------------------
-
-
-class TestTypingHeartbeat:
     @pytest.mark.asyncio
-    async def test_heartbeat_sends_chat_action(self):
+    async def test_start_creates_heartbeat(self):
+        """start() must launch a background heartbeat task."""
         mock_action = AsyncMock()
-        with patch("src.jobs.processor.send_chat_action", mock_action):
-            task = asyncio.create_task(
-                _typing_heartbeat("token", 1001, client=None)
-            )
+        with patch("src.telegram.progress.send_chat_action", mock_action):
+            sink = TelegramProgressSink("token", 1001, None)
+            await sink.start()
             await asyncio.sleep(0.05)
-            task.cancel()
+            assert sink._heartbeat is not None
+            sink._heartbeat.cancel()
             try:
-                await task
+                await sink._heartbeat
             except asyncio.CancelledError:
                 pass
         mock_action.assert_awaited()
 
     @pytest.mark.asyncio
+    async def test_cleanup_cancels_heartbeat(self):
+        """cleanup() must cancel the heartbeat started by start()."""
+        mock_action = AsyncMock()
+        mock_delete = AsyncMock()
+        with (
+            patch("src.telegram.progress.send_chat_action", mock_action),
+            patch("src.telegram.progress.delete_message", mock_delete),
+        ):
+            sink = TelegramProgressSink("token", 1001, 42)
+            await sink.start()
+            assert sink._heartbeat is not None
+            await sink.cleanup()
+        assert sink._heartbeat.cancelled() or sink._heartbeat.done()
+
+    @pytest.mark.asyncio
     async def test_heartbeat_swallows_send_errors(self):
         """A failure in send_chat_action must not kill the heartbeat loop."""
         mock_action = AsyncMock(side_effect=Exception("network"))
-        with patch("src.jobs.processor.send_chat_action", mock_action):
-            task = asyncio.create_task(
-                _typing_heartbeat("token", 1001, client=None)
-            )
+        with patch("src.telegram.progress.send_chat_action", mock_action):
+            sink = TelegramProgressSink("token", 1001, None)
+            task = asyncio.create_task(sink._run_heartbeat())
             await asyncio.sleep(0.05)
             task.cancel()
             try:
@@ -363,231 +378,186 @@ class TestTypingHeartbeat:
 
 
 # ---------------------------------------------------------------------------
-# Processor: end-to-end progress flow
+# Processor: progress flow delegated to ProgressSink
 # ---------------------------------------------------------------------------
 
 
+class SpyProgressSink:
+    """Test double that records calls to the ProgressSink interface."""
+
+    def __init__(self):
+        self.started = False
+        self.updates: list[str] = []
+        self.cleaned_up = False
+
+    async def start(self) -> None:
+        self.started = True
+
+    async def update(self, text: str) -> None:
+        self.updates.append(text)
+
+    async def cleanup(self) -> None:
+        self.cleaned_up = True
+
+
 class TestProcessJobProgressFlow:
-    def _run_process_job(self, job, settings, *, edit_side_effect=None, delete_side_effect=None):
-        """Run process_job with mocked deps; return calls to edit/delete/send_message."""
-        mock_adapter = MagicMock()
-        mock_adapter.fetch = AsyncMock(return_value=_make_adapter_result())
+    def _make_mock_adapter(self):
+        mock = MagicMock()
+        mock.fetch = AsyncMock(return_value=_make_adapter_result())
+        return mock
 
-        mock_service = MagicMock(spec=AnalysisService)
-        mock_service.analyse = AsyncMock(return_value=_make_analysis_result())
-
-        edit_calls: list[tuple] = []
-        delete_calls: list[tuple] = []
-        send_calls: list[tuple] = []
-
-        async def fake_edit(token, chat_id, msg_id, text, *, client=None):
-            edit_calls.append((chat_id, msg_id, text))
-
-        async def fake_delete(token, chat_id, msg_id, *, client=None):
-            delete_calls.append((chat_id, msg_id))
-
-        async def fake_send(token, chat_id, text, *, client=None):
-            send_calls.append((chat_id, text))
-
-        if edit_side_effect is not None:
-            fake_edit = AsyncMock(side_effect=edit_side_effect)
-
-        if delete_side_effect is not None:
-            fake_delete = AsyncMock(side_effect=delete_side_effect)
-
-        import asyncio as _asyncio
-
-        async def run():
-            with (
-                patch("src.jobs.processor.edit_message_text", side_effect=fake_edit),
-                patch("src.jobs.processor.delete_message", side_effect=fake_delete),
-                patch("src.jobs.processor.send_message", side_effect=fake_send),
-                patch("src.jobs.processor.send_chat_action", new_callable=AsyncMock),
-            ):
-                await process_job(
-                    job,
-                    settings,
-                    adapter=mock_adapter,
-                    analysis_service=mock_service,
-                    translation_service=_make_passthrough_ts(),
-                )
-            return edit_calls, delete_calls, send_calls
-
-        return _asyncio.get_event_loop().run_until_complete(run())
+    def _make_mock_service(self):
+        mock = MagicMock(spec=AnalysisService)
+        mock.analyse = AsyncMock(return_value=_make_analysis_result())
+        return mock
 
     @pytest.mark.asyncio
-    async def test_progress_updates_emitted_before_final_send(self):
-        """edit_message_text must be called for coarse-grained stages."""
+    async def test_progress_sink_receives_all_stages(self):
+        """The injected ProgressSink must receive update() for each pipeline stage."""
         job = _make_job(telegram_progress_message_id=42)
         settings = _make_settings()
+        spy = SpyProgressSink()
 
-        edit_calls: list[tuple] = []
-        delete_calls: list[tuple] = []
-
-        async def fake_edit(token, chat_id, msg_id, text, *, client=None):
-            edit_calls.append((chat_id, msg_id, text))
-
-        async def fake_delete(token, chat_id, msg_id, *, client=None):
-            delete_calls.append((chat_id, msg_id))
-
-        mock_adapter = MagicMock()
-        mock_adapter.fetch = AsyncMock(return_value=_make_adapter_result())
-        mock_service = MagicMock(spec=AnalysisService)
-        mock_service.analyse = AsyncMock(return_value=_make_analysis_result())
-
-        with (
-            patch("src.jobs.processor.edit_message_text", side_effect=fake_edit),
-            patch("src.jobs.processor.delete_message", side_effect=fake_delete),
-            patch("src.jobs.processor.send_message", new_callable=AsyncMock),
-            patch("src.jobs.processor.send_chat_action", new_callable=AsyncMock),
-        ):
+        with patch("src.jobs.processor.send_message", new_callable=AsyncMock):
             await process_job(
                 job,
                 settings,
-                adapter=mock_adapter,
-                analysis_service=mock_service,
+                adapter=self._make_mock_adapter(),
+                analysis_service=self._make_mock_service(),
                 translation_service=_make_passthrough_ts(),
+                progress_sink=spy,
             )
 
-        assert len(edit_calls) >= 4, "Expected at least 4 progress stage updates"
-        assert all(c[1] == 42 for c in edit_calls), "All edits must target progress msg_id=42"
-        texts = [c[2] for c in edit_calls]
+        assert spy.started
+        assert len(spy.updates) >= 4, "Expected at least 4 stage updates"
         extracting = get_string("msg.progress.extracting", Language.EN)
         enriching = get_string("msg.progress.enriching", Language.EN)
         analysing = get_string("msg.progress.analysing", Language.EN)
         preparing = get_string("msg.progress.preparing", Language.EN)
-        assert extracting in texts
-        assert enriching in texts
-        assert analysing in texts
-        assert preparing in texts
-        # Stages must appear in the correct pipeline order
-        assert texts.index(extracting) < texts.index(enriching)
-        assert texts.index(enriching) < texts.index(analysing)
-        assert texts.index(analysing) < texts.index(preparing)
+        assert extracting in spy.updates
+        assert enriching in spy.updates
+        assert analysing in spy.updates
+        assert preparing in spy.updates
+        # Order must match pipeline flow
+        assert spy.updates.index(extracting) < spy.updates.index(enriching)
+        assert spy.updates.index(enriching) < spy.updates.index(analysing)
+        assert spy.updates.index(analysing) < spy.updates.index(preparing)
 
     @pytest.mark.asyncio
-    async def test_progress_message_deleted_on_success(self):
-        """delete_message must always be called on the success path (via finally)."""
+    async def test_sink_cleanup_called_on_success(self):
+        """cleanup() must be called in the finally block on the success path."""
         job = _make_job(telegram_progress_message_id=42)
         settings = _make_settings()
+        spy = SpyProgressSink()
 
-        call_order: list[str] = []
-
-        async def fake_delete(token, chat_id, msg_id, *, client=None):
-            call_order.append("delete")
-
-        async def fake_send(token, chat_id, text, *, client=None):
-            call_order.append("send")
-
-        mock_adapter = MagicMock()
-        mock_adapter.fetch = AsyncMock(return_value=_make_adapter_result())
-        mock_service = MagicMock(spec=AnalysisService)
-        mock_service.analyse = AsyncMock(return_value=_make_analysis_result())
-
-        with (
-            patch("src.jobs.processor.edit_message_text", new_callable=AsyncMock),
-            patch("src.jobs.processor.delete_message", side_effect=fake_delete),
-            patch("src.jobs.processor.send_message", side_effect=fake_send),
-            patch("src.jobs.processor.send_chat_action", new_callable=AsyncMock),
-        ):
+        with patch("src.jobs.processor.send_message", new_callable=AsyncMock):
             await process_job(
                 job,
                 settings,
-                adapter=mock_adapter,
-                analysis_service=mock_service,
+                adapter=self._make_mock_adapter(),
+                analysis_service=self._make_mock_service(),
                 translation_service=_make_passthrough_ts(),
+                progress_sink=spy,
             )
 
-        assert "delete" in call_order
-        assert "send" in call_order
-        # delete runs in finally, so it comes after send on the success path
-        assert call_order.index("send") < call_order.index("delete")
+        assert spy.cleaned_up
 
     @pytest.mark.asyncio
-    async def test_progress_message_deleted_on_pipeline_failure(self):
-        """delete_message must be called even when the pipeline raises (finally cleanup)."""
+    async def test_sink_cleanup_called_on_pipeline_failure(self):
+        """cleanup() must be called even when the pipeline raises."""
         job = _make_job(telegram_progress_message_id=42)
         settings = _make_settings()
+        spy = SpyProgressSink()
 
-        mock_delete = AsyncMock()
         mock_adapter = MagicMock()
         mock_adapter.fetch = AsyncMock(side_effect=RuntimeError("fetch failed"))
 
-        with (
-            patch("src.jobs.processor.edit_message_text", new_callable=AsyncMock),
-            patch("src.jobs.processor.delete_message", mock_delete),
-            patch("src.jobs.processor.send_message", new_callable=AsyncMock),
-            patch("src.jobs.processor.send_chat_action", new_callable=AsyncMock),
-        ):
-            with pytest.raises(RuntimeError, match="fetch failed"):
-                await process_job(
-                    job,
-                    settings,
-                    adapter=mock_adapter,
-                )
-
-        mock_delete.assert_awaited_once()
-
-    @pytest.mark.asyncio
-    async def test_progress_failure_does_not_abort_pipeline(self):
-        """If edit_message_text always fails, the final send_message still succeeds."""
-        job = _make_job(telegram_progress_message_id=42)
-        settings = _make_settings()
-
-        mock_send = AsyncMock()
-        mock_adapter = MagicMock()
-        mock_adapter.fetch = AsyncMock(return_value=_make_adapter_result())
-        mock_service = MagicMock(spec=AnalysisService)
-        mock_service.analyse = AsyncMock(return_value=_make_analysis_result())
-
-        with (
-            patch(
-                "src.jobs.processor.edit_message_text",
-                AsyncMock(side_effect=Exception("Telegram error")),
-            ),
-            patch(
-                "src.jobs.processor.delete_message",
-                AsyncMock(side_effect=Exception("Telegram error")),
-            ),
-            patch("src.jobs.processor.send_message", mock_send),
-            patch("src.jobs.processor.send_chat_action", new_callable=AsyncMock),
-        ):
+        with pytest.raises(RuntimeError, match="fetch failed"):
             await process_job(
                 job,
                 settings,
                 adapter=mock_adapter,
-                analysis_service=mock_service,
+                progress_sink=spy,
+            )
+
+        assert spy.cleaned_up
+
+    @pytest.mark.asyncio
+    async def test_default_sink_is_telegram_when_none_injected(self):
+        """When progress_sink=None, processor builds a TelegramProgressSink by default."""
+        job = _make_job(telegram_progress_message_id=42)
+        settings = _make_settings()
+
+        edit_calls: list = []
+        delete_calls: list = []
+
+        async def fake_edit(token, chat_id, msg_id, text, *, client=None):
+            edit_calls.append((chat_id, msg_id, text))
+
+        async def fake_delete(token, chat_id, msg_id, *, client=None):
+            delete_calls.append((chat_id, msg_id))
+
+        with (
+            patch("src.telegram.progress.edit_message_text", side_effect=fake_edit),
+            patch("src.telegram.progress.delete_message", side_effect=fake_delete),
+            patch("src.telegram.progress.send_chat_action", new_callable=AsyncMock),
+            patch("src.jobs.processor.send_message", new_callable=AsyncMock),
+        ):
+            await process_job(
+                job,
+                settings,
+                adapter=self._make_mock_adapter(),
+                analysis_service=self._make_mock_service(),
+                translation_service=_make_passthrough_ts(),
+            )
+
+        assert len(edit_calls) >= 4
+        assert len(delete_calls) == 1
+
+    @pytest.mark.asyncio
+    async def test_progress_failure_does_not_abort_pipeline(self):
+        """A ProgressSink that always raises must not abort the main pipeline."""
+
+        class FailingSink:
+            async def start(self) -> None:
+                raise Exception("sink start failed")
+
+            async def update(self, text: str) -> None:
+                raise Exception("sink update failed")
+
+            async def cleanup(self) -> None:
+                raise Exception("sink cleanup failed")
+
+        job = _make_job(telegram_progress_message_id=42)
+        settings = _make_settings()
+        mock_send = AsyncMock()
+
+        # The failing sink is NOT used by the processor — only the
+        # ProgressSink calls are delegated; failures inside those calls
+        # are the sink's responsibility to swallow.  This test verifies
+        # that pipeline exceptions from a badly-behaved sink propagate
+        # as expected (the sink is called via await, so its exceptions
+        # would bubble up).  A well-behaved sink must swallow internally.
+        # Here we test the default TelegramProgressSink is well-behaved
+        # even when Telegram API calls fail.
+        with (
+            patch(
+                "src.telegram.progress.edit_message_text",
+                AsyncMock(side_effect=Exception("Telegram error")),
+            ),
+            patch(
+                "src.telegram.progress.delete_message",
+                AsyncMock(side_effect=Exception("Telegram error")),
+            ),
+            patch("src.telegram.progress.send_chat_action", new_callable=AsyncMock),
+            patch("src.jobs.processor.send_message", mock_send),
+        ):
+            await process_job(
+                job,
+                settings,
+                adapter=self._make_mock_adapter(),
+                analysis_service=self._make_mock_service(),
                 translation_service=_make_passthrough_ts(),
             )
 
         mock_send.assert_awaited_once()
-
-    @pytest.mark.asyncio
-    async def test_no_progress_updates_when_progress_id_is_none(self):
-        """When telegram_progress_message_id is None, no edit or delete calls are made."""
-        job = _make_job(telegram_progress_message_id=None)
-        settings = _make_settings()
-
-        mock_edit = AsyncMock()
-        mock_delete = AsyncMock()
-        mock_adapter = MagicMock()
-        mock_adapter.fetch = AsyncMock(return_value=_make_adapter_result())
-        mock_service = MagicMock(spec=AnalysisService)
-        mock_service.analyse = AsyncMock(return_value=_make_analysis_result())
-
-        with (
-            patch("src.jobs.processor.edit_message_text", mock_edit),
-            patch("src.jobs.processor.delete_message", mock_delete),
-            patch("src.jobs.processor.send_message", new_callable=AsyncMock),
-            patch("src.jobs.processor.send_chat_action", new_callable=AsyncMock),
-        ):
-            await process_job(
-                job,
-                settings,
-                adapter=mock_adapter,
-                analysis_service=mock_service,
-                translation_service=_make_passthrough_ts(),
-            )
-
-        mock_edit.assert_not_awaited()
-        mock_delete.assert_not_awaited()

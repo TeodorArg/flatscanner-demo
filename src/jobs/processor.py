@@ -12,14 +12,18 @@ through the full pipeline:
 5. Format the translated result with ``format_analysis_message``.
 6. Send the Telegram reply via ``send_message``.
 
+Progress reporting is delegated to a ``ProgressSink`` implementation so that
+the pipeline itself has no direct dependency on Telegram progress helpers.
+When no sink is provided, a ``TelegramProgressSink`` is built from the job's
+Telegram fields as the default.
+
 Dependencies can be injected for unit testing (adapter, analysis_service,
-translation_service, http_client, raw_payload_repo).  When not supplied,
-production defaults are used.
+translation_service, http_client, raw_payload_repo, progress_sink).  When not
+supplied, production defaults are used.
 """
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from typing import TYPE_CHECKING
 
@@ -35,13 +39,15 @@ from src.analysis.result import ReviewInsightsBlock
 from src.analysis.reviews.service import ReviewAnalysisService
 from src.analysis.runner import ModuleRunner
 from src.analysis.service import AnalysisService
+from src.domain.delivery import ProgressSink
 from src.domain.listing import AnalysisJob
 from src.domain.raw_payload import RawPayload
 from src.enrichment.runner import EnrichmentOutcome, EnrichmentProvider, run_enrichments
 from src.i18n import get_string
 from src.i18n.types import Language
 from src.telegram.formatter import format_analysis_message
-from src.telegram.sender import delete_message, edit_message_text, send_chat_action, send_message
+from src.telegram.progress import TelegramProgressSink
+from src.telegram.sender import send_message
 from src.translation.service import TranslationError, TranslationService
 
 if TYPE_CHECKING:
@@ -54,69 +60,6 @@ logger = logging.getLogger(__name__)
 
 class UnsupportedProviderError(Exception):
     """Raised when no adapter is registered for the job's listing provider."""
-
-
-# ---------------------------------------------------------------------------
-# Progress UX helpers (best-effort — never abort the pipeline)
-# ---------------------------------------------------------------------------
-
-
-async def _update_progress(
-    token: str,
-    chat_id: int,
-    message_id: int | None,
-    text: str,
-    *,
-    client: httpx.AsyncClient | None,
-) -> None:
-    """Edit the progress message. Silently swallows any failure."""
-    if message_id is None:
-        return
-    try:
-        await edit_message_text(token, chat_id, message_id, text, client=client)
-    except Exception:
-        logger.debug(
-            "Progress update failed for chat_id=%s msg_id=%s (best-effort, ignored)",
-            chat_id,
-            message_id,
-            exc_info=True,
-        )
-
-
-async def _delete_progress(
-    token: str,
-    chat_id: int,
-    message_id: int | None,
-    *,
-    client: httpx.AsyncClient | None,
-) -> None:
-    """Delete the progress message. Silently swallows any failure."""
-    if message_id is None:
-        return
-    try:
-        await delete_message(token, chat_id, message_id, client=client)
-    except Exception:
-        logger.debug(
-            "Progress message deletion failed for chat_id=%s msg_id=%s (best-effort, ignored)",
-            chat_id,
-            message_id,
-            exc_info=True,
-        )
-
-
-async def _typing_heartbeat(
-    token: str,
-    chat_id: int,
-    *,
-    client: httpx.AsyncClient | None,
-) -> None:
-    """Send a ``typing`` chat action every 4 s until cancelled."""
-    while True:
-        try:
-            await send_chat_action(token, chat_id, client=client)
-        except Exception:
-            pass  # best-effort
-        await asyncio.sleep(4)
 
 
 def _map_reviews_result(rv: ReviewsResult | None) -> ReviewInsightsBlock | None:
@@ -162,6 +105,7 @@ async def process_job(
     http_client: httpx.AsyncClient | None = None,
     enrichment_providers: list[EnrichmentProvider] | None = None,
     raw_payload_repo: "RawPayloadRepository | None" = None,
+    progress_sink: ProgressSink | None = None,
 ) -> None:
     """Process one queued analysis job end-to-end.
 
@@ -194,6 +138,10 @@ async def process_job(
         provided, the raw payload is saved before the normalised listing
         proceeds through the analysis pipeline.  Save errors are logged and
         swallowed — they never block the analysis.
+    progress_sink:
+        Optional ``ProgressSink`` for reporting pipeline stage progress to the
+        user.  When ``None`` a ``TelegramProgressSink`` is constructed from the
+        job's Telegram fields as the production default.
 
     Raises
     ------
@@ -207,7 +155,6 @@ async def process_job(
     """
     token = settings.telegram_bot_token
     chat_id = job.telegram_chat_id
-    progress_id = job.telegram_progress_message_id
 
     # --- 1. Resolve adapter --------------------------------------------------
     if adapter is None:
@@ -226,18 +173,19 @@ async def process_job(
         chat_id,
     )
 
-    # Start typing heartbeat so the user sees activity during the long wait.
-    heartbeat = asyncio.create_task(
-        _typing_heartbeat(token, chat_id, client=http_client)
+    # Build the default Telegram progress sink when none was injected.
+    sink: ProgressSink = progress_sink or TelegramProgressSink(
+        token,
+        chat_id,
+        job.telegram_progress_message_id,
+        client=http_client,
     )
+
+    await sink.start()
 
     try:
         # Stage 1: extracting -----------------------------------------------
-        await _update_progress(
-            token, chat_id, progress_id,
-            get_string("msg.progress.extracting", job.language),
-            client=http_client,
-        )
+        await sink.update(get_string("msg.progress.extracting", job.language))
 
         # --- 2. Fetch listing (raw + normalised) -----------------------------
         adapter_result = await adapter.fetch(job.source_url)
@@ -262,11 +210,7 @@ async def process_job(
                 )
 
         # Stage 2: checking area/infrastructure (before enrichments) --------
-        await _update_progress(
-            token, chat_id, progress_id,
-            get_string("msg.progress.enriching", job.language),
-            client=http_client,
-        )
+        await sink.update(get_string("msg.progress.enriching", job.language))
 
         # --- 2b. Enrich (optional, tolerant) ---------------------------------
         enrichment_outcome: EnrichmentOutcome | None = None
@@ -280,11 +224,7 @@ async def process_job(
                 )
 
         # Stage 3: analyzing reviews and listing details (before module runner)
-        await _update_progress(
-            token, chat_id, progress_id,
-            get_string("msg.progress.analysing", job.language),
-            client=http_client,
-        )
+        await sink.update(get_string("msg.progress.analysing", job.language))
 
         # --- 3. Analyse (via module framework) -------------------------------
         service = analysis_service or AnalysisService(settings)
@@ -319,11 +259,7 @@ async def process_job(
         logger.debug("Analysis complete for job %s", job.id)
 
         # Stage 4: preparing final report (before translate/format/send) ----
-        await _update_progress(
-            token, chat_id, progress_id,
-            get_string("msg.progress.preparing", job.language),
-            client=http_client,
-        )
+        await sink.update(get_string("msg.progress.preparing", job.language))
 
         # --- 4. Translate (on demand, ephemeral) -----------------------------
         # English jobs use the canonical result directly.  For other languages the
@@ -359,9 +295,4 @@ async def process_job(
         # Best-effort cleanup: delete the progress message whether the job
         # succeeded or failed at any stage (fetch / enrich / analysis /
         # translation / send).
-        await _delete_progress(token, chat_id, progress_id, client=http_client)
-        heartbeat.cancel()
-        try:
-            await heartbeat
-        except asyncio.CancelledError:
-            pass
+        await sink.cleanup()
