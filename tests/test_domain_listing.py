@@ -11,6 +11,7 @@ from decimal import Decimal
 
 import pytest
 
+from src.domain.delivery import DeliveryChannel, TelegramDeliveryContext
 from src.domain.listing import (
     AnalysisJob,
     JobStatus,
@@ -51,8 +52,8 @@ class TestJobStatus:
         job = AnalysisJob(
             source_url="https://airbnb.com/rooms/1",
             provider=ListingProvider.AIRBNB,
-            telegram_chat_id=1,
-            telegram_message_id=1,
+            delivery_channel=DeliveryChannel.TELEGRAM,
+            telegram_context=TelegramDeliveryContext(chat_id=1, message_id=1),
         )
         assert job.status is JobStatus.PENDING
 
@@ -206,8 +207,8 @@ class TestAnalysisJob:
         defaults = dict(
             source_url="https://www.airbnb.com/rooms/12345",
             provider=ListingProvider.AIRBNB,
-            telegram_chat_id=1001,
-            telegram_message_id=42,
+            delivery_channel=DeliveryChannel.TELEGRAM,
+            telegram_context=TelegramDeliveryContext(chat_id=1001, message_id=42),
         )
         defaults.update(overrides)
         return AnalysisJob(**defaults)
@@ -240,13 +241,13 @@ class TestAnalysisJob:
         job = self._make(listing_id=listing_uuid)
         assert job.listing_id == listing_uuid
 
-    def test_telegram_fields_stored(self):
-        job = self._make(telegram_chat_id=5001, telegram_message_id=77)
-        assert job.telegram_chat_id == 5001
-        assert job.telegram_message_id == 77
+    def test_telegram_context_stored(self):
+        job = self._make(telegram_context=TelegramDeliveryContext(chat_id=5001, message_id=77))
+        assert job.telegram_context.chat_id == 5001
+        assert job.telegram_context.message_id == 77
 
     def test_large_negative_chat_id(self):
         """Supergroup/channel chat IDs are 64-bit signed values; ensure no overflow."""
         large_id = -1001234567890
-        job = self._make(telegram_chat_id=large_id)
-        assert job.telegram_chat_id == large_id
+        job = self._make(telegram_context=TelegramDeliveryContext(chat_id=large_id, message_id=1))
+        assert job.telegram_context.chat_id == large_id

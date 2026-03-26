@@ -14,6 +14,7 @@ from src.adapters.base import AdapterResult
 from src.analysis.openrouter_client import OpenRouterError
 from src.analysis.result import AnalysisResult, PriceVerdict
 from src.analysis.service import AnalysisService
+from src.domain.delivery import DeliveryChannel, TelegramDeliveryContext
 from src.domain.listing import (
     AnalysisJob,
     JobStatus,
@@ -37,8 +38,8 @@ def _make_job(**overrides) -> AnalysisJob:
     defaults = dict(
         source_url="https://www.airbnb.com/rooms/12345",
         provider=ListingProvider.AIRBNB,
-        telegram_chat_id=1001,
-        telegram_message_id=7,
+        delivery_channel=DeliveryChannel.TELEGRAM,
+        telegram_context=TelegramDeliveryContext(chat_id=1001, message_id=7),
     )
     defaults.update(overrides)
     return AnalysisJob(**defaults)
@@ -130,7 +131,7 @@ class TestProcessJobSuccess:
                 translation_service=_make_passthrough_ts(),
             )
 
-        assert sent_chats == [job.telegram_chat_id]
+        assert sent_chats == [job.telegram_context.chat_id]
         assert "Cozy flat in Berlin" in sent_texts[0]
         assert "A pleasant flat in central Berlin." in sent_texts[0]
 
@@ -482,7 +483,7 @@ class TestDequeueAnalysisJob:
         assert dequeued is not None
         assert dequeued.id == job.id
         assert dequeued.source_url == job.source_url
-        assert dequeued.telegram_chat_id == job.telegram_chat_id
+        assert dequeued.telegram_context.chat_id == job.telegram_context.chat_id
 
     @pytest.mark.asyncio
     async def test_brpop_called_with_queue_key_and_timeout(self):

@@ -12,8 +12,9 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from enum import Enum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
+from src.domain.delivery import DeliveryChannel, TelegramDeliveryContext
 from src.i18n.types import DEFAULT_LANGUAGE, Language
 
 
@@ -112,9 +113,14 @@ class NormalizedListing(BaseModel):
 class AnalysisJob(BaseModel):
     """Tracks the state of a single listing analysis request.
 
-    Created when a Telegram user submits a listing URL.  The job record
-    links the original request (chat/message IDs) to the resulting
-    ``NormalizedListing`` and, eventually, the analysis result.
+    The job is channel-neutral: delivery-channel identity is carried in
+    ``delivery_channel`` and the channel-specific context (e.g. Telegram
+    chat/message IDs) is stored in the corresponding context field.
+
+    Invariant: a TELEGRAM job must always carry a ``telegram_context``.
+    Old Redis payloads that used flat fields (``telegram_chat_id``,
+    ``telegram_message_id``, ``telegram_progress_message_id``) are
+    automatically coerced into the nested shape during deserialization.
     """
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4)
@@ -125,11 +131,9 @@ class AnalysisJob(BaseModel):
     # Set once the raw payload has been normalized
     listing_id: uuid.UUID | None = None
 
-    telegram_chat_id: int
-    telegram_message_id: int
-    # Set by the webhook handler after sending the initial progress message so
-    # the worker can edit / delete it during processing.
-    telegram_progress_message_id: int | None = None
+    # Delivery channel and channel-specific context
+    delivery_channel: DeliveryChannel = DeliveryChannel.TELEGRAM
+    telegram_context: TelegramDeliveryContext | None = None
 
     # Language snapshotted at enqueue time so in-flight jobs are stable even
     # if the chat preference changes before the job completes.
@@ -139,3 +143,41 @@ class AnalysisJob(BaseModel):
 
     created_at: datetime = Field(default_factory=_utcnow)
     updated_at: datetime = Field(default_factory=_utcnow)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_legacy_telegram_fields(cls, data: object) -> object:
+        """Promote pre-S1b flat telegram_* fields into TelegramDeliveryContext.
+
+        Old Redis payloads written before the S1b migration carry three flat
+        fields (``telegram_chat_id``, ``telegram_message_id``,
+        ``telegram_progress_message_id``) instead of the nested
+        ``telegram_context`` object.  This shim converts them transparently so
+        that workers draining the queue during a rolling deploy never reject a
+        payload that was enqueued by the previous release.
+        """
+        if not isinstance(data, dict):
+            return data
+        if "telegram_context" in data:
+            return data
+        chat_id = data.pop("telegram_chat_id", None)
+        message_id = data.pop("telegram_message_id", None)
+        progress_message_id = data.pop("telegram_progress_message_id", None)
+        if chat_id is not None and message_id is not None:
+            data["telegram_context"] = {
+                "chat_id": chat_id,
+                "message_id": message_id,
+                "progress_message_id": progress_message_id,
+            }
+            if "delivery_channel" not in data:
+                data["delivery_channel"] = DeliveryChannel.TELEGRAM
+        return data
+
+    @model_validator(mode="after")
+    def _require_telegram_context_for_telegram_channel(self) -> "AnalysisJob":
+        """Enforce: TELEGRAM delivery channel requires telegram_context."""
+        if self.delivery_channel == DeliveryChannel.TELEGRAM and self.telegram_context is None:
+            raise ValueError(
+                "telegram_context is required when delivery_channel is TELEGRAM"
+            )
+        return self

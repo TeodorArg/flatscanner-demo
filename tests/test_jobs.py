@@ -6,7 +6,9 @@ import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from pydantic import ValidationError
 
+from src.domain.delivery import DeliveryChannel, TelegramDeliveryContext
 from src.domain.listing import AnalysisJob, JobStatus, ListingProvider
 from src.jobs.queue import (
     QUEUE_KEY,
@@ -22,79 +24,49 @@ from src.jobs.queue import (
 
 
 class TestAnalysisJobModel:
-    def test_default_status_is_pending(self):
-        job = AnalysisJob(
+    def _make(self, chat_id: int = 1001, message_id: int = 42) -> AnalysisJob:
+        return AnalysisJob(
             source_url="https://www.airbnb.com/rooms/123",
             provider=ListingProvider.AIRBNB,
-            telegram_chat_id=1001,
-            telegram_message_id=42,
+            delivery_channel=DeliveryChannel.TELEGRAM,
+            telegram_context=TelegramDeliveryContext(chat_id=chat_id, message_id=message_id),
         )
-        assert job.status == JobStatus.PENDING
+
+    def test_default_status_is_pending(self):
+        assert self._make().status == JobStatus.PENDING
 
     def test_id_is_uuid(self):
-        job = AnalysisJob(
-            source_url="https://www.airbnb.com/rooms/123",
-            provider=ListingProvider.AIRBNB,
-            telegram_chat_id=1001,
-            telegram_message_id=42,
-        )
-        assert isinstance(job.id, uuid.UUID)
+        assert isinstance(self._make().id, uuid.UUID)
 
     def test_two_jobs_have_different_ids(self):
-        make = lambda: AnalysisJob(
-            source_url="https://www.airbnb.com/rooms/1",
-            provider=ListingProvider.AIRBNB,
-            telegram_chat_id=1,
-            telegram_message_id=1,
-        )
-        assert make().id != make().id
+        assert self._make().id != self._make().id
 
     def test_fields_are_stored_correctly(self):
-        job = AnalysisJob(
-            source_url="https://www.airbnb.com/rooms/999",
-            provider=ListingProvider.AIRBNB,
-            telegram_chat_id=5555,
-            telegram_message_id=77,
-        )
-        assert job.source_url == "https://www.airbnb.com/rooms/999"
+        job = self._make(chat_id=5555, message_id=77)
+        assert job.source_url == "https://www.airbnb.com/rooms/123"
         assert job.provider == ListingProvider.AIRBNB
-        assert job.telegram_chat_id == 5555
-        assert job.telegram_message_id == 77
+        assert job.telegram_context is not None
+        assert job.telegram_context.chat_id == 5555
+        assert job.telegram_context.message_id == 77
 
     def test_serialises_to_json_roundtrip(self):
-        job = AnalysisJob(
-            source_url="https://www.airbnb.com/rooms/1",
-            provider=ListingProvider.AIRBNB,
-            telegram_chat_id=1,
-            telegram_message_id=2,
-        )
+        job = self._make(chat_id=1, message_id=2)
         json_str = job.model_dump_json()
         restored = AnalysisJob.model_validate_json(json_str)
         assert restored.id == job.id
         assert restored.source_url == job.source_url
         assert restored.provider == job.provider
         assert restored.status == job.status
-        assert restored.telegram_chat_id == job.telegram_chat_id
-        assert restored.telegram_message_id == job.telegram_message_id
+        assert restored.telegram_context is not None
+        assert restored.telegram_context.chat_id == job.telegram_context.chat_id
+        assert restored.telegram_context.message_id == job.telegram_context.message_id
 
     def test_serialised_provider_is_string_value(self):
-        job = AnalysisJob(
-            source_url="https://www.airbnb.com/rooms/1",
-            provider=ListingProvider.AIRBNB,
-            telegram_chat_id=1,
-            telegram_message_id=1,
-        )
-        data = json.loads(job.model_dump_json())
+        data = json.loads(self._make().model_dump_json())
         assert data["provider"] == "airbnb"
 
     def test_serialised_status_is_string_value(self):
-        job = AnalysisJob(
-            source_url="https://www.airbnb.com/rooms/1",
-            provider=ListingProvider.AIRBNB,
-            telegram_chat_id=1,
-            telegram_message_id=1,
-        )
-        data = json.loads(job.model_dump_json())
+        data = json.loads(self._make().model_dump_json())
         assert data["status"] == "pending"
 
 
@@ -111,8 +83,8 @@ class TestEnqueueAnalysisJob:
         job = AnalysisJob(
             source_url="https://www.airbnb.com/rooms/1",
             provider=ListingProvider.AIRBNB,
-            telegram_chat_id=1,
-            telegram_message_id=1,
+            delivery_channel=DeliveryChannel.TELEGRAM,
+            telegram_context=TelegramDeliveryContext(chat_id=1, message_id=1),
         )
         await enqueue_analysis_job(redis, job)
         redis.eval.assert_awaited_once()
@@ -127,16 +99,16 @@ class TestEnqueueAnalysisJob:
         job = AnalysisJob(
             source_url="https://www.airbnb.com/rooms/55",
             provider=ListingProvider.AIRBNB,
-            telegram_chat_id=99,
-            telegram_message_id=10,
+            delivery_channel=DeliveryChannel.TELEGRAM,
+            telegram_context=TelegramDeliveryContext(chat_id=99, message_id=10),
         )
         await enqueue_analysis_job(redis, job)
         # ARGV[2] is the 6th positional arg (index 5)
         payload = redis.eval.call_args[0][5]
         data = json.loads(payload)
         assert data["source_url"] == "https://www.airbnb.com/rooms/55"
-        assert data["telegram_chat_id"] == 99
-        assert data["telegram_message_id"] == 10
+        assert data["telegram_context"]["chat_id"] == 99
+        assert data["telegram_context"]["message_id"] == 10
         assert data["provider"] == "airbnb"
 
     @pytest.mark.asyncio
@@ -146,8 +118,8 @@ class TestEnqueueAnalysisJob:
         job = AnalysisJob(
             source_url="https://www.airbnb.com/rooms/7",
             provider=ListingProvider.AIRBNB,
-            telegram_chat_id=2,
-            telegram_message_id=3,
+            delivery_channel=DeliveryChannel.TELEGRAM,
+            telegram_context=TelegramDeliveryContext(chat_id=2, message_id=3),
         )
         await enqueue_analysis_job(redis, job)
         payload = redis.eval.call_args[0][5]
@@ -170,8 +142,8 @@ class TestEnqueueIdempotency:
         return AnalysisJob(
             source_url="https://www.airbnb.com/rooms/123",
             provider=ListingProvider.AIRBNB,
-            telegram_chat_id=chat_id,
-            telegram_message_id=message_id,
+            delivery_channel=DeliveryChannel.TELEGRAM,
+            telegram_context=TelegramDeliveryContext(chat_id=chat_id, message_id=message_id),
         )
 
     @pytest.mark.asyncio
@@ -293,8 +265,9 @@ class TestWebhookEnqueueWiring:
         assert isinstance(job, AnalysisJob)
         assert job.source_url == "https://www.airbnb.com/rooms/123"
         assert job.provider == ListingProvider.AIRBNB
-        assert job.telegram_chat_id == 1001
-        assert job.telegram_message_id == 5
+        assert job.telegram_context is not None
+        assert job.telegram_context.chat_id == 1001
+        assert job.telegram_context.message_id == 5
 
     @patch("src.telegram.router.enqueue_analysis_job", new_callable=AsyncMock)
     @patch("src.telegram.router.send_message", new_callable=AsyncMock)
@@ -360,3 +333,124 @@ class TestWebhookEnqueueWiring:
         response = client.post("/telegram/webhook", json=payload)
         assert response.status_code == 200
         mock_enqueue.assert_not_awaited()
+
+
+# ---------------------------------------------------------------------------
+# AnalysisJob invariant: TELEGRAM channel requires telegram_context
+# ---------------------------------------------------------------------------
+
+
+class TestAnalysisJobTelegramContextInvariant:
+    """A TELEGRAM job without telegram_context must be rejected at construction."""
+
+    def _base(self, **overrides) -> dict:
+        return {
+            "source_url": "https://www.airbnb.com/rooms/1",
+            "provider": ListingProvider.AIRBNB,
+            **overrides,
+        }
+
+    def test_telegram_without_context_raises(self):
+        with pytest.raises(ValidationError, match="telegram_context"):
+            AnalysisJob(
+                **self._base(
+                    delivery_channel=DeliveryChannel.TELEGRAM,
+                    telegram_context=None,
+                )
+            )
+
+    def test_telegram_without_context_raises_from_json(self):
+        raw = json.dumps({
+            "source_url": "https://www.airbnb.com/rooms/1",
+            "provider": "airbnb",
+            "delivery_channel": "telegram",
+            "telegram_context": None,
+        })
+        with pytest.raises(ValidationError, match="telegram_context"):
+            AnalysisJob.model_validate_json(raw)
+
+    def test_telegram_with_context_is_valid(self):
+        job = AnalysisJob(
+            **self._base(
+                delivery_channel=DeliveryChannel.TELEGRAM,
+                telegram_context=TelegramDeliveryContext(chat_id=1, message_id=2),
+            )
+        )
+        assert job.telegram_context.chat_id == 1
+
+    def test_web_channel_without_context_is_valid(self):
+        """Non-Telegram channels do not require telegram_context."""
+        job = AnalysisJob(
+            **self._base(
+                delivery_channel=DeliveryChannel.WEB,
+                telegram_context=None,
+            )
+        )
+        assert job.delivery_channel == DeliveryChannel.WEB
+        assert job.telegram_context is None
+
+    def test_default_channel_without_context_raises(self):
+        """Default channel is TELEGRAM, so omitting context must still fail."""
+        with pytest.raises(ValidationError, match="telegram_context"):
+            AnalysisJob(**self._base())
+
+
+# ---------------------------------------------------------------------------
+# Backward-compatibility shim: legacy flat telegram_* fields
+# ---------------------------------------------------------------------------
+
+
+class TestAnalysisJobLegacyTelegramFieldShim:
+    """Old Redis payloads with flat telegram_* fields must deserialize cleanly."""
+
+    def _legacy_dict(self, **overrides) -> dict:
+        base = {
+            "source_url": "https://www.airbnb.com/rooms/99",
+            "provider": "airbnb",
+            "telegram_chat_id": 5001,
+            "telegram_message_id": 12,
+        }
+        base.update(overrides)
+        return base
+
+    def test_flat_fields_produce_telegram_context(self):
+        job = AnalysisJob.model_validate(self._legacy_dict())
+        assert job.telegram_context is not None
+        assert job.telegram_context.chat_id == 5001
+        assert job.telegram_context.message_id == 12
+
+    def test_flat_fields_with_progress_id(self):
+        job = AnalysisJob.model_validate(
+            self._legacy_dict(telegram_progress_message_id=77)
+        )
+        assert job.telegram_context.progress_message_id == 77
+
+    def test_flat_fields_without_progress_id(self):
+        job = AnalysisJob.model_validate(self._legacy_dict())
+        assert job.telegram_context.progress_message_id is None
+
+    def test_flat_fields_infer_telegram_channel(self):
+        job = AnalysisJob.model_validate(self._legacy_dict())
+        assert job.delivery_channel == DeliveryChannel.TELEGRAM
+
+    def test_flat_fields_in_json_string(self):
+        raw = json.dumps(self._legacy_dict())
+        job = AnalysisJob.model_validate_json(raw)
+        assert job.telegram_context.chat_id == 5001
+        assert job.telegram_context.message_id == 12
+
+    def test_nested_context_takes_precedence_over_flat_fields(self):
+        """If both are present, telegram_context wins and flat fields are ignored."""
+        data = self._legacy_dict(
+            telegram_context={"chat_id": 9999, "message_id": 888},
+        )
+        job = AnalysisJob.model_validate(data)
+        assert job.telegram_context.chat_id == 9999
+
+    def test_flat_fields_roundtrip_produces_new_shape(self):
+        """Re-serializing a coerced job produces the new nested shape, not flat fields."""
+        job = AnalysisJob.model_validate(self._legacy_dict())
+        data = json.loads(job.model_dump_json())
+        assert "telegram_context" in data
+        assert data["telegram_context"]["chat_id"] == 5001
+        assert "telegram_chat_id" not in data

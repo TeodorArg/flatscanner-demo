@@ -21,7 +21,7 @@ import pytest
 from src.adapters.base import AdapterResult
 from src.analysis.result import AnalysisResult, PriceVerdict
 from src.analysis.service import AnalysisService
-from src.domain.delivery import ProgressSink
+from src.domain.delivery import DeliveryChannel, ProgressSink, TelegramDeliveryContext
 from src.domain.listing import AnalysisJob, ListingProvider, NormalizedListing, PriceInfo
 from src.i18n import get_string
 from src.i18n.types import Language
@@ -34,17 +34,26 @@ from src.telegram.progress import TelegramProgressSink
 # ---------------------------------------------------------------------------
 
 
-def _make_job(**overrides) -> AnalysisJob:
-    defaults = dict(
+def _make_job(
+    *,
+    progress_message_id: int | None = 999,
+    chat_id: int = 1001,
+    message_id: int = 7,
+    language: Language = Language.EN,
+    **overrides,
+) -> AnalysisJob:
+    return AnalysisJob(
         source_url="https://www.airbnb.com/rooms/12345",
         provider=ListingProvider.AIRBNB,
-        telegram_chat_id=1001,
-        telegram_message_id=7,
-        telegram_progress_message_id=999,
-        language=Language.EN,
+        delivery_channel=DeliveryChannel.TELEGRAM,
+        telegram_context=TelegramDeliveryContext(
+            chat_id=chat_id,
+            message_id=message_id,
+            progress_message_id=progress_message_id,
+        ),
+        language=language,
+        **overrides,
     )
-    defaults.update(overrides)
-    return AnalysisJob(**defaults)
 
 
 def _make_listing() -> NormalizedListing:
@@ -141,7 +150,7 @@ class TestAnalysingString:
 
 
 # ---------------------------------------------------------------------------
-# Domain model: AnalysisJob carries telegram_progress_message_id
+# Domain model: TelegramDeliveryContext carries progress_message_id
 # ---------------------------------------------------------------------------
 
 
@@ -150,25 +159,24 @@ class TestAnalysisJobProgressField:
         job = AnalysisJob(
             source_url="https://www.airbnb.com/rooms/1",
             provider=ListingProvider.AIRBNB,
-            telegram_chat_id=1,
-            telegram_message_id=1,
+            delivery_channel=DeliveryChannel.TELEGRAM,
+            telegram_context=TelegramDeliveryContext(chat_id=1, message_id=1),
         )
-        assert job.telegram_progress_message_id is None
+        assert job.telegram_context.progress_message_id is None
 
     def test_progress_message_id_can_be_set(self):
         job = AnalysisJob(
             source_url="https://www.airbnb.com/rooms/1",
             provider=ListingProvider.AIRBNB,
-            telegram_chat_id=1,
-            telegram_message_id=1,
-            telegram_progress_message_id=42,
+            delivery_channel=DeliveryChannel.TELEGRAM,
+            telegram_context=TelegramDeliveryContext(chat_id=1, message_id=1, progress_message_id=42),
         )
-        assert job.telegram_progress_message_id == 42
+        assert job.telegram_context.progress_message_id == 42
 
     def test_progress_message_id_survives_json_round_trip(self):
-        job = _make_job(telegram_progress_message_id=88)
+        job = _make_job(progress_message_id=88)
         restored = AnalysisJob.model_validate_json(job.model_dump_json())
-        assert restored.telegram_progress_message_id == 88
+        assert restored.telegram_context.progress_message_id == 88
 
 
 # ---------------------------------------------------------------------------
@@ -246,7 +254,7 @@ class TestRouterProgressMessage:
         eval_call = mock_redis.eval.call_args
         job_json = eval_call[0][-1]  # last positional arg is the serialised job
         job = AnalysisJob.model_validate_json(job_json)
-        assert job.telegram_progress_message_id == 777
+        assert job.telegram_context.progress_message_id == 777
 
     @patch("src.telegram.router.send_message_return_id", new_callable=AsyncMock)
     def test_progress_message_text_has_no_url(self, mock_send_id):
@@ -456,7 +464,7 @@ class TestProcessJobProgressFlow:
     @pytest.mark.asyncio
     async def test_progress_sink_receives_all_stages(self):
         """The injected ProgressSink must receive update() for each pipeline stage."""
-        job = _make_job(telegram_progress_message_id=42)
+        job = _make_job(progress_message_id=42)
         settings = _make_settings()
         spy = SpyProgressSink()
 
@@ -488,7 +496,7 @@ class TestProcessJobProgressFlow:
     @pytest.mark.asyncio
     async def test_sink_complete_called_on_success(self):
         """complete() must be called when the pipeline succeeds."""
-        job = _make_job(telegram_progress_message_id=42)
+        job = _make_job(progress_message_id=42)
         settings = _make_settings()
         spy = SpyProgressSink()
 
@@ -508,7 +516,7 @@ class TestProcessJobProgressFlow:
     @pytest.mark.asyncio
     async def test_sink_fail_called_on_pipeline_failure(self):
         """fail() must be called when the pipeline raises."""
-        job = _make_job(telegram_progress_message_id=42)
+        job = _make_job(progress_message_id=42)
         settings = _make_settings()
         spy = SpyProgressSink()
 
@@ -529,7 +537,7 @@ class TestProcessJobProgressFlow:
     @pytest.mark.asyncio
     async def test_default_sink_is_telegram_when_none_injected(self):
         """When progress_sink=None, processor builds a TelegramProgressSink by default."""
-        job = _make_job(telegram_progress_message_id=42)
+        job = _make_job(progress_message_id=42)
         settings = _make_settings()
 
         edit_calls: list = []
@@ -561,7 +569,7 @@ class TestProcessJobProgressFlow:
     @pytest.mark.asyncio
     async def test_default_sink_swallows_telegram_api_failures(self):
         """TelegramProgressSink must not abort the pipeline when Telegram API calls fail."""
-        job = _make_job(telegram_progress_message_id=42)
+        job = _make_job(progress_message_id=42)
         settings = _make_settings()
         mock_send = AsyncMock()
 

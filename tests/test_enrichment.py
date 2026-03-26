@@ -21,6 +21,7 @@ import pytest
 
 from src.analysis.result import AnalysisResult, PriceVerdict
 from src.analysis.service import AnalysisService
+from src.domain.delivery import DeliveryChannel, TelegramDeliveryContext
 from src.domain.listing import (
     AnalysisJob,
     ListingProvider,
@@ -62,8 +63,8 @@ def _make_job() -> AnalysisJob:
     return AnalysisJob(
         source_url="https://www.airbnb.com/rooms/99999",
         provider=ListingProvider.AIRBNB,
-        telegram_chat_id=42,
-        telegram_message_id=1,
+        delivery_channel=DeliveryChannel.TELEGRAM,
+        telegram_context=TelegramDeliveryContext(chat_id=42, message_id=1),
     )
 
 

@@ -10,10 +10,14 @@
 
 ## Follow-up Slices
 
-- [ ] S1b: migrate Telegram fields out of `AnalysisJob` — move `telegram_chat_id`,
+- [x] S1b: migrate Telegram fields out of `AnalysisJob` — move `telegram_chat_id`,
       `telegram_message_id`, and `telegram_progress_message_id` from the core job
       model into `TelegramDeliveryContext`; update the router, worker, and all tests
       that construct `AnalysisJob` directly (prerequisite for a fully channel-neutral job shape)
+- [x] S1b follow-up (PR #42): add model-level validator enforcing `telegram_context`
+      is present for TELEGRAM jobs; add backward-compatibility shim that coerces old
+      flat `telegram_*` Redis payloads into the new nested shape during rollout; clarify
+      in processor docs that non-Telegram execution is deferred to later slices
 - [ ] S2: shared submission/use-case layer
 - [ ] S3: Telegram presenter split
 - [ ] S4: web delivery foundation

@@ -6,6 +6,7 @@ import httpx
 import redis.asyncio as aioredis
 from fastapi import APIRouter, HTTPException, Request
 
+from src.domain.delivery import DeliveryChannel, TelegramDeliveryContext
 from src.domain.listing import AnalysisJob
 from src.i18n import DEFAULT_LANGUAGE, Language, get_string
 from src.jobs.queue import enqueue_analysis_job
@@ -243,9 +244,12 @@ async def webhook(request: Request) -> dict:
         job = AnalysisJob(
             source_url=decision["url"],
             provider=decision["provider"],
-            telegram_chat_id=decision["chat_id"],
-            telegram_message_id=update.message.message_id,
-            telegram_progress_message_id=progress_message_id,
+            delivery_channel=DeliveryChannel.TELEGRAM,
+            telegram_context=TelegramDeliveryContext(
+                chat_id=decision["chat_id"],
+                message_id=update.message.message_id,
+                progress_message_id=progress_message_id,
+            ),
             language=lang,
         )
         try:
