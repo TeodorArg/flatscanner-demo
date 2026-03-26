@@ -15,7 +15,7 @@ from src.telegram.dispatcher import route_update
 from src.telegram.menu.callback import parse_callback
 from src.telegram.menu.screens import SCREEN_RENDERERS, render_language_screen, render_main_menu
 from src.telegram.models import TelegramUpdate
-from src.telegram.sender import answer_callback_query, edit_message_text, send_message
+from src.telegram.sender import answer_callback_query, delete_message, edit_message_text, send_message, send_message_return_id
 
 logger = logging.getLogger(__name__)
 
@@ -225,11 +225,27 @@ async def webhook(request: Request) -> dict:
                 decision["chat_id"],
             )
             raise HTTPException(status_code=502, detail="Queue unavailable; please retry")
+
+        # Send the progress message first so its message_id can be carried on the job.
+        progress_text = get_string("msg.analysing", lang)
+        try:
+            progress_message_id = await send_message_return_id(
+                token, decision["chat_id"], progress_text
+            )
+        except httpx.HTTPStatusError as exc:
+            return _handle_send_error(exc, decision["chat_id"])
+        except Exception:
+            logger.exception(
+                "send_message_return_id failed for chat_id=%s", decision["chat_id"]
+            )
+            raise HTTPException(status_code=502, detail="Failed to deliver reply to Telegram")
+
         job = AnalysisJob(
             source_url=decision["url"],
             provider=decision["provider"],
             telegram_chat_id=decision["chat_id"],
             telegram_message_id=update.message.message_id,
+            telegram_progress_message_id=progress_message_id,
             language=lang,
         )
         try:
@@ -241,8 +257,18 @@ async def webhook(request: Request) -> dict:
                 decision["url"],
                 exc,
             )
+            # Best-effort: delete the progress message we already sent so the
+            # chat is not left with a stale "analysing…" bubble.
+            try:
+                await delete_message(token, decision["chat_id"], progress_message_id)
+            except Exception:
+                logger.debug(
+                    "Failed to delete progress message after enqueue failure for chat_id=%s (best-effort)",
+                    decision["chat_id"],
+                    exc_info=True,
+                )
             raise HTTPException(status_code=502, detail="Queue unavailable; please retry")
-        text = get_string("msg.analysing", lang).format(url=decision["url"])
+        return {"ok": True}
 
     # -----------------------------------------------------------------------
     # /language command
