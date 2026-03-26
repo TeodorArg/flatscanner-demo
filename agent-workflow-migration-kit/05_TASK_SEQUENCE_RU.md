@@ -27,7 +27,18 @@ Prompt:
 
 - `prompts/02_define_agent_roles_and_rules.txt`
 
-## Задача 3. Add orchestration contract
+## Задача 3. Bootstrap GitHub repository settings
+
+Цель:
+
+- настроить сам GitHub-репозиторий под workflow
+- зафиксировать required checks, protection rules, variables/secrets и merge policy
+
+Prompt:
+
+- `prompts/04a_bootstrap_github_repository_settings.txt`
+
+## Задача 4. Add orchestration contract
 
 Цель:
 
@@ -39,7 +50,7 @@ Prompt:
 
 - `prompts/03_add_orchestration_scripts_contract.txt`
 
-## Задача 4. Define CI and AI review loop
+## Задача 5. Define CI and AI review loop
 
 Цель:
 
@@ -50,7 +61,7 @@ Prompt:
 
 - `prompts/04_define_ci_and_review_loop.txt`
 
-## Задача 5. Define delivery and smoke process
+## Задача 6. Define delivery and smoke process
 
 Цель:
 
@@ -62,7 +73,7 @@ Prompt:
 
 - `prompts/05_define_delivery_and_smoke_flow.txt`
 
-## Задача 6. Conduct one full validation feature
+## Задача 7. Conduct one full validation feature
 
 Цель:
 
@@ -72,4 +83,3 @@ Prompt:
 Prompt:
 
 - `prompts/06_run_first_test_feature_through_full_loop.txt`
-

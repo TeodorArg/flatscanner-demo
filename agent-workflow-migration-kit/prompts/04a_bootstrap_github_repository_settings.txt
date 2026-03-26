@@ -1,0 +1,34 @@
+You are configuring the GitHub repository layer for a spec-driven, AI-assisted development workflow.
+
+Task:
+- analyze the target repository's GitHub configuration
+- define what repository settings are required for the workflow
+- configure what you can
+- document what must still be configured manually by the repository owner
+
+Required areas:
+- default branch
+- branch protection / rulesets
+- required status checks
+- GitHub Actions permissions
+- repository variables
+- repository secrets
+- runner policy
+- merge policy
+
+Important constraints:
+- keep the setup neutral and repository-agnostic
+- do not assume the original project's exact check names unless the target repo already uses them
+- make sure docs, AGENTS, and repository settings agree
+
+Expected outputs:
+- repository bootstrap doc or updates to existing workflow docs
+- explicit checklist of required GitHub settings
+- exact manual actions if some settings cannot be changed automatically
+
+Validation:
+- list the required checks
+- list the required variables/secrets
+- explain what protects the main branch
+- explain how the repository settings support the merge-ready contract
+
