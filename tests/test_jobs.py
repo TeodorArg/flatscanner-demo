@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from src.domain.delivery import DeliveryChannel, TelegramDeliveryContext
 from src.domain.listing import AnalysisJob, JobStatus, ListingProvider
 from src.jobs.queue import (
     QUEUE_KEY,
@@ -22,79 +23,49 @@ from src.jobs.queue import (
 
 
 class TestAnalysisJobModel:
-    def test_default_status_is_pending(self):
-        job = AnalysisJob(
+    def _make(self, chat_id: int = 1001, message_id: int = 42) -> AnalysisJob:
+        return AnalysisJob(
             source_url="https://www.airbnb.com/rooms/123",
             provider=ListingProvider.AIRBNB,
-            telegram_chat_id=1001,
-            telegram_message_id=42,
+            delivery_channel=DeliveryChannel.TELEGRAM,
+            telegram_context=TelegramDeliveryContext(chat_id=chat_id, message_id=message_id),
         )
-        assert job.status == JobStatus.PENDING
+
+    def test_default_status_is_pending(self):
+        assert self._make().status == JobStatus.PENDING
 
     def test_id_is_uuid(self):
-        job = AnalysisJob(
-            source_url="https://www.airbnb.com/rooms/123",
-            provider=ListingProvider.AIRBNB,
-            telegram_chat_id=1001,
-            telegram_message_id=42,
-        )
-        assert isinstance(job.id, uuid.UUID)
+        assert isinstance(self._make().id, uuid.UUID)
 
     def test_two_jobs_have_different_ids(self):
-        make = lambda: AnalysisJob(
-            source_url="https://www.airbnb.com/rooms/1",
-            provider=ListingProvider.AIRBNB,
-            telegram_chat_id=1,
-            telegram_message_id=1,
-        )
-        assert make().id != make().id
+        assert self._make().id != self._make().id
 
     def test_fields_are_stored_correctly(self):
-        job = AnalysisJob(
-            source_url="https://www.airbnb.com/rooms/999",
-            provider=ListingProvider.AIRBNB,
-            telegram_chat_id=5555,
-            telegram_message_id=77,
-        )
-        assert job.source_url == "https://www.airbnb.com/rooms/999"
+        job = self._make(chat_id=5555, message_id=77)
+        assert job.source_url == "https://www.airbnb.com/rooms/123"
         assert job.provider == ListingProvider.AIRBNB
-        assert job.telegram_chat_id == 5555
-        assert job.telegram_message_id == 77
+        assert job.telegram_context is not None
+        assert job.telegram_context.chat_id == 5555
+        assert job.telegram_context.message_id == 77
 
     def test_serialises_to_json_roundtrip(self):
-        job = AnalysisJob(
-            source_url="https://www.airbnb.com/rooms/1",
-            provider=ListingProvider.AIRBNB,
-            telegram_chat_id=1,
-            telegram_message_id=2,
-        )
+        job = self._make(chat_id=1, message_id=2)
         json_str = job.model_dump_json()
         restored = AnalysisJob.model_validate_json(json_str)
         assert restored.id == job.id
         assert restored.source_url == job.source_url
         assert restored.provider == job.provider
         assert restored.status == job.status
-        assert restored.telegram_chat_id == job.telegram_chat_id
-        assert restored.telegram_message_id == job.telegram_message_id
+        assert restored.telegram_context is not None
+        assert restored.telegram_context.chat_id == job.telegram_context.chat_id
+        assert restored.telegram_context.message_id == job.telegram_context.message_id
 
     def test_serialised_provider_is_string_value(self):
-        job = AnalysisJob(
-            source_url="https://www.airbnb.com/rooms/1",
-            provider=ListingProvider.AIRBNB,
-            telegram_chat_id=1,
-            telegram_message_id=1,
-        )
-        data = json.loads(job.model_dump_json())
+        data = json.loads(self._make().model_dump_json())
         assert data["provider"] == "airbnb"
 
     def test_serialised_status_is_string_value(self):
-        job = AnalysisJob(
-            source_url="https://www.airbnb.com/rooms/1",
-            provider=ListingProvider.AIRBNB,
-            telegram_chat_id=1,
-            telegram_message_id=1,
-        )
-        data = json.loads(job.model_dump_json())
+        data = json.loads(self._make().model_dump_json())
         assert data["status"] == "pending"
 
 
@@ -111,8 +82,8 @@ class TestEnqueueAnalysisJob:
         job = AnalysisJob(
             source_url="https://www.airbnb.com/rooms/1",
             provider=ListingProvider.AIRBNB,
-            telegram_chat_id=1,
-            telegram_message_id=1,
+            delivery_channel=DeliveryChannel.TELEGRAM,
+            telegram_context=TelegramDeliveryContext(chat_id=1, message_id=1),
         )
         await enqueue_analysis_job(redis, job)
         redis.eval.assert_awaited_once()
@@ -127,16 +98,16 @@ class TestEnqueueAnalysisJob:
         job = AnalysisJob(
             source_url="https://www.airbnb.com/rooms/55",
             provider=ListingProvider.AIRBNB,
-            telegram_chat_id=99,
-            telegram_message_id=10,
+            delivery_channel=DeliveryChannel.TELEGRAM,
+            telegram_context=TelegramDeliveryContext(chat_id=99, message_id=10),
         )
         await enqueue_analysis_job(redis, job)
         # ARGV[2] is the 6th positional arg (index 5)
         payload = redis.eval.call_args[0][5]
         data = json.loads(payload)
         assert data["source_url"] == "https://www.airbnb.com/rooms/55"
-        assert data["telegram_chat_id"] == 99
-        assert data["telegram_message_id"] == 10
+        assert data["telegram_context"]["chat_id"] == 99
+        assert data["telegram_context"]["message_id"] == 10
         assert data["provider"] == "airbnb"
 
     @pytest.mark.asyncio
@@ -146,8 +117,8 @@ class TestEnqueueAnalysisJob:
         job = AnalysisJob(
             source_url="https://www.airbnb.com/rooms/7",
             provider=ListingProvider.AIRBNB,
-            telegram_chat_id=2,
-            telegram_message_id=3,
+            delivery_channel=DeliveryChannel.TELEGRAM,
+            telegram_context=TelegramDeliveryContext(chat_id=2, message_id=3),
         )
         await enqueue_analysis_job(redis, job)
         payload = redis.eval.call_args[0][5]
@@ -170,8 +141,8 @@ class TestEnqueueIdempotency:
         return AnalysisJob(
             source_url="https://www.airbnb.com/rooms/123",
             provider=ListingProvider.AIRBNB,
-            telegram_chat_id=chat_id,
-            telegram_message_id=message_id,
+            delivery_channel=DeliveryChannel.TELEGRAM,
+            telegram_context=TelegramDeliveryContext(chat_id=chat_id, message_id=message_id),
         )
 
     @pytest.mark.asyncio
@@ -293,8 +264,9 @@ class TestWebhookEnqueueWiring:
         assert isinstance(job, AnalysisJob)
         assert job.source_url == "https://www.airbnb.com/rooms/123"
         assert job.provider == ListingProvider.AIRBNB
-        assert job.telegram_chat_id == 1001
-        assert job.telegram_message_id == 5
+        assert job.telegram_context is not None
+        assert job.telegram_context.chat_id == 1001
+        assert job.telegram_context.message_id == 5
 
     @patch("src.telegram.router.enqueue_analysis_job", new_callable=AsyncMock)
     @patch("src.telegram.router.send_message", new_callable=AsyncMock)

@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from src.domain.delivery import DeliveryChannel, TelegramDeliveryContext
 from src.i18n.types import DEFAULT_LANGUAGE, Language
 from src.storage.chat_preferences import (
     _KEY_PREFIX,
@@ -247,8 +248,8 @@ class TestAnalysisJobLanguageField:
         job = AnalysisJob(
             source_url="https://www.airbnb.com/rooms/1",
             provider=ListingProvider.AIRBNB,
-            telegram_chat_id=1,
-            telegram_message_id=1,
+            delivery_channel=DeliveryChannel.TELEGRAM,
+            telegram_context=TelegramDeliveryContext(chat_id=1, message_id=1),
         )
         assert job.language == Language.RU
 
@@ -258,8 +259,8 @@ class TestAnalysisJobLanguageField:
         job = AnalysisJob(
             source_url="https://www.airbnb.com/rooms/1",
             provider=ListingProvider.AIRBNB,
-            telegram_chat_id=1,
-            telegram_message_id=1,
+            delivery_channel=DeliveryChannel.TELEGRAM,
+            telegram_context=TelegramDeliveryContext(chat_id=1, message_id=1),
             language=Language.ES,
         )
         assert job.language == Language.ES
@@ -270,8 +271,8 @@ class TestAnalysisJobLanguageField:
         job = AnalysisJob(
             source_url="https://www.airbnb.com/rooms/1",
             provider=ListingProvider.AIRBNB,
-            telegram_chat_id=1,
-            telegram_message_id=1,
+            delivery_channel=DeliveryChannel.TELEGRAM,
+            telegram_context=TelegramDeliveryContext(chat_id=1, message_id=1),
             language=Language.EN,
         )
         restored = AnalysisJob.model_validate_json(job.model_dump_json())
@@ -283,8 +284,8 @@ class TestAnalysisJobLanguageField:
         job = AnalysisJob(
             source_url="https://www.airbnb.com/rooms/1",
             provider=ListingProvider.AIRBNB,
-            telegram_chat_id=1,
-            telegram_message_id=1,
+            delivery_channel=DeliveryChannel.TELEGRAM,
+            telegram_context=TelegramDeliveryContext(chat_id=1, message_id=1),
             language=Language.RU,
         )
         data = json.loads(job.model_dump_json())

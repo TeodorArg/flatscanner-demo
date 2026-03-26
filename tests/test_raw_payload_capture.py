@@ -23,6 +23,7 @@ from src.adapters.apify_client import ApifyClient
 from src.adapters.base import AdapterResult
 from src.analysis.result import AnalysisResult, PriceVerdict
 from src.analysis.service import AnalysisService
+from src.domain.delivery import DeliveryChannel, TelegramDeliveryContext
 from src.domain.listing import AnalysisJob, ListingProvider, NormalizedListing, PriceInfo
 from src.domain.raw_payload import RawPayload
 from src.i18n.types import Language
@@ -51,8 +52,8 @@ def _make_job(**overrides) -> AnalysisJob:
     defaults = dict(
         source_url="https://www.airbnb.com/rooms/12345",
         provider=ListingProvider.AIRBNB,
-        telegram_chat_id=1001,
-        telegram_message_id=7,
+        delivery_channel=DeliveryChannel.TELEGRAM,
+        telegram_context=TelegramDeliveryContext(chat_id=1001, message_id=7),
     )
     defaults.update(overrides)
     return AnalysisJob(**defaults)
@@ -271,7 +272,7 @@ class TestProcessorRawPayloadPersistence:
             )
 
         # Pipeline completed despite save failure
-        assert sent_chats == [job.telegram_chat_id]
+        assert sent_chats == [job.telegram_context.chat_id]
 
     @pytest.mark.asyncio
     async def test_raw_payload_source_id_none_when_listing_source_id_empty(self):
@@ -338,8 +339,8 @@ class TestProcessOnceWorkerWiring:
         job = AnalysisJob(
             source_url="https://www.airbnb.com/rooms/1",
             provider=ListingProvider.AIRBNB,
-            telegram_chat_id=1,
-            telegram_message_id=1,
+            delivery_channel=DeliveryChannel.TELEGRAM,
+            telegram_context=TelegramDeliveryContext(chat_id=1, message_id=1),
         )
         session_factory, mock_session = _make_mock_session_factory()
         redis = AsyncMock()
@@ -371,8 +372,8 @@ class TestProcessOnceWorkerWiring:
         job = AnalysisJob(
             source_url="https://www.airbnb.com/rooms/2",
             provider=ListingProvider.AIRBNB,
-            telegram_chat_id=2,
-            telegram_message_id=2,
+            delivery_channel=DeliveryChannel.TELEGRAM,
+            telegram_context=TelegramDeliveryContext(chat_id=2, message_id=2),
         )
         session_factory, mock_session = _make_mock_session_factory()
         redis = AsyncMock()
@@ -396,8 +397,8 @@ class TestProcessOnceWorkerWiring:
         job = AnalysisJob(
             source_url="https://www.airbnb.com/rooms/3",
             provider=ListingProvider.AIRBNB,
-            telegram_chat_id=3,
-            telegram_message_id=3,
+            delivery_channel=DeliveryChannel.TELEGRAM,
+            telegram_context=TelegramDeliveryContext(chat_id=3, message_id=3),
         )
         redis = AsyncMock()
         settings = _make_settings()

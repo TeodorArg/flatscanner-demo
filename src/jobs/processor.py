@@ -15,7 +15,7 @@ through the full pipeline:
 Progress reporting is delegated to a ``ProgressSink`` implementation so that
 the pipeline itself has no direct dependency on Telegram progress helpers.
 When no sink is provided, a ``TelegramProgressSink`` is built from the job's
-Telegram fields as the default.
+``telegram_context`` as the default.
 
 Dependencies can be injected for unit testing (adapter, analysis_service,
 translation_service, http_client, raw_payload_repo, progress_sink).  When not
@@ -141,7 +141,7 @@ async def process_job(
     progress_sink:
         Optional ``ProgressSink`` for reporting pipeline stage progress to the
         user.  When ``None`` a ``TelegramProgressSink`` is constructed from the
-        job's Telegram fields as the production default.
+        job's ``telegram_context`` as the production default.
 
     Raises
     ------
@@ -154,7 +154,12 @@ async def process_job(
         the job).
     """
     token = settings.telegram_bot_token
-    chat_id = job.telegram_chat_id
+    tg_ctx = job.telegram_context
+    if tg_ctx is None:
+        raise ValueError(
+            f"Job {job.id} has no telegram_context; Telegram delivery requires one"
+        )
+    chat_id = tg_ctx.chat_id
 
     # --- 1. Resolve adapter --------------------------------------------------
     if adapter is None:
@@ -176,8 +181,8 @@ async def process_job(
     # Build the default Telegram progress sink when none was injected.
     sink: ProgressSink = progress_sink or TelegramProgressSink(
         token,
-        chat_id,
-        job.telegram_progress_message_id,
+        tg_ctx.chat_id,
+        tg_ctx.progress_message_id,
         client=http_client,
     )
 

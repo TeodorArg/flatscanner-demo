@@ -14,6 +14,7 @@ from enum import Enum
 
 from pydantic import BaseModel, Field
 
+from src.domain.delivery import DeliveryChannel, TelegramDeliveryContext
 from src.i18n.types import DEFAULT_LANGUAGE, Language
 
 
@@ -112,9 +113,9 @@ class NormalizedListing(BaseModel):
 class AnalysisJob(BaseModel):
     """Tracks the state of a single listing analysis request.
 
-    Created when a Telegram user submits a listing URL.  The job record
-    links the original request (chat/message IDs) to the resulting
-    ``NormalizedListing`` and, eventually, the analysis result.
+    The job is channel-neutral: delivery-channel identity is carried in
+    ``delivery_channel`` and the channel-specific context (e.g. Telegram
+    chat/message IDs) is stored in the corresponding context field.
     """
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4)
@@ -125,11 +126,9 @@ class AnalysisJob(BaseModel):
     # Set once the raw payload has been normalized
     listing_id: uuid.UUID | None = None
 
-    telegram_chat_id: int
-    telegram_message_id: int
-    # Set by the webhook handler after sending the initial progress message so
-    # the worker can edit / delete it during processing.
-    telegram_progress_message_id: int | None = None
+    # Delivery channel and channel-specific context
+    delivery_channel: DeliveryChannel = DeliveryChannel.TELEGRAM
+    telegram_context: TelegramDeliveryContext | None = None
 
     # Language snapshotted at enqueue time so in-flight jobs are stable even
     # if the chat preference changes before the job completes.

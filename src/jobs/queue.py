@@ -16,9 +16,9 @@ from src.domain.listing import AnalysisJob
 QUEUE_KEY = "flatscanner:analysis_jobs"
 
 # Idempotency key namespace and TTL for deduplicating Telegram retries.
-# Keyed on (chat_id, message_id) — the stable identity Telegram assigns to
-# every user message.  The TTL is generous enough to outlast any realistic
-# retry window without persisting keys indefinitely.
+# For Telegram jobs keyed on (chat_id, message_id); for other channels keyed
+# on job.id.  The TTL is generous enough to outlast any realistic retry window
+# without persisting keys indefinitely.
 _IDEMPOTENCY_KEY_PREFIX = "flatscanner:enqueued"
 _IDEMPOTENCY_TTL_SECONDS = 86_400  # 24 hours
 
@@ -88,9 +88,11 @@ async def enqueue_analysis_job(redis: Redis, job: AnalysisJob) -> bool:
     Lua script so the operation is atomic: a transient Redis failure can never
     leave the key set without the corresponding LPUSH having succeeded.
     """
-    idempotency_key = (
-        f"{_IDEMPOTENCY_KEY_PREFIX}:{job.telegram_chat_id}:{job.telegram_message_id}"
-    )
+    tg_ctx = job.telegram_context
+    if tg_ctx is not None:
+        idempotency_key = f"{_IDEMPOTENCY_KEY_PREFIX}:{tg_ctx.chat_id}:{tg_ctx.message_id}"
+    else:
+        idempotency_key = f"{_IDEMPOTENCY_KEY_PREFIX}:{job.id}"
     result = await redis.eval(
         _ENQUEUE_SCRIPT,
         2,  # numkeys
