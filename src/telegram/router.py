@@ -15,7 +15,7 @@ from src.telegram.dispatcher import route_update
 from src.telegram.menu.callback import parse_callback
 from src.telegram.menu.screens import SCREEN_RENDERERS, render_language_screen, render_main_menu
 from src.telegram.models import TelegramUpdate
-from src.telegram.sender import answer_callback_query, edit_message_text, send_message, send_message_return_id
+from src.telegram.sender import answer_callback_query, delete_message, edit_message_text, send_message, send_message_return_id
 
 logger = logging.getLogger(__name__)
 
@@ -257,6 +257,16 @@ async def webhook(request: Request) -> dict:
                 decision["url"],
                 exc,
             )
+            # Best-effort: delete the progress message we already sent so the
+            # chat is not left with a stale "analysing…" bubble.
+            try:
+                await delete_message(token, decision["chat_id"], progress_message_id)
+            except Exception:
+                logger.debug(
+                    "Failed to delete progress message after enqueue failure for chat_id=%s (best-effort)",
+                    decision["chat_id"],
+                    exc_info=True,
+                )
             raise HTTPException(status_code=502, detail="Queue unavailable; please retry")
         return {"ok": True}
 

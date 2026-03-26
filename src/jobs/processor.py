@@ -232,10 +232,10 @@ async def process_job(
     )
 
     try:
-        # Stage: fetching ---------------------------------------------------
+        # Stage 1: extracting -----------------------------------------------
         await _update_progress(
             token, chat_id, progress_id,
-            get_string("msg.progress.fetching", job.language),
+            get_string("msg.progress.extracting", job.language),
             client=http_client,
         )
 
@@ -261,6 +261,13 @@ async def process_job(
                     exc_info=True,
                 )
 
+        # Stage 2: checking area/infrastructure (before enrichments) --------
+        await _update_progress(
+            token, chat_id, progress_id,
+            get_string("msg.progress.enriching", job.language),
+            client=http_client,
+        )
+
         # --- 2b. Enrich (optional, tolerant) ---------------------------------
         enrichment_outcome: EnrichmentOutcome | None = None
         if enrichment_providers:
@@ -272,7 +279,7 @@ async def process_job(
                     job.id,
                 )
 
-        # Stage: analysing --------------------------------------------------
+        # Stage 3: analyzing reviews and listing details (before module runner)
         await _update_progress(
             token, chat_id, progress_id,
             get_string("msg.progress.analysing", job.language),
@@ -310,6 +317,13 @@ async def process_job(
 
         result = result.model_copy(update={"display_title": listing.title, "review_insights": review_insights})
         logger.debug("Analysis complete for job %s", job.id)
+
+        # Stage 4: preparing final report (before translate/format/send) ----
+        await _update_progress(
+            token, chat_id, progress_id,
+            get_string("msg.progress.preparing", job.language),
+            client=http_client,
+        )
 
         # --- 4. Translate (on demand, ephemeral) -----------------------------
         # English jobs use the canonical result directly.  For other languages the

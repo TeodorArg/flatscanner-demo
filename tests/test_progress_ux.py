@@ -117,15 +117,25 @@ class TestAnalysingString:
         text = get_string("msg.analysing", Language.RU)
         assert "2 " in text or "минут" in text
 
-    def test_progress_fetching_key_exists_for_all_languages(self):
+    def test_progress_extracting_key_exists_for_all_languages(self):
         for lang in Language:
-            text = get_string("msg.progress.fetching", lang)
-            assert text  # non-empty
+            text = get_string("msg.progress.extracting", lang)
+            assert text
 
     def test_progress_analysing_key_exists_for_all_languages(self):
         for lang in Language:
             text = get_string("msg.progress.analysing", lang)
-            assert text  # non-empty
+            assert text
+
+    def test_progress_enriching_key_exists_for_all_languages(self):
+        for lang in Language:
+            text = get_string("msg.progress.enriching", lang)
+            assert text
+
+    def test_progress_preparing_key_exists_for_all_languages(self):
+        for lang in Language:
+            text = get_string("msg.progress.preparing", lang)
+            assert text
 
 
 # ---------------------------------------------------------------------------
@@ -244,6 +254,24 @@ class TestRouterProgressMessage:
         client.post("/telegram/webhook", json=self._analyse_payload())
         call_args = mock_send_id.call_args[0]
         assert "airbnb.com/rooms/12345" not in call_args[2]
+
+    @patch("src.telegram.router.delete_message", new_callable=AsyncMock)
+    @patch("src.telegram.router.send_message_return_id", new_callable=AsyncMock)
+    def test_progress_message_deleted_on_enqueue_failure(self, mock_send_id, mock_delete):
+        """If enqueue (redis.eval) fails, the progress message must be best-effort deleted."""
+        import redis.asyncio as aioredis
+
+        mock_send_id.return_value = 555
+        client, mock_redis = self._make_app_client()
+        mock_redis.eval.side_effect = aioredis.RedisError("connection refused")
+
+        response = client.post("/telegram/webhook", json=self._analyse_payload())
+
+        assert response.status_code == 502
+        mock_delete.assert_awaited_once()
+        # delete_message must be called with the id returned by send_message_return_id
+        args = mock_delete.call_args[0]
+        assert args[2] == 555  # chat_id is args[1], message_id is args[2]
 
 
 # ---------------------------------------------------------------------------
@@ -421,15 +449,21 @@ class TestProcessJobProgressFlow:
                 translation_service=_make_passthrough_ts(),
             )
 
-        assert len(edit_calls) >= 2, "Expected at least 2 progress stage updates"
+        assert len(edit_calls) >= 4, "Expected at least 4 progress stage updates"
         assert all(c[1] == 42 for c in edit_calls), "All edits must target progress msg_id=42"
-        # The fetching stage must appear before the analysing stage
         texts = [c[2] for c in edit_calls]
-        fetching = get_string("msg.progress.fetching", Language.EN)
+        extracting = get_string("msg.progress.extracting", Language.EN)
+        enriching = get_string("msg.progress.enriching", Language.EN)
         analysing = get_string("msg.progress.analysing", Language.EN)
-        assert fetching in texts
+        preparing = get_string("msg.progress.preparing", Language.EN)
+        assert extracting in texts
+        assert enriching in texts
         assert analysing in texts
-        assert texts.index(fetching) < texts.index(analysing)
+        assert preparing in texts
+        # Stages must appear in the correct pipeline order
+        assert texts.index(extracting) < texts.index(enriching)
+        assert texts.index(enriching) < texts.index(analysing)
+        assert texts.index(analysing) < texts.index(preparing)
 
     @pytest.mark.asyncio
     async def test_progress_message_deleted_before_final_send(self):

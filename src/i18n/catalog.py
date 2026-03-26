@@ -54,15 +54,25 @@ _CATALOG: dict[str, dict[Language, str]] = {
         Language.EN: "Analysing your listing — this can take around 2 minutes…",
         Language.ES: "Analizando tu anuncio — esto puede tardar unos 2 minutos…",
     },
-    "msg.progress.fetching": {
-        Language.RU: "Загружаю данные объявления…",
-        Language.EN: "Fetching listing details…",
-        Language.ES: "Obteniendo detalles del anuncio…",
+    "msg.progress.extracting": {
+        Language.RU: "Извлекаю данные объявления…",
+        Language.EN: "Extracting listing data…",
+        Language.ES: "Extrayendo datos del anuncio…",
     },
     "msg.progress.analysing": {
-        Language.RU: "Запускаю ИИ-анализ…",
-        Language.EN: "Running AI analysis…",
-        Language.ES: "Ejecutando análisis de IA…",
+        Language.RU: "Анализирую отзывы и детали объявления…",
+        Language.EN: "Analyzing reviews and listing details…",
+        Language.ES: "Analizando reseñas y detalles del anuncio…",
+    },
+    "msg.progress.enriching": {
+        Language.RU: "Проверяю район и инфраструктуру…",
+        Language.EN: "Checking area and infrastructure…",
+        Language.ES: "Verificando zona e infraestructura…",
+    },
+    "msg.progress.preparing": {
+        Language.RU: "Подготавливаю итоговый отчёт…",
+        Language.EN: "Preparing final report…",
+        Language.ES: "Preparando el informe final…",
     },
     # --- Language switching ---
     "msg.language_set": {
