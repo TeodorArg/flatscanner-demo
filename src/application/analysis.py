@@ -24,7 +24,7 @@ from typing import TYPE_CHECKING
 
 import httpx
 
-from src.domain.delivery import ProgressSink
+from src.domain.delivery import AnalysisResultPresenter, ProgressSink
 from src.domain.listing import AnalysisJob
 from src.enrichment.runner import EnrichmentProvider
 
@@ -75,6 +75,7 @@ async def run_analysis_job(
     enrichment_providers: list[EnrichmentProvider] | None = None,
     raw_payload_repo: "RawPayloadRepository | None" = None,
     progress_sink: ProgressSink | None = None,
+    result_presenter: AnalysisResultPresenter | None = None,
 ) -> None:
     """Execute an analysis job through the full pipeline.
 
@@ -97,4 +98,5 @@ async def run_analysis_job(
         enrichment_providers=enrichment_providers,
         raw_payload_repo=raw_payload_repo,
         progress_sink=progress_sink,
+        result_presenter=result_presenter,
     )

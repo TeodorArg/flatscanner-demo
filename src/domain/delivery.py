@@ -10,9 +10,14 @@ channel so that the core platform can import it freely.
 from __future__ import annotations
 
 from enum import Enum
-from typing import Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from pydantic import BaseModel
+
+if TYPE_CHECKING:
+    from src.analysis.result import AnalysisResult
+    from src.domain.listing import NormalizedListing
+    from src.i18n.types import Language
 
 
 class DeliveryChannel(str, Enum):
@@ -80,4 +85,23 @@ class ProgressSink(Protocol):
         but may additionally surface an error indicator.  On Telegram this
         deletes the progress message.
         """
+        ...
+
+
+@runtime_checkable
+class AnalysisResultPresenter(Protocol):
+    """Channel-specific interface for presenting a completed analysis result.
+
+    The analysis engine produces a structured canonical result.  Concrete
+    delivery channels are responsible for rendering and delivering that result
+    to the user in their own format (Telegram message, future Web DTO, etc.).
+    """
+
+    async def deliver(
+        self,
+        listing: "NormalizedListing",
+        result: "AnalysisResult",
+        language: "Language",
+    ) -> None:
+        """Render and deliver the final analysis result for one channel."""
         ...

@@ -468,7 +468,7 @@ class TestProcessJobProgressFlow:
         settings = _make_settings()
         spy = SpyProgressSink()
 
-        with patch("src.jobs.processor.send_message", new_callable=AsyncMock):
+        with patch("src.telegram.presenter.send_message", new_callable=AsyncMock):
             await process_job(
                 job,
                 settings,
@@ -500,7 +500,7 @@ class TestProcessJobProgressFlow:
         settings = _make_settings()
         spy = SpyProgressSink()
 
-        with patch("src.jobs.processor.send_message", new_callable=AsyncMock):
+        with patch("src.telegram.presenter.send_message", new_callable=AsyncMock):
             await process_job(
                 job,
                 settings,
@@ -553,7 +553,7 @@ class TestProcessJobProgressFlow:
             patch("src.telegram.progress.edit_message_text", side_effect=fake_edit),
             patch("src.telegram.progress.delete_message", side_effect=fake_delete),
             patch("src.telegram.progress.send_chat_action", new_callable=AsyncMock),
-            patch("src.jobs.processor.send_message", new_callable=AsyncMock),
+            patch("src.telegram.presenter.send_message", new_callable=AsyncMock),
         ):
             await process_job(
                 job,
@@ -583,7 +583,7 @@ class TestProcessJobProgressFlow:
                 AsyncMock(side_effect=Exception("Telegram error")),
             ),
             patch("src.telegram.progress.send_chat_action", new_callable=AsyncMock),
-            patch("src.jobs.processor.send_message", mock_send),
+            patch("src.telegram.presenter.send_message", mock_send),
         ):
             await process_job(
                 job,
@@ -594,3 +594,4 @@ class TestProcessJobProgressFlow:
             )
 
         mock_send.assert_awaited_once()
+

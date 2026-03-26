@@ -389,7 +389,7 @@ class TestProcessJobEnrichmentIntegration:
 
         providers = [_FailingProvider("transit"), _FailingProvider("safety")]
 
-        with patch("src.jobs.processor.send_message", new_callable=AsyncMock):
+        with patch("src.telegram.presenter.send_message", new_callable=AsyncMock):
             # Must not raise
             await process_job(
                 job,
@@ -427,7 +427,7 @@ class TestProcessJobEnrichmentIntegration:
             return await run_enrichments(lst, provs, timeout=0.01)
 
         with (
-            patch("src.jobs.processor.send_message", new_callable=AsyncMock),
+            patch("src.telegram.presenter.send_message", new_callable=AsyncMock),
             patch("src.jobs.processor.run_enrichments", side_effect=fast_enrich),
         ):
             await process_job(
@@ -470,7 +470,7 @@ class TestProcessJobEnrichmentIntegration:
 
         with (
             patch("src.jobs.processor.run_enrichments", side_effect=capture_enrich),
-            patch("src.jobs.processor.send_message", new_callable=AsyncMock),
+            patch("src.telegram.presenter.send_message", new_callable=AsyncMock),
         ):
             await process_job(
                 job,
@@ -503,7 +503,7 @@ class TestProcessJobEnrichmentIntegration:
             patch(
                 "src.jobs.processor.run_enrichments", new_callable=AsyncMock
             ) as mock_run,
-            patch("src.jobs.processor.send_message", new_callable=AsyncMock),
+            patch("src.telegram.presenter.send_message", new_callable=AsyncMock),
         ):
             await process_job(
                 job,
@@ -540,7 +540,7 @@ class TestProcessJobEnrichmentIntegration:
         async def fake_send(token, chat_id, text, *, client=None):
             sent_texts.append(text)
 
-        with patch("src.jobs.processor.send_message", side_effect=fake_send):
+        with patch("src.telegram.presenter.send_message", side_effect=fake_send):
             await process_job(
                 job,
                 settings,
@@ -552,3 +552,4 @@ class TestProcessJobEnrichmentIntegration:
 
         assert len(sent_texts) == 1
         assert "Test flat" in sent_texts[0]
+

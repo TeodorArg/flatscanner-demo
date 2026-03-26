@@ -193,7 +193,7 @@ class TestProcessorRawPayloadPersistence:
 
         mock_repo = AsyncMock()
 
-        with patch("src.jobs.processor.send_message", new_callable=AsyncMock):
+        with patch("src.telegram.presenter.send_message", new_callable=AsyncMock):
             await process_job(
                 job,
                 settings,
@@ -227,7 +227,7 @@ class TestProcessorRawPayloadPersistence:
         mock_service.analyse = AsyncMock(return_value=result)
 
         # No raw_payload_repo passed — should complete without error
-        with patch("src.jobs.processor.send_message", new_callable=AsyncMock):
+        with patch("src.telegram.presenter.send_message", new_callable=AsyncMock):
             await process_job(
                 job,
                 settings,
@@ -261,7 +261,7 @@ class TestProcessorRawPayloadPersistence:
         async def fake_send(token, chat_id, text, *, client=None):
             sent_chats.append(chat_id)
 
-        with patch("src.jobs.processor.send_message", side_effect=fake_send):
+        with patch("src.telegram.presenter.send_message", side_effect=fake_send):
             await process_job(
                 job,
                 settings,
@@ -296,7 +296,7 @@ class TestProcessorRawPayloadPersistence:
 
         mock_repo = AsyncMock()
 
-        with patch("src.jobs.processor.send_message", new_callable=AsyncMock):
+        with patch("src.telegram.presenter.send_message", new_callable=AsyncMock):
             await process_job(
                 job,
                 settings,
@@ -501,3 +501,4 @@ class TestRunWorkerProcessDBWiring:
                 await run_worker_process(settings=settings, redis=redis)
 
         mock_engine.dispose.assert_awaited_once()
+
