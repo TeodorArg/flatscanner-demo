@@ -12,6 +12,7 @@
 ## Core Backend Shape (MVP)
 
 - `src/telegram/`: message intake and response formatting
+  - channel-specific progress + presenter implementations for Telegram delivery
 - `src/adapters/`: provider detection and source adapters
 - `src/domain/`: normalized listing models
 - `src/enrichment/`: external context providers
@@ -30,7 +31,8 @@ See ADR 004 for the full decision. The planned layers in execution order:
 3. **Analysis Module Framework** - module registry and runner; provider-specific + generic fallback per module. P3 now fronts the live analysis stage with a generic `AISummaryModule`, so future specialist modules can be added without replacing the delivery path again.
 4. **Enrichment Layer** - transport, nearby places, safety (future), comparable prices (future)
 5. **Result Assembly** - score aggregation, analysis cache lookup/write
-6. **Formatter / Delivery Layer** - Telegram formatter; future channels
+6. **Formatter / Delivery Layer** - channel-specific presenters/serializers;
+   Telegram now delivers final results through `TelegramAnalysisPresenter`
 7. **Persistence Layer** - six bounded areas: Users, ChatSettings, Billing, AnalysisCache, RawPayloads, AnalysisResults
 
 Migration is broken into phases P1-P7 in `specs/015-post-mvp-architecture-foundation/spec.md`.

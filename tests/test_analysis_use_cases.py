@@ -119,6 +119,7 @@ class TestRunAnalysisJob:
             enrichment_providers=None,
             raw_payload_repo=None,
             progress_sink=None,
+            result_presenter=None,
         )
 
     @pytest.mark.asyncio
@@ -128,6 +129,7 @@ class TestRunAnalysisJob:
         mock_settings = object()
         mock_sink = AsyncMock()
         mock_http = AsyncMock()
+        mock_presenter = object()
 
         with patch(
             "src.jobs.processor.process_job",
@@ -138,11 +140,13 @@ class TestRunAnalysisJob:
                 mock_settings,
                 http_client=mock_http,
                 progress_sink=mock_sink,
+                result_presenter=mock_presenter,
             )
 
         _, call_kwargs = mock_process.call_args
         assert call_kwargs["http_client"] is mock_http
         assert call_kwargs["progress_sink"] is mock_sink
+        assert call_kwargs["result_presenter"] is mock_presenter
 
     @pytest.mark.asyncio
     async def test_propagates_exceptions(self):

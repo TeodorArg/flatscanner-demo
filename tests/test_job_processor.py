@@ -122,7 +122,7 @@ class TestProcessJobSuccess:
             sent_texts.append(text)
             sent_chats.append(chat_id)
 
-        with patch("src.jobs.processor.send_message", side_effect=fake_send):
+        with patch("src.telegram.presenter.send_message", side_effect=fake_send):
             await process_job(
                 job,
                 settings,
@@ -148,7 +148,7 @@ class TestProcessJobSuccess:
         mock_service = MagicMock(spec=AnalysisService)
         mock_service.analyse = AsyncMock(return_value=result)
 
-        with patch("src.jobs.processor.send_message", new_callable=AsyncMock):
+        with patch("src.telegram.presenter.send_message", new_callable=AsyncMock):
             await process_job(
                 job,
                 settings,
@@ -172,7 +172,7 @@ class TestProcessJobSuccess:
         mock_service = MagicMock(spec=AnalysisService)
         mock_service.analyse = AsyncMock(return_value=result)
 
-        with patch("src.jobs.processor.send_message", new_callable=AsyncMock):
+        with patch("src.telegram.presenter.send_message", new_callable=AsyncMock):
             await process_job(
                 job,
                 settings,
@@ -201,7 +201,7 @@ class TestProcessJobSuccess:
         async def capture_send(token, chat_id, text, *, client=None):
             captured_tokens.append(token)
 
-        with patch("src.jobs.processor.send_message", side_effect=capture_send):
+        with patch("src.telegram.presenter.send_message", side_effect=capture_send):
             await process_job(
                 job,
                 settings,
@@ -230,7 +230,7 @@ class TestProcessJobSuccess:
             patch(
                 "src.jobs.processor.resolve_adapter", return_value=mock_adapter
             ) as mock_resolve,
-            patch("src.jobs.processor.send_message", new_callable=AsyncMock),
+            patch("src.telegram.presenter.send_message", new_callable=AsyncMock),
         ):
             await process_job(
                 job, settings, analysis_service=mock_service,
@@ -238,6 +238,42 @@ class TestProcessJobSuccess:
             )
 
         mock_resolve.assert_called_once_with(job.source_url)
+
+    @pytest.mark.asyncio
+    async def test_injected_result_presenter_receives_translated_result(self):
+        """When result_presenter is injected, processor delegates final delivery to it."""
+        job = _make_job(language=Language.ES)
+        listing = _make_listing()
+        result = _make_result()
+        settings = _make_settings()
+
+        mock_adapter = MagicMock()
+        mock_adapter.fetch = AsyncMock(return_value=_make_adapter_result(listing))
+        mock_service = MagicMock(spec=AnalysisService)
+        mock_service.analyse = AsyncMock(return_value=result)
+
+        translated_result = result.model_copy(
+            update={"display_title": "Apartamento acogedor en Berlin"}
+        )
+        mock_translation_service = MagicMock()
+        mock_translation_service.translate = AsyncMock(return_value=translated_result)
+        mock_presenter = MagicMock()
+        mock_presenter.deliver = AsyncMock()
+
+        await process_job(
+            job,
+            settings,
+            adapter=mock_adapter,
+            analysis_service=mock_service,
+            translation_service=mock_translation_service,
+            result_presenter=mock_presenter,
+        )
+
+        mock_presenter.deliver.assert_awaited_once_with(
+            listing,
+            translated_result,
+            Language.ES,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -373,7 +409,7 @@ class TestProcessJobSendFailure:
             )
 
         with (
-            patch("src.jobs.processor.send_message", side_effect=failing_send),
+            patch("src.telegram.presenter.send_message", side_effect=failing_send),
             pytest.raises(httpx.HTTPStatusError),
         ):
             await process_job(
@@ -408,7 +444,7 @@ class TestProcessJobTranslationFallback:
         async def fake_send(token, chat_id, text, *, client=None):
             sent_texts.append(text)
 
-        with patch("src.jobs.processor.send_message", side_effect=fake_send):
+        with patch("src.telegram.presenter.send_message", side_effect=fake_send):
             await process_job(
                 job,
                 settings,
@@ -446,7 +482,7 @@ class TestProcessJobLocalizedTitle:
         async def fake_send(token, chat_id, text, *, client=None):
             sent_texts.append(text)
 
-        with patch("src.jobs.processor.send_message", side_effect=fake_send):
+        with patch("src.telegram.presenter.send_message", side_effect=fake_send):
             await process_job(
                 job,
                 settings,
@@ -537,7 +573,7 @@ class TestProcessOnce:
             patch("src.jobs.processor.resolve_adapter", return_value=mock_adapter),
             patch("src.jobs.processor.AnalysisService", return_value=mock_service),
             patch("src.jobs.processor.TranslationService", return_value=_make_passthrough_ts()),
-            patch("src.jobs.processor.send_message", new_callable=AsyncMock),
+            patch("src.telegram.presenter.send_message", new_callable=AsyncMock),
         ):
             outcome = await process_once(redis, settings)
 
@@ -875,7 +911,7 @@ class TestProcessJobFrameworkIntegration:
 
         with (
             patch.object(ModuleRunner, "run", spy_run),
-            patch("src.jobs.processor.send_message", new_callable=AsyncMock),
+            patch("src.telegram.presenter.send_message", new_callable=AsyncMock),
         ):
             await process_job(
                 job,
@@ -908,7 +944,7 @@ class TestProcessJobFrameworkIntegration:
         async def fake_send(token, chat_id, text, *, client=None):
             sent_texts.append(text)
 
-        with patch("src.jobs.processor.send_message", side_effect=fake_send):
+        with patch("src.telegram.presenter.send_message", side_effect=fake_send):
             await process_job(
                 job,
                 settings,
@@ -948,7 +984,7 @@ class TestProcessJobFrameworkIntegration:
 
         with (
             patch.object(ModuleRunner, "run", spy_run),
-            patch("src.jobs.processor.send_message", new_callable=AsyncMock),
+            patch("src.telegram.presenter.send_message", new_callable=AsyncMock),
         ):
             await process_job(
                 job,
@@ -993,7 +1029,7 @@ class TestProcessJobFrameworkIntegration:
 
         with (
             patch.object(ModuleRunner, "run", spy_run),
-            patch("src.jobs.processor.send_message", new_callable=AsyncMock),
+            patch("src.telegram.presenter.send_message", new_callable=AsyncMock),
         ):
             await process_job(
                 job,
@@ -1045,7 +1081,7 @@ class TestProcessJobReviewsModuleIntegration:
 
         with (
             patch.object(ModuleRunner, "run", spy_run),
-            patch("src.jobs.processor.send_message", new_callable=AsyncMock),
+            patch("src.telegram.presenter.send_message", new_callable=AsyncMock),
         ):
             await process_job(
                 job,
@@ -1085,7 +1121,7 @@ class TestProcessJobReviewsModuleIntegration:
 
         with (
             patch.object(ModuleRunner, "run", spy_run),
-            patch("src.jobs.processor.send_message", new_callable=AsyncMock),
+            patch("src.telegram.presenter.send_message", new_callable=AsyncMock),
         ):
             await process_job(
                 job,
@@ -1138,7 +1174,7 @@ class TestProcessJobReviewsModuleIntegration:
 
         with (
             patch.object(ModuleRunner, "run", spy_run),
-            patch("src.jobs.processor.send_message", new_callable=AsyncMock),
+            patch("src.telegram.presenter.send_message", new_callable=AsyncMock),
         ):
             await process_job(
                 job,
@@ -1172,7 +1208,7 @@ class TestProcessJobReviewsModuleIntegration:
         async def fake_send(token, chat_id, text, *, client=None):
             sent_texts.append(text)
 
-        with patch("src.jobs.processor.send_message", side_effect=fake_send):
+        with patch("src.telegram.presenter.send_message", side_effect=fake_send):
             await process_job(
                 job,
                 settings,
@@ -1184,3 +1220,4 @@ class TestProcessJobReviewsModuleIntegration:
         assert sent_texts
         assert "Cozy flat in Berlin" in sent_texts[0]
         assert "A pleasant flat in central Berlin." in sent_texts[0]
+

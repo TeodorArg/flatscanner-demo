@@ -9,13 +9,14 @@ through the full pipeline:
 3. Run AI analysis through ``AnalysisService`` (canonical English output).
 4. Translate freeform result blocks via ``TranslationService`` when the job
    language is not English.  Translated output is ephemeral and never persisted.
-5. Format the translated result with ``format_analysis_message``.
-6. Send the Telegram reply via ``send_message``.
+5. Delegate final presentation + delivery through a channel-specific presenter.
 
 Progress reporting is delegated to a ``ProgressSink`` implementation so that
 the pipeline itself has no direct dependency on Telegram progress helpers.
 When no sink is provided, a ``TelegramProgressSink`` is built from the job's
-``telegram_context`` as the default.
+``telegram_context`` as the default.  Final result delivery follows the same
+pattern: when no presenter is injected, a ``TelegramAnalysisPresenter`` is
+built from the job's Telegram delivery context.
 
 **Current channel support**: only ``DeliveryChannel.TELEGRAM`` is implemented
 end-to-end here.  Support for other delivery channels (e.g. ``WEB``) is
@@ -23,8 +24,8 @@ deferred to later feature slices (S2+) and will be wired in separately once
 channel-specific presenter and delivery adapters are available.
 
 Dependencies can be injected for unit testing (adapter, analysis_service,
-translation_service, http_client, raw_payload_repo, progress_sink).  When not
-supplied, production defaults are used.
+translation_service, http_client, raw_payload_repo, progress_sink,
+result_presenter).  When not supplied, production defaults are used.
 """
 
 from __future__ import annotations
@@ -44,15 +45,14 @@ from src.analysis.result import ReviewInsightsBlock
 from src.analysis.reviews.service import ReviewAnalysisService
 from src.analysis.runner import ModuleRunner
 from src.analysis.service import AnalysisService
-from src.domain.delivery import ProgressSink
+from src.domain.delivery import AnalysisResultPresenter, ProgressSink
 from src.domain.listing import AnalysisJob
 from src.domain.raw_payload import RawPayload
 from src.enrichment.runner import EnrichmentOutcome, EnrichmentProvider, run_enrichments
 from src.i18n import get_string
 from src.i18n.types import Language
-from src.telegram.formatter import format_analysis_message
+from src.telegram.presenter import TelegramAnalysisPresenter
 from src.telegram.progress import TelegramProgressSink
-from src.telegram.sender import send_message
 from src.translation.service import TranslationError, TranslationService
 
 if TYPE_CHECKING:
@@ -111,6 +111,7 @@ async def process_job(
     enrichment_providers: list[EnrichmentProvider] | None = None,
     raw_payload_repo: "RawPayloadRepository | None" = None,
     progress_sink: ProgressSink | None = None,
+    result_presenter: AnalysisResultPresenter | None = None,
 ) -> None:
     """Process one queued analysis job end-to-end.
 
@@ -147,6 +148,11 @@ async def process_job(
         Optional ``ProgressSink`` for reporting pipeline stage progress to the
         user.  When ``None`` a ``TelegramProgressSink`` is constructed from the
         job's ``telegram_context`` as the production default.
+    result_presenter:
+        Optional channel-specific presenter that formats + delivers the final
+        translated result.  When ``None`` a ``TelegramAnalysisPresenter`` is
+        constructed from the job's ``telegram_context`` as the production
+        default.
 
     Raises
     ------
@@ -188,6 +194,11 @@ async def process_job(
         token,
         tg_ctx.chat_id,
         tg_ctx.progress_message_id,
+        client=http_client,
+    )
+    presenter = result_presenter or TelegramAnalysisPresenter(
+        token,
+        tg_ctx.chat_id,
         client=http_client,
     )
 
@@ -295,11 +306,8 @@ async def process_job(
             translated_result = result
             render_language = Language.EN
 
-        # --- 5. Format -------------------------------------------------------
-        text = format_analysis_message(listing, translated_result, render_language)
-
-        # --- 6. Send final result ---------------------------------------------
-        await send_message(token, chat_id, text, client=http_client)
+        # --- 5. Present + deliver final result --------------------------------
+        await presenter.deliver(listing, translated_result, render_language)
         logger.info("Reply sent for job %s to chat %s", job.id, chat_id)
         _pipeline_succeeded = True
 

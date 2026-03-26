@@ -21,7 +21,10 @@
 - [x] S2: shared submission/use-case layer — `src/application/analysis.py` with
       `submit_analysis_request` and `run_analysis_job`; router and worker updated to
       call the use-case layer; 10 focused tests added in `tests/test_analysis_use_cases.py`
-- [ ] S3: Telegram presenter split
+- [x] S3: Telegram presenter split - `process_job` now delegates final Telegram
+      formatting + delivery through `TelegramAnalysisPresenter`; the
+      application layer forwards an optional `result_presenter`; focused tests
+      cover the presenter seam and full suite remains green
 - [ ] S4: web delivery foundation
 - [ ] S5: web UI integration
 
