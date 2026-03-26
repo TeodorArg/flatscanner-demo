@@ -10,6 +10,10 @@
 
 ## Follow-up Slices
 
+- [ ] S1b: migrate Telegram fields out of `AnalysisJob` — move `telegram_chat_id`,
+      `telegram_message_id`, and `telegram_progress_message_id` from the core job
+      model into `TelegramDeliveryContext`; update the router, worker, and all tests
+      that construct `AnalysisJob` directly (prerequisite for a fully channel-neutral job shape)
 - [ ] S2: shared submission/use-case layer
 - [ ] S3: Telegram presenter split
 - [ ] S4: web delivery foundation

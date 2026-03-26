@@ -183,6 +183,7 @@ async def process_job(
 
     await sink.start()
 
+    _pipeline_succeeded = False
     try:
         # Stage 1: extracting -----------------------------------------------
         await sink.update(get_string("msg.progress.extracting", job.language))
@@ -290,9 +291,13 @@ async def process_job(
         # --- 6. Send final result ---------------------------------------------
         await send_message(token, chat_id, text, client=http_client)
         logger.info("Reply sent for job %s to chat %s", job.id, chat_id)
+        _pipeline_succeeded = True
 
     finally:
-        # Best-effort cleanup: delete the progress message whether the job
-        # succeeded or failed at any stage (fetch / enrich / analysis /
-        # translation / send).
-        await sink.cleanup()
+        # Notify the sink whether the pipeline completed successfully or not
+        # so that channel-specific implementations can handle each case
+        # differently (e.g. surface an error indicator on failure).
+        if _pipeline_succeeded:
+            await sink.complete()
+        else:
+            await sink.fail()

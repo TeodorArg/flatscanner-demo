@@ -64,11 +64,20 @@ class ProgressSink(Protocol):
         """
         ...
 
-    async def cleanup(self) -> None:
-        """Called in the finally block at the end of pipeline execution.
+    async def complete(self) -> None:
+        """Called when the pipeline finishes successfully.
 
         Implementations should remove any transient progress indicator and
-        stop any background activity started in ``start()``.  This must be
-        called whether the pipeline succeeded or failed.
+        stop background activity started in ``start()``.  On Telegram this
+        deletes the progress message so the final result message stands alone.
+        """
+        ...
+
+    async def fail(self) -> None:
+        """Called when the pipeline terminates with an error.
+
+        Implementations should clean up the same resources as ``complete()``
+        but may additionally surface an error indicator.  On Telegram this
+        deletes the progress message.
         """
         ...

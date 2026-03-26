@@ -308,27 +308,50 @@ class TestTelegramProgressSink:
             await sink.update("text")  # must not raise
 
     @pytest.mark.asyncio
-    async def test_cleanup_skips_delete_when_message_id_is_none(self):
+    async def test_complete_skips_delete_when_message_id_is_none(self):
         mock_delete = AsyncMock()
         with patch("src.telegram.progress.delete_message", mock_delete):
             sink = TelegramProgressSink("token", 1, None)
-            await sink.cleanup()
+            await sink.complete()
         mock_delete.assert_not_awaited()
 
     @pytest.mark.asyncio
-    async def test_cleanup_calls_delete_when_message_id_given(self):
+    async def test_complete_calls_delete_when_message_id_given(self):
         mock_delete = AsyncMock()
         with patch("src.telegram.progress.delete_message", mock_delete):
             sink = TelegramProgressSink("token", 1001, 55)
-            await sink.cleanup()
+            await sink.complete()
         mock_delete.assert_awaited_once_with("token", 1001, 55, client=None)
 
     @pytest.mark.asyncio
-    async def test_cleanup_swallows_delete_errors(self):
+    async def test_complete_swallows_delete_errors(self):
         mock_delete = AsyncMock(side_effect=Exception("not found"))
         with patch("src.telegram.progress.delete_message", mock_delete):
             sink = TelegramProgressSink("token", 1, 99)
-            await sink.cleanup()  # must not raise
+            await sink.complete()  # must not raise
+
+    @pytest.mark.asyncio
+    async def test_fail_skips_delete_when_message_id_is_none(self):
+        mock_delete = AsyncMock()
+        with patch("src.telegram.progress.delete_message", mock_delete):
+            sink = TelegramProgressSink("token", 1, None)
+            await sink.fail()
+        mock_delete.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_fail_calls_delete_when_message_id_given(self):
+        mock_delete = AsyncMock()
+        with patch("src.telegram.progress.delete_message", mock_delete):
+            sink = TelegramProgressSink("token", 1001, 55)
+            await sink.fail()
+        mock_delete.assert_awaited_once_with("token", 1001, 55, client=None)
+
+    @pytest.mark.asyncio
+    async def test_fail_swallows_delete_errors(self):
+        mock_delete = AsyncMock(side_effect=Exception("not found"))
+        with patch("src.telegram.progress.delete_message", mock_delete):
+            sink = TelegramProgressSink("token", 1, 99)
+            await sink.fail()  # must not raise
 
     @pytest.mark.asyncio
     async def test_start_creates_heartbeat(self):
@@ -347,8 +370,8 @@ class TestTelegramProgressSink:
         mock_action.assert_awaited()
 
     @pytest.mark.asyncio
-    async def test_cleanup_cancels_heartbeat(self):
-        """cleanup() must cancel the heartbeat started by start()."""
+    async def test_complete_cancels_heartbeat(self):
+        """complete() must cancel the heartbeat started by start()."""
         mock_action = AsyncMock()
         mock_delete = AsyncMock()
         with (
@@ -358,7 +381,22 @@ class TestTelegramProgressSink:
             sink = TelegramProgressSink("token", 1001, 42)
             await sink.start()
             assert sink._heartbeat is not None
-            await sink.cleanup()
+            await sink.complete()
+        assert sink._heartbeat.cancelled() or sink._heartbeat.done()
+
+    @pytest.mark.asyncio
+    async def test_fail_cancels_heartbeat(self):
+        """fail() must cancel the heartbeat started by start()."""
+        mock_action = AsyncMock()
+        mock_delete = AsyncMock()
+        with (
+            patch("src.telegram.progress.send_chat_action", mock_action),
+            patch("src.telegram.progress.delete_message", mock_delete),
+        ):
+            sink = TelegramProgressSink("token", 1001, 42)
+            await sink.start()
+            assert sink._heartbeat is not None
+            await sink.fail()
         assert sink._heartbeat.cancelled() or sink._heartbeat.done()
 
     @pytest.mark.asyncio
@@ -388,7 +426,8 @@ class SpyProgressSink:
     def __init__(self):
         self.started = False
         self.updates: list[str] = []
-        self.cleaned_up = False
+        self.completed = False
+        self.failed = False
 
     async def start(self) -> None:
         self.started = True
@@ -396,8 +435,11 @@ class SpyProgressSink:
     async def update(self, text: str) -> None:
         self.updates.append(text)
 
-    async def cleanup(self) -> None:
-        self.cleaned_up = True
+    async def complete(self) -> None:
+        self.completed = True
+
+    async def fail(self) -> None:
+        self.failed = True
 
 
 class TestProcessJobProgressFlow:
@@ -444,8 +486,8 @@ class TestProcessJobProgressFlow:
         assert spy.updates.index(analysing) < spy.updates.index(preparing)
 
     @pytest.mark.asyncio
-    async def test_sink_cleanup_called_on_success(self):
-        """cleanup() must be called in the finally block on the success path."""
+    async def test_sink_complete_called_on_success(self):
+        """complete() must be called when the pipeline succeeds."""
         job = _make_job(telegram_progress_message_id=42)
         settings = _make_settings()
         spy = SpyProgressSink()
@@ -460,11 +502,12 @@ class TestProcessJobProgressFlow:
                 progress_sink=spy,
             )
 
-        assert spy.cleaned_up
+        assert spy.completed
+        assert not spy.failed
 
     @pytest.mark.asyncio
-    async def test_sink_cleanup_called_on_pipeline_failure(self):
-        """cleanup() must be called even when the pipeline raises."""
+    async def test_sink_fail_called_on_pipeline_failure(self):
+        """fail() must be called when the pipeline raises."""
         job = _make_job(telegram_progress_message_id=42)
         settings = _make_settings()
         spy = SpyProgressSink()
@@ -480,7 +523,8 @@ class TestProcessJobProgressFlow:
                 progress_sink=spy,
             )
 
-        assert spy.cleaned_up
+        assert spy.failed
+        assert not spy.completed
 
     @pytest.mark.asyncio
     async def test_default_sink_is_telegram_when_none_injected(self):
@@ -515,31 +559,12 @@ class TestProcessJobProgressFlow:
         assert len(delete_calls) == 1
 
     @pytest.mark.asyncio
-    async def test_progress_failure_does_not_abort_pipeline(self):
-        """A ProgressSink that always raises must not abort the main pipeline."""
-
-        class FailingSink:
-            async def start(self) -> None:
-                raise Exception("sink start failed")
-
-            async def update(self, text: str) -> None:
-                raise Exception("sink update failed")
-
-            async def cleanup(self) -> None:
-                raise Exception("sink cleanup failed")
-
+    async def test_default_sink_swallows_telegram_api_failures(self):
+        """TelegramProgressSink must not abort the pipeline when Telegram API calls fail."""
         job = _make_job(telegram_progress_message_id=42)
         settings = _make_settings()
         mock_send = AsyncMock()
 
-        # The failing sink is NOT used by the processor — only the
-        # ProgressSink calls are delegated; failures inside those calls
-        # are the sink's responsibility to swallow.  This test verifies
-        # that pipeline exceptions from a badly-behaved sink propagate
-        # as expected (the sink is called via await, so its exceptions
-        # would bubble up).  A well-behaved sink must swallow internally.
-        # Here we test the default TelegramProgressSink is well-behaved
-        # even when Telegram API calls fail.
         with (
             patch(
                 "src.telegram.progress.edit_message_text",

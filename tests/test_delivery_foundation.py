@@ -86,12 +86,13 @@ class TestProgressSinkProtocol:
         assert isinstance(sink, ProgressSink)
 
     def test_plain_conformant_object_satisfies_protocol(self):
-        """Any object with the three async methods satisfies ProgressSink."""
+        """Any object with the four async methods satisfies ProgressSink."""
 
         class MinimalSink:
             async def start(self) -> None: ...
             async def update(self, text: str) -> None: ...
-            async def cleanup(self) -> None: ...
+            async def complete(self) -> None: ...
+            async def fail(self) -> None: ...
 
         assert isinstance(MinimalSink(), ProgressSink)
 
@@ -101,11 +102,11 @@ class TestProgressSinkProtocol:
         class IncompleteSink:
             async def start(self) -> None: ...
             async def update(self, text: str) -> None: ...
-            # cleanup is missing
+            # complete and fail are missing
 
         assert not isinstance(IncompleteSink(), ProgressSink)
 
     def test_protocol_has_expected_methods(self):
-        """ProgressSink exposes start, update, and cleanup."""
-        for method_name in ("start", "update", "cleanup"):
+        """ProgressSink exposes start, update, complete, and fail."""
+        for method_name in ("start", "update", "complete", "fail"):
             assert hasattr(ProgressSink, method_name)

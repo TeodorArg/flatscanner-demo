@@ -83,7 +83,19 @@ class TelegramProgressSink:
                 exc_info=True,
             )
 
-    async def cleanup(self) -> None:
+    async def complete(self) -> None:
+        """Delete the progress message and cancel the heartbeat (success path)."""
+        await self._cleanup()
+
+    async def fail(self) -> None:
+        """Delete the progress message and cancel the heartbeat (failure path)."""
+        await self._cleanup()
+
+    # ------------------------------------------------------------------
+    # Internal cleanup helper shared by complete() and fail()
+    # ------------------------------------------------------------------
+
+    async def _cleanup(self) -> None:
         """Delete the progress message and cancel the typing heartbeat."""
         if self._progress_message_id is not None:
             try:
