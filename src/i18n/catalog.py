@@ -50,18 +50,19 @@ _CATALOG: dict[str, dict[Language, str]] = {
         ),
     },
     "msg.analysing": {
-        Language.RU: (
-            "Понял! Анализирую объявление по ссылке {url} — "
-            "скоро вернусь с результатами."
-        ),
-        Language.EN: (
-            "Got it! I'm looking at the listing at {url} — "
-            "I'll get back to you shortly."
-        ),
-        Language.ES: (
-            "¡Entendido! Estoy analizando el anuncio en {url} — "
-            "te responderé en breve."
-        ),
+        Language.RU: "Анализирую объявление — это займёт около 2 минут…",
+        Language.EN: "Analysing your listing — this can take around 2 minutes…",
+        Language.ES: "Analizando tu anuncio — esto puede tardar unos 2 minutos…",
+    },
+    "msg.progress.fetching": {
+        Language.RU: "Загружаю данные объявления…",
+        Language.EN: "Fetching listing details…",
+        Language.ES: "Obteniendo detalles del anuncio…",
+    },
+    "msg.progress.analysing": {
+        Language.RU: "Запускаю ИИ-анализ…",
+        Language.EN: "Running AI analysis…",
+        Language.ES: "Ejecutando análisis de IA…",
     },
     # --- Language switching ---
     "msg.language_set": {

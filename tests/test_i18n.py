@@ -59,10 +59,11 @@ class TestGetString:
             result = get_string(key, Language.RU)
             assert result, f"Empty Russian string for key {key!r}"
 
-    def test_analysing_string_contains_placeholder(self):
+    def test_analysing_string_has_no_url_placeholder(self):
+        """Progress message must not echo the URL — the {url} placeholder was removed in 025."""
         for lang in Language:
             result = get_string("msg.analysing", lang)
-            assert "{url}" in result, f"Missing {{url}} placeholder for language {lang}"
+            assert "{url}" not in result, f"Unexpected {{url}} placeholder for language {lang}"
 
     def test_unknown_key_raises_key_error(self):
         with pytest.raises(KeyError, match="unknown.key"):

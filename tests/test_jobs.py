@@ -266,14 +266,15 @@ class TestWebhookEnqueueWiring:
 
     @patch("src.telegram.router.get_chat_language", new_callable=AsyncMock)
     @patch("src.telegram.router.enqueue_analysis_job", new_callable=AsyncMock)
-    @patch("src.telegram.router.send_message", new_callable=AsyncMock)
-    def test_enqueue_called_when_redis_available(self, mock_send, mock_enqueue, mock_get_lang):
+    @patch("src.telegram.router.send_message_return_id", new_callable=AsyncMock)
+    def test_enqueue_called_when_redis_available(self, mock_send_id, mock_enqueue, mock_get_lang):
         from fastapi.testclient import TestClient
 
         from src.app.main import create_app
         from src.i18n.types import Language
 
         mock_get_lang.return_value = Language.RU
+        mock_send_id.return_value = 999
 
         app = create_app(settings=_test_settings())
         mock_redis = MagicMock()

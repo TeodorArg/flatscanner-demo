@@ -426,19 +426,21 @@ class TestWebhookEndpoint:
             payload["message"]["text"] = text
         return payload
 
-    @patch("src.telegram.router.send_message", new_callable=AsyncMock)
-    def test_webhook_url_triggers_analyse_reply(self, mock_send):
+    @patch("src.telegram.router.send_message_return_id", new_callable=AsyncMock)
+    def test_webhook_url_triggers_analyse_reply(self, mock_send_return_id):
+        mock_send_return_id.return_value = 999
         client = self._client()
         payload = self._update_payload("https://www.airbnb.com/rooms/123", chat_id=1001)
         response = client.post("/telegram/webhook", json=payload)
         assert response.status_code == 200
         assert response.json() == {"ok": True}
-        mock_send.assert_awaited_once()
-        _, call_kwargs = mock_send.call_args
-        # Positional: (token, chat_id, text)
-        call_args = mock_send.call_args[0]
+        mock_send_return_id.assert_awaited_once()
+        call_args = mock_send_return_id.call_args[0]
         assert call_args[1] == 1001
-        assert "airbnb.com/rooms/123" in call_args[2]
+        # Progress message must NOT echo the URL
+        assert "airbnb.com/rooms/123" not in call_args[2]
+        # Must mention ~2 minutes
+        assert "2 " in call_args[2] or "минут" in call_args[2]
 
     @patch("src.telegram.router.get_chat_language", new_callable=AsyncMock)
     @patch("src.telegram.router.send_message", new_callable=AsyncMock)
@@ -464,12 +466,13 @@ class TestWebhookEndpoint:
         assert response.json() == {"ok": True}
         mock_send.assert_not_awaited()
 
-    @patch("src.telegram.router.send_message", new_callable=AsyncMock)
-    def test_webhook_uses_bot_token_from_settings(self, mock_send):
+    @patch("src.telegram.router.send_message_return_id", new_callable=AsyncMock)
+    def test_webhook_uses_bot_token_from_settings(self, mock_send_return_id):
+        mock_send_return_id.return_value = 999
         client = self._client(telegram_bot_token="my-secret-token")
         payload = self._update_payload("https://airbnb.com/rooms/1")
         client.post("/telegram/webhook", json=payload)
-        call_args = mock_send.call_args[0]
+        call_args = mock_send_return_id.call_args[0]
         assert call_args[0] == "my-secret-token"
 
     def test_webhook_rejects_invalid_payload(self):
@@ -477,18 +480,20 @@ class TestWebhookEndpoint:
         response = client.post("/telegram/webhook", json={"bad": "data"})
         assert response.status_code == 422
 
-    @patch("src.telegram.router.send_message", new_callable=AsyncMock)
-    def test_webhook_url_with_query_params_echoed_correctly(self, mock_send):
-        """URLs containing & query params must be echoed verbatim (no HTML escaping)."""
+    @patch("src.telegram.router.send_message_return_id", new_callable=AsyncMock)
+    def test_webhook_url_with_query_params_triggers_progress_not_echo(self, mock_send_return_id):
+        """URLs with query params must trigger the progress message (URL must not be echoed)."""
+        mock_send_return_id.return_value = 999
         url_with_params = "https://www.airbnb.com/rooms/123?check_in=2024-01-01&check_out=2024-01-05&guests=2"
         client = self._client()
         payload = self._update_payload(url_with_params, chat_id=1001)
         response = client.post("/telegram/webhook", json=payload)
         assert response.status_code == 200
         assert response.json() == {"ok": True}
-        call_args = mock_send.call_args[0]
-        # Full URL including query string must appear verbatim in the reply text
-        assert url_with_params in call_args[2]
+        mock_send_return_id.assert_awaited_once()
+        call_args = mock_send_return_id.call_args[0]
+        # URL must NOT be echoed back in the progress message
+        assert url_with_params not in call_args[2]
 
     @patch("src.telegram.router.get_chat_language", new_callable=AsyncMock)
     @patch("src.telegram.router.send_message", new_callable=AsyncMock)
@@ -508,19 +513,19 @@ class TestWebhookEndpoint:
         assert "looking at" not in call_args[2]
         assert "поддерж" in call_args[2].lower() or "airbnb" in call_args[2].lower()
 
-    @patch("src.telegram.router.send_message", new_callable=AsyncMock)
-    def test_webhook_returns_non_2xx_when_send_message_raises(self, mock_send):
+    @patch("src.telegram.router.send_message_return_id", new_callable=AsyncMock)
+    def test_webhook_returns_non_2xx_when_send_message_raises(self, mock_send_return_id):
         """Network / unexpected failures must return non-2xx so Telegram retries."""
-        mock_send.side_effect = Exception("network failure")
+        mock_send_return_id.side_effect = Exception("network failure")
         client = self._client()
         payload = self._update_payload("https://airbnb.com/rooms/1")
         response = client.post("/telegram/webhook", json=payload)
         assert response.status_code >= 400
 
-    @patch("src.telegram.router.send_message", new_callable=AsyncMock)
-    def test_webhook_returns_502_on_5xx_telegram_error(self, mock_send):
+    @patch("src.telegram.router.send_message_return_id", new_callable=AsyncMock)
+    def test_webhook_returns_502_on_5xx_telegram_error(self, mock_send_return_id):
         """5xx Telegram errors are transient — webhook must return 502 to trigger retry."""
-        mock_send.side_effect = httpx.HTTPStatusError(
+        mock_send_return_id.side_effect = httpx.HTTPStatusError(
             "503 Service Unavailable",
             request=httpx.Request("POST", "https://api.telegram.org/bottoken/sendMessage"),
             response=httpx.Response(503),
@@ -530,10 +535,10 @@ class TestWebhookEndpoint:
         response = client.post("/telegram/webhook", json=payload)
         assert response.status_code == 502
 
-    @patch("src.telegram.router.send_message", new_callable=AsyncMock)
-    def test_webhook_returns_200_on_4xx_telegram_error(self, mock_send):
+    @patch("src.telegram.router.send_message_return_id", new_callable=AsyncMock)
+    def test_webhook_returns_200_on_4xx_telegram_error(self, mock_send_return_id):
         """Permanent 4xx Telegram errors must be acknowledged (200) to avoid retry loops."""
-        mock_send.side_effect = httpx.HTTPStatusError(
+        mock_send_return_id.side_effect = httpx.HTTPStatusError(
             "400 Bad Request",
             request=httpx.Request("POST", "https://api.telegram.org/bottoken/sendMessage"),
             response=httpx.Response(400),
@@ -544,10 +549,10 @@ class TestWebhookEndpoint:
         assert response.status_code == 200
         assert response.json() == {"ok": True}
 
-    @patch("src.telegram.router.send_message", new_callable=AsyncMock)
-    def test_webhook_returns_200_on_403_telegram_error(self, mock_send):
+    @patch("src.telegram.router.send_message_return_id", new_callable=AsyncMock)
+    def test_webhook_returns_200_on_403_telegram_error(self, mock_send_return_id):
         """403 from Telegram (bot blocked) is permanent — must acknowledge and not retry."""
-        mock_send.side_effect = httpx.HTTPStatusError(
+        mock_send_return_id.side_effect = httpx.HTTPStatusError(
             "403 Forbidden",
             request=httpx.Request("POST", "https://api.telegram.org/bottoken/sendMessage"),
             response=httpx.Response(403),
@@ -557,10 +562,10 @@ class TestWebhookEndpoint:
         response = client.post("/telegram/webhook", json=payload)
         assert response.status_code == 200
 
-    @patch("src.telegram.router.send_message", new_callable=AsyncMock)
-    def test_webhook_returns_502_on_429_telegram_error(self, mock_send):
+    @patch("src.telegram.router.send_message_return_id", new_callable=AsyncMock)
+    def test_webhook_returns_502_on_429_telegram_error(self, mock_send_return_id):
         """429 Too Many Requests is transient — webhook must return 502 so Telegram retries."""
-        mock_send.side_effect = httpx.HTTPStatusError(
+        mock_send_return_id.side_effect = httpx.HTTPStatusError(
             "429 Too Many Requests",
             request=httpx.Request("POST", "https://api.telegram.org/bottoken/sendMessage"),
             response=httpx.Response(429),
@@ -570,9 +575,10 @@ class TestWebhookEndpoint:
         response = client.post("/telegram/webhook", json=payload)
         assert response.status_code == 502
 
-    @patch("src.telegram.router.send_message", new_callable=AsyncMock)
-    def test_webhook_caption_airbnb_url_triggers_analyse_reply(self, mock_send):
+    @patch("src.telegram.router.send_message_return_id", new_callable=AsyncMock)
+    def test_webhook_caption_airbnb_url_triggers_analyse_reply(self, mock_send_return_id):
         """An Airbnb URL in a media caption must route to analysis just like message text."""
+        mock_send_return_id.return_value = 999
         client = self._client()
         payload = {
             "update_id": 1,
@@ -586,25 +592,27 @@ class TestWebhookEndpoint:
         response = client.post("/telegram/webhook", json=payload)
         assert response.status_code == 200
         assert response.json() == {"ok": True}
-        mock_send.assert_awaited_once()
-        call_args = mock_send.call_args[0]
+        mock_send_return_id.assert_awaited_once()
+        call_args = mock_send_return_id.call_args[0]
         assert call_args[1] == 1001
-        assert "airbnb.com/rooms/456" in call_args[2]
+        # Progress message must not echo the URL
+        assert "airbnb.com/rooms/456" not in call_args[2]
 
-    @patch("src.telegram.router.send_message", new_callable=AsyncMock)
-    def test_webhook_analyse_returns_502_when_redis_unavailable(self, mock_send):
-        """When Redis is unavailable, the analyse path must return 502 and not send a false acknowledgement."""
+    def test_webhook_analyse_returns_502_when_redis_unavailable(self):
+        """When Redis is unavailable, the analyse path must return 502 before any message is sent."""
         app = create_app(settings=_test_settings())
         # app.state.redis is None by default (lifespan not run)
         client = TestClient(app)
         payload = self._update_payload("https://www.airbnb.com/rooms/123")
         response = client.post("/telegram/webhook", json=payload)
         assert response.status_code == 502
-        mock_send.assert_not_awaited()
 
-    @patch("src.telegram.router.send_message", new_callable=AsyncMock)
-    def test_webhook_analyse_returns_502_on_redis_error_during_enqueue(self, mock_send):
-        """A RedisError raised by enqueue_analysis_job must return 502 and not call send_message."""
+    @patch("src.telegram.router.send_message_return_id", new_callable=AsyncMock)
+    def test_webhook_analyse_returns_502_on_redis_error_during_enqueue(
+        self, mock_send_return_id
+    ):
+        """A RedisError raised by enqueue_analysis_job must return 502."""
+        mock_send_return_id.return_value = 999
         app = create_app(settings=_test_settings())
         mock_redis = AsyncMock()
         mock_redis.eval.side_effect = aioredis.RedisError("connection reset")
@@ -613,7 +621,6 @@ class TestWebhookEndpoint:
         payload = self._update_payload("https://www.airbnb.com/rooms/123")
         response = client.post("/telegram/webhook", json=payload)
         assert response.status_code == 502
-        mock_send.assert_not_awaited()
 
 
 # ---------------------------------------------------------------------------

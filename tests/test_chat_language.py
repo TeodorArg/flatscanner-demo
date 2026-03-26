@@ -151,13 +151,13 @@ class TestRouterLanguageSnapshot:
         }
 
     @patch("src.telegram.router.enqueue_analysis_job", new_callable=AsyncMock)
-    @patch("src.telegram.router.send_message", new_callable=AsyncMock)
+    @patch("src.telegram.router.send_message_return_id", new_callable=AsyncMock)
     @patch(
         "src.telegram.router.get_chat_language",
         new_callable=AsyncMock,
     )
     def test_job_carries_default_language_when_no_preference(
-        self, mock_get_lang, mock_send, mock_enqueue
+        self, mock_get_lang, mock_send_id, mock_enqueue
     ):
         from fastapi.testclient import TestClient
 
@@ -165,6 +165,7 @@ class TestRouterLanguageSnapshot:
         from src.domain.listing import AnalysisJob
 
         mock_get_lang.return_value = Language.RU
+        mock_send_id.return_value = 999
         mock_enqueue.return_value = True
 
         app = create_app(settings=_test_settings())
@@ -178,13 +179,13 @@ class TestRouterLanguageSnapshot:
         assert job.language == Language.RU
 
     @patch("src.telegram.router.enqueue_analysis_job", new_callable=AsyncMock)
-    @patch("src.telegram.router.send_message", new_callable=AsyncMock)
+    @patch("src.telegram.router.send_message_return_id", new_callable=AsyncMock)
     @patch(
         "src.telegram.router.get_chat_language",
         new_callable=AsyncMock,
     )
     def test_job_carries_english_when_chat_preference_is_en(
-        self, mock_get_lang, mock_send, mock_enqueue
+        self, mock_get_lang, mock_send_id, mock_enqueue
     ):
         from fastapi.testclient import TestClient
 
@@ -192,6 +193,7 @@ class TestRouterLanguageSnapshot:
         from src.domain.listing import AnalysisJob
 
         mock_get_lang.return_value = Language.EN
+        mock_send_id.return_value = 999
         mock_enqueue.return_value = True
 
         app = create_app(settings=_test_settings())
@@ -205,19 +207,20 @@ class TestRouterLanguageSnapshot:
         assert job.language == Language.EN
 
     @patch("src.telegram.router.enqueue_analysis_job", new_callable=AsyncMock)
-    @patch("src.telegram.router.send_message", new_callable=AsyncMock)
+    @patch("src.telegram.router.send_message_return_id", new_callable=AsyncMock)
     @patch(
         "src.telegram.router.get_chat_language",
         new_callable=AsyncMock,
     )
     def test_get_chat_language_called_with_correct_chat_id(
-        self, mock_get_lang, mock_send, mock_enqueue
+        self, mock_get_lang, mock_send_id, mock_enqueue
     ):
         from fastapi.testclient import TestClient
 
         from src.app.main import create_app
 
         mock_get_lang.return_value = Language.RU
+        mock_send_id.return_value = 999
         mock_enqueue.return_value = True
 
         app = create_app(settings=_test_settings())

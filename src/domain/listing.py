@@ -127,6 +127,9 @@ class AnalysisJob(BaseModel):
 
     telegram_chat_id: int
     telegram_message_id: int
+    # Set by the webhook handler after sending the initial progress message so
+    # the worker can edit / delete it during processing.
+    telegram_progress_message_id: int | None = None
 
     # Language snapshotted at enqueue time so in-flight jobs are stable even
     # if the chat preference changes before the job completes.
