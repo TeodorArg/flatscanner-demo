@@ -5,6 +5,7 @@
 Создать в новом проекте:
 
 - `AGENTS.md`
+- `CLAUDE.md`
 - `docs/README.md`
 - `docs/project-idea.md`
 - `docs/project/backend/backend-docs.md`
@@ -18,6 +19,7 @@
 
 - проект получает durable memory layer
 - появляется единая read order
+- появляется явный implementation-agent contract
 
 ## Этап 2. Ввести feature-memory workflow
 
@@ -45,6 +47,13 @@
 - кто implementation agent
 - кто review agent
 - кто и что может менять напрямую
+
+В `CLAUDE.md` или эквивалентном implementation guide закрепить:
+
+- что implementation agent обязан читать до кодинга
+- что он обязан обновлять вместе с кодом
+- как он ведет PR loop
+- что ему запрещено делать
 
 Также зафиксировать:
 

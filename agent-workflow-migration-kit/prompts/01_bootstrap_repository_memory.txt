@@ -7,6 +7,7 @@ Task:
 
 Required outputs:
 - AGENTS.md
+- CLAUDE.md or an equivalent implementation-agent contract file
 - docs/README.md
 - docs/project-idea.md
 - docs/project/backend/backend-docs.md
@@ -17,6 +18,7 @@ Required outputs:
 Requirements:
 - docs/ must be the durable memory layer
 - specs/<feature-id>/ must be the feature memory layer
+- CLAUDE.md must define the implementation-agent coding contract
 - define a clear read order
 - explain what belongs in docs vs specs
 - do not add product-specific assumptions unless the repo already contains them
@@ -26,4 +28,3 @@ Validation:
 - summarize what files were created
 - explain the read order
 - explain how a new feature should be started
-

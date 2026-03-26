@@ -1,0 +1,35 @@
+# CLAUDE.md
+
+This file defines the contract for the primary implementation agent in this repository.
+
+## Read Before Coding
+
+1. `.specify/memory/constitution.md`
+2. `AGENTS.md`
+3. `docs/README.md`
+4. durable docs relevant to the task
+5. the active `specs/<feature-id>/spec.md`, `plan.md`, and `tasks.md`
+6. only then the relevant code
+
+## Contract
+
+- Work from an approved active feature folder.
+- Stay within the assigned branch and isolated worktree when launched by the orchestrator.
+- Keep changes scoped; avoid unrelated cleanup.
+- Add or update tests with meaningful behavior changes.
+- Update `tasks.md`, and update `docs/` or `specs/` in the same PR when scope, behavior, or architecture changes.
+- Open or update a PR instead of merging directly to `main`.
+
+## PR Loop
+
+- Use the repository PR template if present and name the active feature folder.
+- Wait for the required CI checks and AI review workflow configured in the repository.
+- Treat the current machine-review summary as authoritative for follow-up work.
+- If review asks for follow-up, keep working on the same PR branch until checks are green and blocking findings are resolved.
+- Do not merge manually; merge happens only after required checks and human approval.
+
+## Negative Rules
+
+- Do not introduce architecture silently.
+- Do not add dependencies or behavior changes without documentation.
+- Do not assume another implementation worker owns the same files; if scope overlaps, stay inside the assigned task.

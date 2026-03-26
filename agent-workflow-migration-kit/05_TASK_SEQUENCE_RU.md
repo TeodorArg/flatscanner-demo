@@ -7,6 +7,7 @@
 Цель:
 
 - создать `AGENTS.md`
+- создать `CLAUDE.md`
 - создать `docs/`
 - создать `specs/`
 - зафиксировать read order и durable memory model

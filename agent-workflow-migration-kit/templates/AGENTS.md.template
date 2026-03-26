@@ -8,15 +8,16 @@ This repository uses two memory layers:
 ## Read Order
 
 1. `.specify/memory/constitution.md`
-2. `docs/README.md`
-3. `docs/project-idea.md`
-4. `docs/project/frontend/frontend-docs.md`
-5. `docs/project/backend/backend-docs.md`
-6. `docs/adr/*.md`
-7. `specs/*/spec.md`
-8. `specs/*/plan.md`
-9. `specs/*/tasks.md`
-10. Relevant implementation files
+2. `CLAUDE.md`
+3. `docs/README.md`
+4. `docs/project-idea.md`
+5. `docs/project/frontend/frontend-docs.md`
+6. `docs/project/backend/backend-docs.md`
+7. `docs/adr/*.md`
+8. `specs/*/spec.md`
+9. `specs/*/plan.md`
+10. `specs/*/tasks.md`
+11. Relevant implementation files
 
 ## Roles
 
@@ -53,4 +54,3 @@ An orchestrated PR loop is finished only when the current PR head SHA has:
 - green required checks
 - no merge conflicts
 - only human approval or final merge remaining
-

@@ -27,6 +27,7 @@
 
 - [AI PR workflow](./docs/ai-pr-workflow.md)
 - [Claude worker orchestration](./docs/claude-worker-orchestration.md)
+- [Claude implementation contract](./CLAUDE.md)
 - [Agent roles and repository rules](./AGENTS.md)
 
 ## Основная идея

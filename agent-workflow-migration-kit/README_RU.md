@@ -21,6 +21,7 @@
 Переносится не продуктовый код, а framework разработки:
 
 - repository memory через `docs/` и `specs/`
+- implementation-agent contract через `CLAUDE.md` или эквивалентный файл
 - spec-first execution
 - роли оркестратора, implementation agent и review agent
 - isolated worktrees
@@ -68,6 +69,7 @@
 После прохождения всех шагов в новом проекте должны появиться:
 
 - `AGENTS.md`
+- `CLAUDE.md` или эквивалентный implementation-agent contract
 - `.specify/` или эквивалентный слой process templates
 - `docs/` как durable memory
 - `specs/` как task memory
