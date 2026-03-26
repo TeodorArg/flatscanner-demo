@@ -6,6 +6,7 @@ import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from pydantic import ValidationError
 
 from src.domain.delivery import DeliveryChannel, TelegramDeliveryContext
 from src.domain.listing import AnalysisJob, JobStatus, ListingProvider
@@ -332,3 +333,124 @@ class TestWebhookEnqueueWiring:
         response = client.post("/telegram/webhook", json=payload)
         assert response.status_code == 200
         mock_enqueue.assert_not_awaited()
+
+
+# ---------------------------------------------------------------------------
+# AnalysisJob invariant: TELEGRAM channel requires telegram_context
+# ---------------------------------------------------------------------------
+
+
+class TestAnalysisJobTelegramContextInvariant:
+    """A TELEGRAM job without telegram_context must be rejected at construction."""
+
+    def _base(self, **overrides) -> dict:
+        return {
+            "source_url": "https://www.airbnb.com/rooms/1",
+            "provider": ListingProvider.AIRBNB,
+            **overrides,
+        }
+
+    def test_telegram_without_context_raises(self):
+        with pytest.raises(ValidationError, match="telegram_context"):
+            AnalysisJob(
+                **self._base(
+                    delivery_channel=DeliveryChannel.TELEGRAM,
+                    telegram_context=None,
+                )
+            )
+
+    def test_telegram_without_context_raises_from_json(self):
+        raw = json.dumps({
+            "source_url": "https://www.airbnb.com/rooms/1",
+            "provider": "airbnb",
+            "delivery_channel": "telegram",
+            "telegram_context": None,
+        })
+        with pytest.raises(ValidationError, match="telegram_context"):
+            AnalysisJob.model_validate_json(raw)
+
+    def test_telegram_with_context_is_valid(self):
+        job = AnalysisJob(
+            **self._base(
+                delivery_channel=DeliveryChannel.TELEGRAM,
+                telegram_context=TelegramDeliveryContext(chat_id=1, message_id=2),
+            )
+        )
+        assert job.telegram_context.chat_id == 1
+
+    def test_web_channel_without_context_is_valid(self):
+        """Non-Telegram channels do not require telegram_context."""
+        job = AnalysisJob(
+            **self._base(
+                delivery_channel=DeliveryChannel.WEB,
+                telegram_context=None,
+            )
+        )
+        assert job.delivery_channel == DeliveryChannel.WEB
+        assert job.telegram_context is None
+
+    def test_default_channel_without_context_raises(self):
+        """Default channel is TELEGRAM, so omitting context must still fail."""
+        with pytest.raises(ValidationError, match="telegram_context"):
+            AnalysisJob(**self._base())
+
+
+# ---------------------------------------------------------------------------
+# Backward-compatibility shim: legacy flat telegram_* fields
+# ---------------------------------------------------------------------------
+
+
+class TestAnalysisJobLegacyTelegramFieldShim:
+    """Old Redis payloads with flat telegram_* fields must deserialize cleanly."""
+
+    def _legacy_dict(self, **overrides) -> dict:
+        base = {
+            "source_url": "https://www.airbnb.com/rooms/99",
+            "provider": "airbnb",
+            "telegram_chat_id": 5001,
+            "telegram_message_id": 12,
+        }
+        base.update(overrides)
+        return base
+
+    def test_flat_fields_produce_telegram_context(self):
+        job = AnalysisJob.model_validate(self._legacy_dict())
+        assert job.telegram_context is not None
+        assert job.telegram_context.chat_id == 5001
+        assert job.telegram_context.message_id == 12
+
+    def test_flat_fields_with_progress_id(self):
+        job = AnalysisJob.model_validate(
+            self._legacy_dict(telegram_progress_message_id=77)
+        )
+        assert job.telegram_context.progress_message_id == 77
+
+    def test_flat_fields_without_progress_id(self):
+        job = AnalysisJob.model_validate(self._legacy_dict())
+        assert job.telegram_context.progress_message_id is None
+
+    def test_flat_fields_infer_telegram_channel(self):
+        job = AnalysisJob.model_validate(self._legacy_dict())
+        assert job.delivery_channel == DeliveryChannel.TELEGRAM
+
+    def test_flat_fields_in_json_string(self):
+        raw = json.dumps(self._legacy_dict())
+        job = AnalysisJob.model_validate_json(raw)
+        assert job.telegram_context.chat_id == 5001
+        assert job.telegram_context.message_id == 12
+
+    def test_nested_context_takes_precedence_over_flat_fields(self):
+        """If both are present, telegram_context wins and flat fields are ignored."""
+        data = self._legacy_dict(
+            telegram_context={"chat_id": 9999, "message_id": 888},
+        )
+        job = AnalysisJob.model_validate(data)
+        assert job.telegram_context.chat_id == 9999
+
+    def test_flat_fields_roundtrip_produces_new_shape(self):
+        """Re-serializing a coerced job produces the new nested shape, not flat fields."""
+        job = AnalysisJob.model_validate(self._legacy_dict())
+        data = json.loads(job.model_dump_json())
+        assert "telegram_context" in data
+        assert data["telegram_context"]["chat_id"] == 5001
+        assert "telegram_chat_id" not in data

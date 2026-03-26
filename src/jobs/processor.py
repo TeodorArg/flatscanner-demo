@@ -17,6 +17,11 @@ the pipeline itself has no direct dependency on Telegram progress helpers.
 When no sink is provided, a ``TelegramProgressSink`` is built from the job's
 ``telegram_context`` as the default.
 
+**Current channel support**: only ``DeliveryChannel.TELEGRAM`` is implemented
+end-to-end here.  Support for other delivery channels (e.g. ``WEB``) is
+deferred to later feature slices (S2+) and will be wired in separately once
+channel-specific presenter and delivery adapters are available.
+
 Dependencies can be injected for unit testing (adapter, analysis_service,
 translation_service, http_client, raw_payload_repo, progress_sink).  When not
 supplied, production defaults are used.
