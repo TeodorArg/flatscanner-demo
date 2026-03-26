@@ -4,11 +4,11 @@
 
 | File | Change |
 |---|---|
-| `src/i18n/catalog.py` | Update `msg.analysing` (remove URL placeholder); add `msg.progress.fetching`, `msg.progress.analysing` |
+| `src/i18n/catalog.py` | Update `msg.analysing` (remove URL placeholder); add `msg.progress.extracting`, `msg.progress.enriching`, `msg.progress.analysing`, `msg.progress.preparing` |
 | `src/domain/listing.py` | Add `telegram_progress_message_id: int \| None = None` to `AnalysisJob` |
 | `src/telegram/sender.py` | Add `send_message_return_id`, `send_chat_action`, `delete_message` |
 | `src/telegram/router.py` | Analyse path: send progress msg → get id → attach to job → enqueue → return early |
-| `src/jobs/processor.py` | Import new sender helpers; add typing heartbeat; update progress at stages; delete progress before final send |
+| `src/jobs/processor.py` | Import new sender helpers; add typing heartbeat; update progress at 4 stages (extracting → enriching → analysing → preparing); delete progress in `finally` block (covers both success and failure paths) |
 | `tests/test_telegram_routing.py` | Update analyse-path tests (mock `send_message_return_id`, assert no URL in progress msg) |
 | `tests/test_progress_ux.py` | New focused tests for progress UX |
 

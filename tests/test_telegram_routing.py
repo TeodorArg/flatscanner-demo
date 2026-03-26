@@ -598,7 +598,8 @@ class TestWebhookEndpoint:
         # Progress message must not echo the URL
         assert "airbnb.com/rooms/456" not in call_args[2]
 
-    def test_webhook_analyse_returns_502_when_redis_unavailable(self):
+    @patch("src.telegram.router.send_message_return_id", new_callable=AsyncMock)
+    def test_webhook_analyse_returns_502_when_redis_unavailable(self, mock_send_return_id):
         """When Redis is unavailable, the analyse path must return 502 before any message is sent."""
         app = create_app(settings=_test_settings())
         # app.state.redis is None by default (lifespan not run)
@@ -606,6 +607,7 @@ class TestWebhookEndpoint:
         payload = self._update_payload("https://www.airbnb.com/rooms/123")
         response = client.post("/telegram/webhook", json=payload)
         assert response.status_code == 502
+        mock_send_return_id.assert_not_awaited()
 
     @patch("src.telegram.router.send_message_return_id", new_callable=AsyncMock)
     def test_webhook_analyse_returns_502_on_redis_error_during_enqueue(

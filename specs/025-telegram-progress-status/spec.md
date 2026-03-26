@@ -25,9 +25,11 @@ Replace the immediate reply with a localized progress message that:
 ### Worker / Processor
 
 - On job start: begin a background typing-action heartbeat (fires `sendChatAction` with `typing` every 4 s until cancelled).
-- After adapter resolved / before fetch: update progress message to `msg.progress.fetching`.
-- After listing fetched / before analysis: update progress message to `msg.progress.analysing`.
-- Before final `sendMessage`: delete the progress message via `deleteMessage`.
+- Before fetch: update progress message to `msg.progress.extracting`.
+- Before enrichment: update progress message to `msg.progress.enriching`.
+- Before AI analysis modules: update progress message to `msg.progress.analysing`.
+- Before translate / format / send: update progress message to `msg.progress.preparing`.
+- **Always** delete the progress message via `deleteMessage` in a `finally` block so cleanup happens whether the job succeeds or raises at any stage.
 - **All progress operations are best-effort**: any failure is logged at DEBUG and swallowed. They must never abort the pipeline or affect the final result.
 
 ### i18n
@@ -37,8 +39,10 @@ New catalog keys:
 | Key | RU | EN | ES |
 |---|---|---|---|
 | `msg.analysing` | Анализирую объявление — это займёт около 2 минут… | Analysing your listing — this can take around 2 minutes… | Analizando tu anuncio — esto puede tardar unos 2 minutos… |
-| `msg.progress.fetching` | Загружаю данные объявления… | Fetching listing details… | Obteniendo detalles del anuncio… |
-| `msg.progress.analysing` | Запускаю ИИ-анализ… | Running AI analysis… | Ejecutando análisis de IA… |
+| `msg.progress.extracting` | Загружаю данные объявления… | Extracting listing data… | Extrayendo datos del anuncio… |
+| `msg.progress.enriching` | Проверяю район и инфраструктуру… | Checking area and infrastructure… | Verificando zona e infraestructura… |
+| `msg.progress.analysing` | Анализирую отзывы и объявление… | Analyzing reviews and listing details… | Analizando reseñas y detalles del anuncio… |
+| `msg.progress.preparing` | Готовлю итоговый отчёт… | Preparing final report… | Preparando el informe final… |
 
 ## Non-goals
 

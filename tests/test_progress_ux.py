@@ -466,8 +466,8 @@ class TestProcessJobProgressFlow:
         assert texts.index(analysing) < texts.index(preparing)
 
     @pytest.mark.asyncio
-    async def test_progress_message_deleted_before_final_send(self):
-        """delete_message must be called before send_message."""
+    async def test_progress_message_deleted_on_success(self):
+        """delete_message must always be called on the success path (via finally)."""
         job = _make_job(telegram_progress_message_id=42)
         settings = _make_settings()
 
@@ -500,7 +500,33 @@ class TestProcessJobProgressFlow:
 
         assert "delete" in call_order
         assert "send" in call_order
-        assert call_order.index("delete") < call_order.index("send")
+        # delete runs in finally, so it comes after send on the success path
+        assert call_order.index("send") < call_order.index("delete")
+
+    @pytest.mark.asyncio
+    async def test_progress_message_deleted_on_pipeline_failure(self):
+        """delete_message must be called even when the pipeline raises (finally cleanup)."""
+        job = _make_job(telegram_progress_message_id=42)
+        settings = _make_settings()
+
+        mock_delete = AsyncMock()
+        mock_adapter = MagicMock()
+        mock_adapter.fetch = AsyncMock(side_effect=RuntimeError("fetch failed"))
+
+        with (
+            patch("src.jobs.processor.edit_message_text", new_callable=AsyncMock),
+            patch("src.jobs.processor.delete_message", mock_delete),
+            patch("src.jobs.processor.send_message", new_callable=AsyncMock),
+            patch("src.jobs.processor.send_chat_action", new_callable=AsyncMock),
+        ):
+            with pytest.raises(RuntimeError, match="fetch failed"):
+                await process_job(
+                    job,
+                    settings,
+                    adapter=mock_adapter,
+                )
+
+        mock_delete.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_progress_failure_does_not_abort_pipeline(self):

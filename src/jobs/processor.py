@@ -351,12 +351,15 @@ async def process_job(
         # --- 5. Format -------------------------------------------------------
         text = format_analysis_message(listing, translated_result, render_language)
 
-        # --- 6. Delete progress message, then send final result --------------
-        await _delete_progress(token, chat_id, progress_id, client=http_client)
+        # --- 6. Send final result ---------------------------------------------
         await send_message(token, chat_id, text, client=http_client)
         logger.info("Reply sent for job %s to chat %s", job.id, chat_id)
 
     finally:
+        # Best-effort cleanup: delete the progress message whether the job
+        # succeeded or failed at any stage (fetch / enrich / analysis /
+        # translation / send).
+        await _delete_progress(token, chat_id, progress_id, client=http_client)
         heartbeat.cancel()
         try:
             await heartbeat
