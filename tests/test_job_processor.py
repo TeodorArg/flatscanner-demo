@@ -600,7 +600,7 @@ class TestRunWorker:
         redis.brpop.side_effect = brpop_side_effect
 
         with patch(
-            "src.jobs.worker.process_job",
+            "src.jobs.worker.run_analysis_job",
             side_effect=UnsupportedProviderError("unknown provider"),
         ):
             await run_worker(redis, settings)
@@ -626,7 +626,7 @@ class TestRunWorker:
 
         with (
             patch(
-                "src.jobs.worker.process_job",
+                "src.jobs.worker.run_analysis_job",
                 side_effect=RuntimeError("transient network error"),
             ),
             patch(
@@ -657,7 +657,7 @@ class TestRunWorker:
 
         with (
             patch(
-                "src.jobs.worker.process_job",
+                "src.jobs.worker.run_analysis_job",
                 side_effect=RuntimeError("transient error"),
             ),
             patch(
@@ -687,7 +687,7 @@ class TestRunWorker:
 
         with (
             patch(
-                "src.jobs.worker.process_job",
+                "src.jobs.worker.run_analysis_job",
                 side_effect=UnsupportedProviderError("unsupported"),
             ),
             patch(
@@ -744,7 +744,7 @@ class TestRunWorker:
 
         with (
             patch(
-                "src.jobs.worker.process_job",
+                "src.jobs.worker.run_analysis_job",
                 side_effect=RuntimeError("transient error"),
             ),
             patch(
@@ -780,7 +780,7 @@ class TestRunWorker:
         )
 
         with (
-            patch("src.jobs.worker.process_job", side_effect=error),
+            patch("src.jobs.worker.run_analysis_job", side_effect=error),
             patch("src.jobs.worker.requeue_raw_payload", new_callable=AsyncMock) as mock_requeue,
         ):
             await run_worker(redis, settings)
@@ -805,7 +805,7 @@ class TestRunWorker:
 
         with (
             patch(
-                "src.jobs.worker.process_job",
+                "src.jobs.worker.run_analysis_job",
                 side_effect=ApifyError("Apify actor run failed with status 400: invalid-input"),
             ),
             patch("src.jobs.worker.requeue_raw_payload", new_callable=AsyncMock) as mock_requeue,
@@ -832,7 +832,7 @@ class TestRunWorker:
 
         with (
             patch(
-                "src.jobs.worker.process_job",
+                "src.jobs.worker.run_analysis_job",
                 side_effect=OpenRouterError("OpenRouter request failed with status 500: upstream timeout"),
             ),
             patch("src.jobs.worker.requeue_raw_payload", new_callable=AsyncMock) as mock_requeue,

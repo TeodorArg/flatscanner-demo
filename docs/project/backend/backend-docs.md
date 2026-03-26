@@ -17,6 +17,9 @@
 - `src/enrichment/`: external context providers
 - `src/analysis/`: AI summarization and price-fairness logic
 - `src/jobs/` and `src/storage/`: async execution and persistence
+- `src/application/`: channel-neutral use-case layer (`submit_analysis_request`,
+  `run_analysis_job`); all delivery channels must go through this layer instead
+  of calling queue or processor modules directly
 
 ## Target Post-MVP Layer Model
 

@@ -354,7 +354,7 @@ class TestProcessOnceWorkerWiring:
 
         with (
             patch("src.jobs.worker.dequeue_analysis_job", new_callable=AsyncMock, return_value=job),
-            patch("src.jobs.worker.process_job", side_effect=fake_process_job),
+            patch("src.jobs.worker.run_analysis_job", side_effect=fake_process_job),
             patch("src.jobs.worker.build_default_providers", return_value=[]),
         ):
             result = await process_once(redis, settings, session_factory=session_factory)
@@ -381,7 +381,7 @@ class TestProcessOnceWorkerWiring:
 
         with (
             patch("src.jobs.worker.dequeue_analysis_job", new_callable=AsyncMock, return_value=job),
-            patch("src.jobs.worker.process_job", new_callable=AsyncMock),
+            patch("src.jobs.worker.run_analysis_job", new_callable=AsyncMock),
             patch("src.jobs.worker.build_default_providers", return_value=[]),
         ):
             await process_once(redis, settings, session_factory=session_factory)
@@ -410,7 +410,7 @@ class TestProcessOnceWorkerWiring:
 
         with (
             patch("src.jobs.worker.dequeue_analysis_job", new_callable=AsyncMock, return_value=job),
-            patch("src.jobs.worker.process_job", side_effect=fake_process_job),
+            patch("src.jobs.worker.run_analysis_job", side_effect=fake_process_job),
             patch("src.jobs.worker.build_default_providers", return_value=[]),
         ):
             result = await process_once(redis, settings, session_factory=None)

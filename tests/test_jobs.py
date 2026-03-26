@@ -237,7 +237,7 @@ class TestWebhookEnqueueWiring:
         }
 
     @patch("src.telegram.router.get_chat_language", new_callable=AsyncMock)
-    @patch("src.telegram.router.enqueue_analysis_job", new_callable=AsyncMock)
+    @patch("src.telegram.router.submit_analysis_request", new_callable=AsyncMock)
     @patch("src.telegram.router.send_message_return_id", new_callable=AsyncMock)
     def test_enqueue_called_when_redis_available(self, mock_send_id, mock_enqueue, mock_get_lang):
         from fastapi.testclient import TestClient
@@ -269,7 +269,7 @@ class TestWebhookEnqueueWiring:
         assert job.telegram_context.chat_id == 1001
         assert job.telegram_context.message_id == 5
 
-    @patch("src.telegram.router.enqueue_analysis_job", new_callable=AsyncMock)
+    @patch("src.telegram.router.submit_analysis_request", new_callable=AsyncMock)
     @patch("src.telegram.router.send_message", new_callable=AsyncMock)
     def test_enqueue_skipped_when_redis_is_none(self, mock_send, mock_enqueue):
         """Without a Redis connection, enqueue is skipped and a 502 is returned so Telegram retries."""
@@ -286,7 +286,7 @@ class TestWebhookEnqueueWiring:
         mock_enqueue.assert_not_awaited()
         mock_send.assert_not_awaited()
 
-    @patch("src.telegram.router.enqueue_analysis_job", new_callable=AsyncMock)
+    @patch("src.telegram.router.submit_analysis_request", new_callable=AsyncMock)
     @patch("src.telegram.router.send_message", new_callable=AsyncMock)
     def test_warning_logged_when_redis_is_none(self, mock_send, mock_enqueue, caplog):
         """A WARNING must be emitted when Redis is unavailable and the request gets a 502."""
@@ -307,7 +307,7 @@ class TestWebhookEnqueueWiring:
         mock_send.assert_not_awaited()
 
     @patch("src.telegram.router.get_chat_language", new_callable=AsyncMock)
-    @patch("src.telegram.router.enqueue_analysis_job", new_callable=AsyncMock)
+    @patch("src.telegram.router.submit_analysis_request", new_callable=AsyncMock)
     @patch("src.telegram.router.send_message", new_callable=AsyncMock)
     def test_enqueue_not_called_for_unsupported_url(self, mock_send, mock_enqueue, mock_get_lang):
         from fastapi.testclient import TestClient
