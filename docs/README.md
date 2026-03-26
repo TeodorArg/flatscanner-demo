@@ -19,4 +19,7 @@ Recommended order:
 4. `adr/*.md`
 5. `ai-pr-workflow.md`
 6. `claude-worker-orchestration.md`
-7. `glossary.md`
+7. `../README_PROCESS_RU.md`
+8. `../PROCESS_OVERVIEW_EN.md`
+9. `../DELIVERY_FLOW_RU.md`
+10. `glossary.md`
