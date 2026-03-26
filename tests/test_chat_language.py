@@ -151,7 +151,7 @@ class TestRouterLanguageSnapshot:
             },
         }
 
-    @patch("src.telegram.router.enqueue_analysis_job", new_callable=AsyncMock)
+    @patch("src.telegram.router.submit_analysis_request", new_callable=AsyncMock)
     @patch("src.telegram.router.send_message_return_id", new_callable=AsyncMock)
     @patch(
         "src.telegram.router.get_chat_language",
@@ -179,7 +179,7 @@ class TestRouterLanguageSnapshot:
         job: AnalysisJob = mock_enqueue.call_args[0][1]
         assert job.language == Language.RU
 
-    @patch("src.telegram.router.enqueue_analysis_job", new_callable=AsyncMock)
+    @patch("src.telegram.router.submit_analysis_request", new_callable=AsyncMock)
     @patch("src.telegram.router.send_message_return_id", new_callable=AsyncMock)
     @patch(
         "src.telegram.router.get_chat_language",
@@ -207,7 +207,7 @@ class TestRouterLanguageSnapshot:
         job: AnalysisJob = mock_enqueue.call_args[0][1]
         assert job.language == Language.EN
 
-    @patch("src.telegram.router.enqueue_analysis_job", new_callable=AsyncMock)
+    @patch("src.telegram.router.submit_analysis_request", new_callable=AsyncMock)
     @patch("src.telegram.router.send_message_return_id", new_callable=AsyncMock)
     @patch(
         "src.telegram.router.get_chat_language",

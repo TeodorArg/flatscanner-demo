@@ -27,9 +27,10 @@ from pydantic import ValidationError
 
 from src.adapters.apify_client import ApifyError
 from src.analysis.openrouter_client import OpenRouterError
+from src.application.analysis import run_analysis_job
 from src.domain.listing import AnalysisJob
 from src.enrichment.providers import build_default_providers
-from src.jobs.processor import UnsupportedProviderError, process_job
+from src.jobs.processor import UnsupportedProviderError
 from src.jobs.queue import QUEUE_KEY, dequeue_analysis_job, requeue_raw_payload
 from src.storage.sqlalchemy_repos import SQLAlchemyRawPayloadRepository
 
@@ -60,7 +61,7 @@ async def _process_job_with_capture(
     async with session_factory() as session:
         raw_payload_repo = SQLAlchemyRawPayloadRepository(session)
         try:
-            await process_job(
+            await run_analysis_job(
                 job,
                 settings,
                 enrichment_providers=providers,
@@ -148,7 +149,7 @@ async def process_once(
             job, settings, providers=providers, session_factory=session_factory
         )
     else:
-        await process_job(job, settings, enrichment_providers=providers)
+        await run_analysis_job(job, settings, enrichment_providers=providers)
     return True
 
 
@@ -195,7 +196,7 @@ async def run_worker(
                     job, settings, providers=providers, session_factory=session_factory
                 )
             else:
-                await process_job(job, settings, enrichment_providers=providers)
+                await run_analysis_job(job, settings, enrichment_providers=providers)
         except asyncio.CancelledError:
             logger.info("Worker cancelled - shutting down")
             break

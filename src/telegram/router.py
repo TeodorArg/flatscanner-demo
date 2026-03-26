@@ -6,10 +6,10 @@ import httpx
 import redis.asyncio as aioredis
 from fastapi import APIRouter, HTTPException, Request
 
+from src.application.analysis import submit_analysis_request
 from src.domain.delivery import DeliveryChannel, TelegramDeliveryContext
 from src.domain.listing import AnalysisJob
 from src.i18n import DEFAULT_LANGUAGE, Language, get_string
-from src.jobs.queue import enqueue_analysis_job
 from src.storage.chat_preferences import get_chat_language, set_chat_language
 from src.storage.chat_settings import ChatSettings, get_chat_settings, save_chat_settings
 from src.telegram.dispatcher import route_update
@@ -253,7 +253,7 @@ async def webhook(request: Request) -> dict:
             language=lang,
         )
         try:
-            await enqueue_analysis_job(redis, job)
+            await submit_analysis_request(redis, job)
         except aioredis.RedisError as exc:
             logger.error(
                 "Redis error while enqueueing job for chat_id=%s url=%s: %s",
