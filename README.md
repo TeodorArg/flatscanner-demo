@@ -17,6 +17,7 @@
 
 - [Русское описание процесса и структуры проекта](./README_PROCESS_RU.md)
 - [English process overview](./PROCESS_OVERVIEW_EN.md)
+- [Блок-схема delivery flow и деплоя](./DELIVERY_FLOW_RU.md)
 - [Durable docs layer](./docs/README.md)
 - [Product idea](./docs/project-idea.md)
 - [Backend docs](./docs/project/backend/backend-docs.md)
