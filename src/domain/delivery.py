@@ -1,0 +1,83 @@
+"""Delivery-channel abstractions for the analysis platform.
+
+These types establish the seam between the channel-agnostic analysis engine
+and concrete delivery implementations such as Telegram or a future Web UI.
+
+The module intentionally has no runtime dependencies on Telegram or any other
+channel so that the core platform can import it freely.
+"""
+
+from __future__ import annotations
+
+from enum import Enum
+from typing import Protocol, runtime_checkable
+
+from pydantic import BaseModel
+
+
+class DeliveryChannel(str, Enum):
+    """Supported delivery channels for analysis results."""
+
+    TELEGRAM = "telegram"
+    WEB = "web"
+
+
+class TelegramDeliveryContext(BaseModel):
+    """Telegram-specific delivery metadata attached to a channel-neutral job.
+
+    Carries the identifiers the Telegram delivery layer needs to send progress
+    updates and the final result to the correct chat.
+    """
+
+    chat_id: int
+    message_id: int
+    # Set after the initial progress message is sent; None means no progress
+    # indicator is active (e.g. when the webhook could not send one).
+    progress_message_id: int | None = None
+
+
+@runtime_checkable
+class ProgressSink(Protocol):
+    """Channel-neutral interface for reporting pipeline progress to the user.
+
+    The analysis engine calls these methods at well-defined pipeline
+    milestones.  Each concrete delivery channel (Telegram, Web, …) provides
+    its own implementation.
+
+    All methods are best-effort: implementations must swallow failures
+    internally and never propagate exceptions to the caller.
+    """
+
+    async def start(self) -> None:
+        """Called once when pipeline execution begins.
+
+        Implementations may use this to start background activity (e.g.
+        a Telegram typing heartbeat).
+        """
+        ...
+
+    async def update(self, text: str) -> None:
+        """Emit a user-visible stage description.
+
+        Called at each coarse pipeline stage (extracting, enriching,
+        analysing, preparing).  *text* is a pre-localised string.
+        """
+        ...
+
+    async def complete(self) -> None:
+        """Called when the pipeline finishes successfully.
+
+        Implementations should remove any transient progress indicator and
+        stop background activity started in ``start()``.  On Telegram this
+        deletes the progress message so the final result message stands alone.
+        """
+        ...
+
+    async def fail(self) -> None:
+        """Called when the pipeline terminates with an error.
+
+        Implementations should clean up the same resources as ``complete()``
+        but may additionally surface an error indicator.  On Telegram this
+        deletes the progress message.
+        """
+        ...
