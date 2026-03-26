@@ -24,3 +24,11 @@
 - [ ] S3: Telegram presenter split
 - [ ] S4: web delivery foundation
 - [ ] S5: web UI integration
+
+## Follow-up (deferred, no runtime change)
+
+- [ ] `UnsupportedProviderError` layering — this exception is currently raised inside
+  `src/jobs/processor.py`, which is below the use-case layer.  Once S3/S4 land and
+  the use-case layer owns more of the error surface, consider re-raising it (or a
+  channel-neutral wrapper) from `run_analysis_job` so callers don't need to import
+  from `src.jobs` to handle it.  No change needed until a second channel is wired up.
