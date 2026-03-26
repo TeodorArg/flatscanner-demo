@@ -65,8 +65,8 @@ This workflow makes development:
 
 ## Recommended reading
 
-- [Russian full process guide](C:\Users\User\FlatProject\flatscanner\README_PROCESS_RU.md)
-- [Project docs](C:\Users\User\FlatProject\flatscanner\docs\README.md)
-- [AI PR workflow](C:\Users\User\FlatProject\flatscanner\docs\ai-pr-workflow.md)
-- [Claude worker orchestration](C:\Users\User\FlatProject\flatscanner\docs\claude-worker-orchestration.md)
-- [Agent rules](C:\Users\User\FlatProject\flatscanner\AGENTS.md)
+- [Russian full process guide](./README_PROCESS_RU.md)
+- [Project docs](./docs/README.md)
+- [AI PR workflow](./docs/ai-pr-workflow.md)
+- [Claude worker orchestration](./docs/claude-worker-orchestration.md)
+- [Agent rules](./AGENTS.md)

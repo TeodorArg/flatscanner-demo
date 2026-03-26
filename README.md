@@ -15,17 +15,17 @@
 
 ### Для понимания проекта
 
-- [Русское описание процесса и структуры проекта](C:\Users\User\FlatProject\flatscanner\README_PROCESS_RU.md)
-- [English process overview](C:\Users\User\FlatProject\flatscanner\PROCESS_OVERVIEW_EN.md)
-- [Durable docs layer](C:\Users\User\FlatProject\flatscanner\docs\README.md)
-- [Product idea](C:\Users\User\FlatProject\flatscanner\docs\project-idea.md)
-- [Backend docs](C:\Users\User\FlatProject\flatscanner\docs\project\backend\backend-docs.md)
+- [Русское описание процесса и структуры проекта](./README_PROCESS_RU.md)
+- [English process overview](./PROCESS_OVERVIEW_EN.md)
+- [Durable docs layer](./docs/README.md)
+- [Product idea](./docs/project-idea.md)
+- [Backend docs](./docs/project/backend/backend-docs.md)
 
 ### Для process/workflow
 
-- [AI PR workflow](C:\Users\User\FlatProject\flatscanner\docs\ai-pr-workflow.md)
-- [Claude worker orchestration](C:\Users\User\FlatProject\flatscanner\docs\claude-worker-orchestration.md)
-- [Agent roles and repository rules](C:\Users\User\FlatProject\flatscanner\AGENTS.md)
+- [AI PR workflow](./docs/ai-pr-workflow.md)
+- [Claude worker orchestration](./docs/claude-worker-orchestration.md)
+- [Agent roles and repository rules](./AGENTS.md)
 
 ## Основная идея
 

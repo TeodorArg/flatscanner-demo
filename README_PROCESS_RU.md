@@ -707,12 +707,12 @@ flowchart TD
 
 Рекомендуемый порядок входа:
 
-1. [C:\Users\User\FlatProject\flatscanner\.specify\memory\constitution.md](C:\Users\User\FlatProject\flatscanner\.specify\memory\constitution.md)
-2. [C:\Users\User\FlatProject\flatscanner\docs\README.md](C:\Users\User\FlatProject\flatscanner\docs\README.md)
-3. [C:\Users\User\FlatProject\flatscanner\docs\project-idea.md](C:\Users\User\FlatProject\flatscanner\docs\project-idea.md)
-4. [C:\Users\User\FlatProject\flatscanner\docs\project\backend\backend-docs.md](C:\Users\User\FlatProject\flatscanner\docs\project\backend\backend-docs.md)
-5. [C:\Users\User\FlatProject\flatscanner\docs\ai-pr-workflow.md](C:\Users\User\FlatProject\flatscanner\docs\ai-pr-workflow.md)
-6. [C:\Users\User\FlatProject\flatscanner\docs\claude-worker-orchestration.md](C:\Users\User\FlatProject\flatscanner\docs\claude-worker-orchestration.md)
+1. [`.specify/memory/constitution.md`](./.specify/memory/constitution.md)
+2. [`docs/README.md`](./docs/README.md)
+3. [`docs/project-idea.md`](./docs/project-idea.md)
+4. [`docs/project/backend/backend-docs.md`](./docs/project/backend/backend-docs.md)
+5. [`docs/ai-pr-workflow.md`](./docs/ai-pr-workflow.md)
+6. [`docs/claude-worker-orchestration.md`](./docs/claude-worker-orchestration.md)
 7. актуальный `specs/<feature-id>/`
 8. только потом — продуктовый код в `src/`
 
