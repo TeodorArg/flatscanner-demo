@@ -7,6 +7,7 @@ from redis.asyncio import Redis
 from src.app.config import Settings
 from src.storage.db import make_engine, make_session_factory
 from src.telegram.router import router as telegram_router
+from src.web.router import router as web_router
 
 
 @asynccontextmanager
@@ -50,6 +51,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return {"status": "ok"}
 
     app.include_router(telegram_router)
+    app.include_router(web_router)
 
     return app
 

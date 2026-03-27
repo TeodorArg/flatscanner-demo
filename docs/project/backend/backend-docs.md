@@ -13,6 +13,9 @@
 
 - `src/telegram/`: message intake and response formatting
   - channel-specific progress + presenter implementations for Telegram delivery
+- `src/web/`: placeholder web-channel contracts and stub API endpoints
+  - `POST /web/submit` currently returns an explicit 501 placeholder
+  - `GET /web/status/{job_id}` and `GET /web/result/{job_id}` are shape-only stubs
 - `src/adapters/`: provider detection and source adapters
 - `src/domain/`: normalized listing models
 - `src/enrichment/`: external context providers
@@ -32,7 +35,9 @@ See ADR 004 for the full decision. The planned layers in execution order:
 4. **Enrichment Layer** - transport, nearby places, safety (future), comparable prices (future)
 5. **Result Assembly** - score aggregation, analysis cache lookup/write
 6. **Formatter / Delivery Layer** - channel-specific presenters/serializers;
-   Telegram now delivers final results through `TelegramAnalysisPresenter`
+   Telegram now delivers final results through `TelegramAnalysisPresenter`;
+   Web foundation currently exposes read models and no-op presenter/progress
+   stubs until persistence-backed delivery lands
 7. **Persistence Layer** - six bounded areas: Users, ChatSettings, Billing, AnalysisCache, RawPayloads, AnalysisResults
 
 Migration is broken into phases P1-P7 in `specs/015-post-mvp-architecture-foundation/spec.md`.

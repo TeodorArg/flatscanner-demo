@@ -25,7 +25,17 @@
       formatting + delivery through `TelegramAnalysisPresenter`; the
       application layer forwards an optional `result_presenter`; focused tests
       cover the presenter seam and full suite remains green
-- [ ] S4: web delivery foundation
+- [x] S4: web delivery foundation — `WebDeliveryContext` added to domain/delivery;
+      `web_context` field added to `AnalysisJob`; `src/web/` package with
+      `WebSubmitRequest/Response`, `WebJobStatusResponse`, `WebAnalysisResultResponse`
+      models, `WebProgressSink` and `WebAnalysisPresenter` no-op stubs, and
+      a FastAPI router with `POST /web/submit` (501 placeholder — no real enqueuing),
+      `GET /web/status/{job_id}` (200 stub, persistence deferred),
+      `GET /web/result/{job_id}` (200 stub, storage deferred);
+      processor updated to use no-op path for WEB-channel jobs;
+      web router registered in `src/app/main.py`;
+      focused tests in `tests/test_web_delivery.py` cover domain models, stubs,
+      read-model contracts, and honest placeholder endpoint behavior
 - [ ] S5: web UI integration
 
 ## Follow-up (deferred, no runtime change)

@@ -41,6 +41,20 @@ class TelegramDeliveryContext(BaseModel):
     progress_message_id: int | None = None
 
 
+class WebDeliveryContext(BaseModel):
+    """Web-channel delivery metadata attached to a channel-neutral job.
+
+    Carries an optional correlation identifier that the web layer can use to
+    track progress and fetch results.  All fields are optional for S4; the
+    model is intentionally minimal and will grow as the web channel matures.
+    """
+
+    # Caller-supplied opaque identifier used to correlate the request with its
+    # result (e.g. a browser session token or a UUID generated at submit time).
+    # ``None`` means the caller did not provide one.
+    correlation_id: str | None = None
+
+
 @runtime_checkable
 class ProgressSink(Protocol):
     """Channel-neutral interface for reporting pipeline progress to the user.

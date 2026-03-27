@@ -14,7 +14,7 @@ from enum import Enum
 
 from pydantic import BaseModel, Field, model_validator
 
-from src.domain.delivery import DeliveryChannel, TelegramDeliveryContext
+from src.domain.delivery import DeliveryChannel, TelegramDeliveryContext, WebDeliveryContext
 from src.i18n.types import DEFAULT_LANGUAGE, Language
 
 
@@ -134,6 +134,7 @@ class AnalysisJob(BaseModel):
     # Delivery channel and channel-specific context
     delivery_channel: DeliveryChannel = DeliveryChannel.TELEGRAM
     telegram_context: TelegramDeliveryContext | None = None
+    web_context: WebDeliveryContext | None = None
 
     # Language snapshotted at enqueue time so in-flight jobs are stable even
     # if the chat preference changes before the job completes.

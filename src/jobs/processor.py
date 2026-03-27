@@ -45,7 +45,7 @@ from src.analysis.result import ReviewInsightsBlock
 from src.analysis.reviews.service import ReviewAnalysisService
 from src.analysis.runner import ModuleRunner
 from src.analysis.service import AnalysisService
-from src.domain.delivery import AnalysisResultPresenter, ProgressSink
+from src.domain.delivery import AnalysisResultPresenter, DeliveryChannel, ProgressSink
 from src.domain.listing import AnalysisJob
 from src.domain.raw_payload import RawPayload
 from src.enrichment.runner import EnrichmentOutcome, EnrichmentProvider, run_enrichments
@@ -54,6 +54,7 @@ from src.i18n.types import Language
 from src.telegram.presenter import TelegramAnalysisPresenter
 from src.telegram.progress import TelegramProgressSink
 from src.translation.service import TranslationError, TranslationService
+from src.web.stubs import WebAnalysisPresenter, WebProgressSink
 
 if TYPE_CHECKING:
     from src.adapters.base import ListingAdapter
@@ -166,11 +167,15 @@ async def process_job(
     """
     token = settings.telegram_bot_token
     tg_ctx = job.telegram_context
-    if tg_ctx is None:
-        raise ValueError(
-            f"Job {job.id} has no telegram_context; Telegram delivery requires one"
-        )
-    chat_id = tg_ctx.chat_id
+
+    if job.delivery_channel == DeliveryChannel.TELEGRAM:
+        if tg_ctx is None:
+            raise ValueError(
+                f"Job {job.id} has no telegram_context; Telegram delivery requires one"
+            )
+        channel_label: str = str(tg_ctx.chat_id)
+    else:
+        channel_label = job.delivery_channel.value
 
     # --- 1. Resolve adapter --------------------------------------------------
     if adapter is None:
@@ -182,25 +187,36 @@ async def process_job(
         )
 
     logger.info(
-        "Processing job %s: provider=%s url=%s chat=%s",
+        "Processing job %s: provider=%s url=%s channel=%s",
         job.id,
         job.provider,
         job.source_url,
-        chat_id,
+        channel_label,
     )
 
-    # Build the default Telegram progress sink when none was injected.
-    sink: ProgressSink = progress_sink or TelegramProgressSink(
-        token,
-        tg_ctx.chat_id,
-        tg_ctx.progress_message_id,
-        client=http_client,
-    )
-    presenter = result_presenter or TelegramAnalysisPresenter(
-        token,
-        tg_ctx.chat_id,
-        client=http_client,
-    )
+    # Build the default progress sink and presenter for the active channel.
+    if progress_sink is not None:
+        sink: ProgressSink = progress_sink
+    elif job.delivery_channel == DeliveryChannel.TELEGRAM and tg_ctx is not None:
+        sink = TelegramProgressSink(
+            token,
+            tg_ctx.chat_id,
+            tg_ctx.progress_message_id,
+            client=http_client,
+        )
+    else:
+        sink = WebProgressSink()
+
+    if result_presenter is not None:
+        presenter = result_presenter
+    elif job.delivery_channel == DeliveryChannel.TELEGRAM and tg_ctx is not None:
+        presenter = TelegramAnalysisPresenter(
+            token,
+            tg_ctx.chat_id,
+            client=http_client,
+        )
+    else:
+        presenter = WebAnalysisPresenter()
 
     await sink.start()
 
@@ -308,7 +324,7 @@ async def process_job(
 
         # --- 5. Present + deliver final result --------------------------------
         await presenter.deliver(listing, translated_result, render_language)
-        logger.info("Reply sent for job %s to chat %s", job.id, chat_id)
+        logger.info("Result delivered for job %s (channel=%s)", job.id, channel_label)
         _pipeline_succeeded = True
 
     finally:
