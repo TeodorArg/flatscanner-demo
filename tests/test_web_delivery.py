@@ -5,7 +5,7 @@ Covers:
 - web_context field on AnalysisJob
 - WebProgressSink and WebAnalysisPresenter (no-op stubs)
 - Web read models (request/response serialization)
-- Web router endpoints: submit (mocked queue), status stub, result stub
+- Web router endpoints: submit returns 501 (deferred), status stub, result stub
 - processor handles WEB channel without crashing (no-op sink/presenter)
 """
 
@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import uuid
 from decimal import Decimal
-from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -216,10 +215,8 @@ class TestWebModels:
 # ---------------------------------------------------------------------------
 
 
-def _make_test_client(redis_mock=None):
+def _make_test_client():
     app = create_app(settings=_test_settings())
-    # Inject a mock redis into app state before the test client is started.
-    app.state.redis = redis_mock
     return TestClient(app, raise_server_exceptions=True)
 
 
@@ -256,93 +253,33 @@ class TestWebRouterResult:
 
 
 class TestWebRouterSubmit:
-    def test_submit_enqueues_and_returns_202(self):
-        mock_redis = object()  # non-None sentinel
-        with patch(
-            "src.web.router.submit_analysis_request",
-            new_callable=AsyncMock,
-            return_value=True,
-        ) as mock_enqueue:
-            client = _make_test_client(redis_mock=mock_redis)
-            resp = client.post(
-                "/web/submit",
-                json={"url": "https://www.airbnb.com/rooms/12345"},
-            )
-        assert resp.status_code == 202
-        body = resp.json()
-        assert body["status"] == "queued"
-        assert "job_id" in body
-        uuid.UUID(body["job_id"])  # must be valid UUID
-        mock_enqueue.assert_awaited_once()
-
-    def test_submit_passes_web_channel(self):
-        mock_redis = object()
-        captured: list[AnalysisJob] = []
-
-        async def _capture(redis, job):
-            captured.append(job)
-            return True
-
-        with patch("src.web.router.submit_analysis_request", side_effect=_capture):
-            client = _make_test_client(redis_mock=mock_redis)
-            client.post(
-                "/web/submit",
-                json={"url": "https://www.airbnb.com/rooms/12345", "language": "ru"},
-            )
-
-        assert len(captured) == 1
-        job = captured[0]
-        assert job.delivery_channel == DeliveryChannel.WEB
-        assert job.language == Language.RU
-
-    def test_submit_no_redis_returns_502(self):
-        client = _make_test_client(redis_mock=None)
+    def test_submit_returns_501_deferred(self):
+        """POST /web/submit is a S4 placeholder — always returns 501."""
+        client = _make_test_client()
         resp = client.post(
             "/web/submit",
             json={"url": "https://www.airbnb.com/rooms/12345"},
         )
-        assert resp.status_code == 502
+        assert resp.status_code == 501
 
-    def test_submit_correlation_id_stored_in_web_context(self):
-        mock_redis = object()
-        captured: list[AnalysisJob] = []
+    def test_submit_validates_body(self):
+        """Request body is still validated even though submit is deferred."""
+        client = _make_test_client()
+        # Missing required 'url' field → 422 Unprocessable Entity.
+        resp = client.post("/web/submit", json={})
+        assert resp.status_code == 422
 
-        async def _capture(redis, job):
-            captured.append(job)
-            return True
-
-        with patch("src.web.router.submit_analysis_request", side_effect=_capture):
-            client = _make_test_client(redis_mock=mock_redis)
-            client.post(
-                "/web/submit",
-                json={
-                    "url": "https://www.airbnb.com/rooms/12345",
-                    "correlation_id": "my-correlation",
-                },
-            )
-
-        job = captured[0]
-        assert job.web_context is not None
-        assert job.web_context.correlation_id == "my-correlation"
-
-    def test_submit_unknown_language_falls_back_to_default_language(self):
-        mock_redis = object()
-        captured: list[AnalysisJob] = []
-
-        async def _capture(redis, job):
-            captured.append(job)
-            return True
-
-        with patch("src.web.router.submit_analysis_request", side_effect=_capture):
-            client = _make_test_client(redis_mock=mock_redis)
-            client.post(
-                "/web/submit",
-                json={"url": "https://www.airbnb.com/rooms/12345", "language": "xx"},
-            )
-
-        job = captured[0]
-        # Unknown language → falls back to DEFAULT_LANGUAGE ("ru")
-        assert job.language == Language.RU
+    def test_submit_with_correlation_id_still_returns_501(self):
+        """Optional fields are accepted but submission remains deferred."""
+        client = _make_test_client()
+        resp = client.post(
+            "/web/submit",
+            json={
+                "url": "https://www.airbnb.com/rooms/12345",
+                "correlation_id": "my-correlation",
+            },
+        )
+        assert resp.status_code == 501
 
 
 # ---------------------------------------------------------------------------
