@@ -94,6 +94,29 @@ def _first_present(*values: Any) -> Any:
     return None
 
 
+def _period_from_qualifier(qualifier: Any) -> str:
+    """Derive a price period from the tri_angle ``price.qualifier`` field.
+
+    Returns ``'night'`` for nightly rates, ``'month'`` for monthly stays,
+    ``'week'`` for weekly stays, and ``'stay'`` for any multi-night qualifier
+    (e.g. ``'for 7 nights'``) where the amount is a stay total rather than a
+    per-night rate.  Defaults to ``'night'`` for absent or unknown qualifiers
+    so undated (nightly) requests are not affected.
+    """
+    if not isinstance(qualifier, str):
+        return "night"
+    q = qualifier.strip().lower()
+    if q == "night":
+        return "night"
+    if q in ("monthly", "month"):
+        return "month"
+    if q in ("week", "weekly"):
+        return "week"
+    # Any other value (e.g. 'for 7 nights', '3 nights') is treated as a
+    # stay-period total to avoid mislabelling it as a nightly rate.
+    return "stay"
+
+
 def _parse_price_amount(val: Any) -> Decimal | None:
     """Parse a price value that may be a number or a formatted string like ``'$120'``.
 
@@ -122,7 +145,7 @@ def _build_actor_input(url: str, actor_id: str) -> dict[str, Any]:
     """Return the actor-specific Apify input payload for *url*.
 
     Different public Airbnb actors expect different input contracts:
-    - ``tri_angle/airbnb-rooms-urls-scraper``: ``startUrls`` array with
+    - ``tri_angle~airbnb-rooms-urls-scraper``: ``startUrls`` array with
       ``currency`` to request priced output (listing details, dated price,
       photos, host, amenities, rules).
     - ``curious_coder~airbnb-scraper``: ``urls`` array with scrape flags.
@@ -186,7 +209,7 @@ def _normalize(url: str, raw: dict[str, Any]) -> NormalizedListing:
     # Field lookup order (most-specific to least-specific):
     # 1. pricing.rate.amount  — curious_coder actor nested structure
     # 2. costPerNight         — curious_coder actor flat field
-    # 3. price                — tri_angle actor flat nightly-rate field
+    # 3. price                — tri_angle actor field (object or scalar)
     price: PriceInfo | None = None
     pricing = raw.get("pricing")
     if isinstance(pricing, dict):
@@ -214,22 +237,30 @@ def _normalize(url: str, raw: dict[str, Any]) -> NormalizedListing:
         # tri_angle actor returns price as an object; scalar (numeric/string)
         # values are also accepted for backward compatibility.
         if isinstance(price_raw, dict):
-            # Prefer basePrice.price (nightly base rate) over the top-level
-            # price field which may be a formatted display string.
-            # breakDown.total.price is intentionally NOT used here — that is
-            # the stay total, not a nightly rate.
+            # Derive the period from the qualifier so dated stays (weekly,
+            # monthly, etc.) are not mislabelled as nightly.
+            period = _period_from_qualifier(price_raw.get("qualifier"))
+            # Amount priority for the tri_angle price object:
+            # 1. discountedPrice — the actual discounted amount for the period;
+            #    populated for both undated and dated requests.
+            # 2. price (top-level display string) — non-empty for undated
+            #    nightly requests; empty string when dates are given.
+            # 3. basePrice.price — last resort (also represents the period
+            #    total for dated requests, not a per-night rate).
             amount: Decimal | None = None
-            base_price = price_raw.get("basePrice")
-            if isinstance(base_price, dict):
-                amount = _parse_price_amount(base_price.get("price"))
+            amount = _parse_price_amount(price_raw.get("discountedPrice"))
             if amount is None:
                 amount = _parse_price_amount(price_raw.get("price"))
+            if amount is None:
+                base_price = price_raw.get("basePrice")
+                if isinstance(base_price, dict):
+                    amount = _parse_price_amount(base_price.get("price"))
             if amount is not None:
                 try:
                     price = PriceInfo(
                         amount=amount,
                         currency=str(raw.get("currency") or "USD"),
-                        period="night",
+                        period=period,
                     )
                 except Exception:
                     pass

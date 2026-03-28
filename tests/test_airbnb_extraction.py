@@ -600,19 +600,101 @@ class TestNormalize:
         assert listing.price.cleaning_fee is None
         assert listing.price.service_fee is None
 
-    def test_tri_angle_price_object_prefers_base_price(self):
-        """``basePrice.price`` wins over the top-level ``price`` field inside the object."""
+    def test_tri_angle_price_object_discounted_price_takes_priority(self):
+        """``discountedPrice`` wins over ``price`` and ``basePrice`` inside the object."""
         payload = {
             "name": "Test",
             "price": {
-                "price": "$200",  # formatted display price (may be stay total)
-                "basePrice": {"price": "$100"},
+                "qualifier": "night",
+                "price": "$200",
+                "discountedPrice": "$180",
+                "basePrice": {"price": "$200"},
             },
             "currency": "USD",
         }
         listing = _normalize(self._URL, payload)
         assert listing.price is not None
-        assert listing.price.amount == Decimal("100")
+        assert listing.price.amount == Decimal("180")
+
+    def test_tri_angle_price_falls_back_to_price_when_no_discounted(self):
+        """Falls back to ``price.price`` when ``discountedPrice`` is absent."""
+        payload = {
+            "name": "Test",
+            "price": {
+                "qualifier": "night",
+                "price": "$75",
+                "basePrice": {"price": "$75"},
+            },
+            "currency": "USD",
+        }
+        listing = _normalize(self._URL, payload)
+        assert listing.price is not None
+        assert listing.price.amount == Decimal("75")
+        assert listing.price.period == "night"
+
+    def test_tri_angle_weekly_stay_period_and_amount(self):
+        """'for 7 nights' qualifier yields period='stay'; amount from discountedPrice."""
+        payload = {
+            "name": "Test",
+            "price": {
+                "qualifier": "for 7 nights",
+                "price": "",
+                "discountedPrice": "$840",
+                "breakDown": {
+                    "basePrice": {"description": "7 nights x $120", "price": "$840"},
+                    "total": {"price": "$840"},
+                },
+            },
+            "currency": "USD",
+        }
+        listing = _normalize(self._URL, payload)
+        assert listing.price is not None
+        assert listing.price.amount == Decimal("840")
+        assert listing.price.period == "stay"
+
+    def test_tri_angle_monthly_stay_period_and_amount(self):
+        """'monthly' qualifier yields period='month'; amount from discountedPrice."""
+        payload = {
+            "name": "Test",
+            "price": {
+                "qualifier": "monthly",
+                "price": "",
+                "discountedPrice": "$1484.46",
+                "breakDown": {
+                    "basePrice": {
+                        "description": "Average monthly price",
+                        "price": "$1484.46",
+                    },
+                },
+            },
+            "currency": "USD",
+        }
+        listing = _normalize(self._URL, payload)
+        assert listing.price is not None
+        assert listing.price.amount == Decimal("1484.46")
+        assert listing.price.period == "month"
+
+    def test_tri_angle_nightly_qualifier_yields_night_period(self):
+        """Explicit 'night' qualifier yields period='night'."""
+        payload = {
+            "name": "Test",
+            "price": {"qualifier": "night", "price": "$120", "discountedPrice": "$120"},
+            "currency": "USD",
+        }
+        listing = _normalize(self._URL, payload)
+        assert listing.price is not None
+        assert listing.price.period == "night"
+
+    def test_tri_angle_unknown_qualifier_defaults_to_stay(self):
+        """An unrecognised qualifier falls back to 'stay' (safe default)."""
+        payload = {
+            "name": "Test",
+            "price": {"qualifier": "special rate", "discountedPrice": "$500"},
+            "currency": "USD",
+        }
+        listing = _normalize(self._URL, payload)
+        assert listing.price is not None
+        assert listing.price.period == "stay"
 
     def test_tri_angle_price_scalar_still_accepted(self):
         """Flat numeric ``price`` (e.g. older schema) is still mapped correctly."""

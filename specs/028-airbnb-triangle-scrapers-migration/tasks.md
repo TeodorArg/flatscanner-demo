@@ -13,11 +13,13 @@
 - [x] Follow-up: parse check_in/check_out from URL and pass as checkIn/checkOut actor input
 - [x] Follow-up: normalize tri_angle price object (label/price/basePrice.price) into PriceInfo
 - [x] Follow-up: fix photos field — live actor uses `images`, not `photos`
+- [x] Follow-up: fix dated-stay price period — derive from qualifier (night/week/month/stay) instead of hardcoding 'night'; use discountedPrice as primary amount source
+- [x] Follow-up: fix slash-form actor IDs in docstrings and docs (must use tilde form in runtime config)
 - [ ] Open PR for Slice 1 and drive checks to green
 
 ### Slice 2 - Dedicated Reviews Source
 
-- [ ] Add dedicated `tri_angle/airbnb-reviews-scraper` configuration
+- [ ] Add dedicated `tri_angle~airbnb-reviews-scraper` configuration
 - [ ] Introduce Airbnb review-source fetching via the dedicated reviews actor
 - [ ] Update Airbnb review normalization/tests for the new reviews schema
 - [ ] Update the reviews module to use the dedicated reviews source

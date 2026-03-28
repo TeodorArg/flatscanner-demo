@@ -18,12 +18,12 @@ without fixing the root issue.
 
 Migrate Airbnb ingestion to a pair of specialized `tri_angle` actors:
 
-1. `tri_angle/airbnb-rooms-urls-scraper`
+1. `tri_angle~airbnb-rooms-urls-scraper`
    - listing details
    - dated price data
    - photos
    - host / amenities / rules
-2. `tri_angle/airbnb-reviews-scraper`
+2. `tri_angle~airbnb-reviews-scraper`
    - dedicated review corpus for the reviews module
 
 ## Scope
@@ -33,7 +33,7 @@ This feature is intentionally split into narrow slices.
 ### Slice 1
 
 Replace the current listing/detail Airbnb actor with
-`tri_angle/airbnb-rooms-urls-scraper` and adapt normalization for:
+`tri_angle~airbnb-rooms-urls-scraper` and adapt normalization for:
 
 - listing title/description/location
 - price fields
@@ -42,7 +42,7 @@ Replace the current listing/detail Airbnb actor with
 
 ### Slice 2
 
-Migrate reviews ingestion to `tri_angle/airbnb-reviews-scraper` and make the
+Migrate reviews ingestion to `tri_angle~airbnb-reviews-scraper` and make the
 Airbnb reviews module consume the dedicated review payload instead of assuming
 reviews come from the listing actor.
 

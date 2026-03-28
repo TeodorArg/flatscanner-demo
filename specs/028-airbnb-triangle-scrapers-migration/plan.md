@@ -8,7 +8,7 @@ Do not switch both actors in one PR. Land the migration in two small slices.
 
 ### Goal
 
-Replace `curious_coder~airbnb-scraper` with `tri_angle/airbnb-rooms-urls-scraper`
+Replace `curious_coder~airbnb-scraper` with `tri_angle~airbnb-rooms-urls-scraper`
 for the core Airbnb listing adapter path.
 
 ### Affected files
@@ -33,7 +33,7 @@ for the core Airbnb listing adapter path.
 
 ### Goal
 
-Move Airbnb review ingestion to `tri_angle/airbnb-reviews-scraper`.
+Move Airbnb review ingestion to `tri_angle~airbnb-reviews-scraper`.
 
 ### Affected areas
 
