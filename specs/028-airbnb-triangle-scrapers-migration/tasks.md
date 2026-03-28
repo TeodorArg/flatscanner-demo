@@ -15,7 +15,7 @@
 - [x] Follow-up: fix photos field — live actor uses `images`, not `photos`
 - [x] Follow-up: fix dated-stay price period — derive from qualifier (night/week/month/stay) instead of hardcoding 'night'; use discountedPrice as primary amount source
 - [x] Follow-up: fix slash-form actor IDs in docstrings and docs (must use tilde form in runtime config)
-- [ ] Open PR for Slice 1 and drive checks to green
+- [x] Open PR for Slice 1 and drive checks to green
 
 ### Slice 2 - Dedicated Reviews Source
 
