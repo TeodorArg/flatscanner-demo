@@ -3,11 +3,20 @@
 Provides two implementations of the reviews analysis module:
 
 ``AirbnbReviewsModule``
-    Provider-specific module for Airbnb listings.  Normalizes reviews from
-    the raw payload via ``AirbnbReviewNormalizer``, then runs an AI analysis
-    with ``ReviewAnalysisService`` when at least one comment text is present.
-    Falls back to ``GenericReviewNormalizer`` when ``ctx.raw_payload`` is
-    ``None`` (e.g. raw payload capture was disabled or failed).
+    Provider-specific module for Airbnb listings.  Fetches reviews from the
+    dedicated ``tri_angle~airbnb-reviews-scraper`` actor via
+    ``AirbnbReviewSource`` when configured, normalizes them with
+    ``AirbnbReviewNormalizer.normalize_from_actor_items()``, then runs an AI
+    analysis with ``ReviewAnalysisService`` when at least one comment text is
+    present.
+
+    Fallback chain (most specific first):
+    1. Dedicated reviews actor (``review_source`` is set and fetch succeeds)
+    2. Listing raw payload (``ctx.raw_payload`` is present and has reviews)
+    3. Generic metadata-only (listing ``review_count`` / ``rating`` fields)
+
+    The module degrades gracefully at each level: a failed actor fetch falls
+    back to the listing payload; a failed AI call returns metadata-only.
 
 ``GenericReviewsModule``
     Generic fallback module for any provider.  Uses ``GenericReviewNormalizer``
@@ -32,6 +41,7 @@ from src.domain.listing import ListingProvider
 
 if TYPE_CHECKING:
     from src.analysis.context import AnalysisContext
+    from src.analysis.reviews.airbnb_source import AirbnbReviewSource
     from src.analysis.reviews.service import ReviewAnalysisService
 
 logger = logging.getLogger(__name__)
@@ -77,24 +87,41 @@ class AirbnbReviewsModule:
     service:
         Pre-built ``ReviewAnalysisService`` used for AI-backed analysis.
         Callers are responsible for constructing and configuring it.
+    review_source:
+        Optional ``AirbnbReviewSource`` for fetching reviews from the
+        dedicated ``tri_angle~airbnb-reviews-scraper`` actor.  When provided,
+        the module fetches reviews directly rather than relying on the listing
+        raw payload.  Falls back to the listing payload when ``None`` or when
+        the fetch raises an exception.
     """
 
     name = "reviews"
     supported_providers: frozenset[ListingProvider] = frozenset({ListingProvider.AIRBNB})
 
-    def __init__(self, service: "ReviewAnalysisService") -> None:
+    def __init__(
+        self,
+        service: "ReviewAnalysisService",
+        review_source: "AirbnbReviewSource | None" = None,
+    ) -> None:
         self._service = service
+        self._review_source = review_source
         self._airbnb_normalizer = AirbnbReviewNormalizer()
         self._generic_normalizer = GenericReviewNormalizer()
 
     async def run(self, ctx: "AnalysisContext") -> ReviewsResult:
         """Normalize reviews and optionally run AI analysis.
 
+        Fetch order:
+        1. Dedicated reviews actor (when ``review_source`` is set and listing
+           URL is available).  A failed fetch is logged and silently skipped.
+        2. Listing raw payload (``ctx.raw_payload``).
+        3. Generic normalizer (metadata-only fallback).
+
         Parameters
         ----------
         ctx:
-            Analysis context.  ``ctx.raw_payload`` is used when present;
-            falls back to ``GenericReviewNormalizer`` otherwise.
+            Analysis context.  ``ctx.listing.source_url`` is passed to the
+            reviews actor; ``ctx.raw_payload`` is used as fallback.
 
         Returns
         -------
@@ -102,12 +129,29 @@ class AirbnbReviewsModule:
             Populated with AI analysis fields when comment texts are available,
             metadata-only otherwise.
         """
-        if ctx.raw_payload is not None:
-            extraction = self._airbnb_normalizer.normalize(
-                ctx.raw_payload.payload, ctx.listing
-            )
-        else:
-            extraction = self._generic_normalizer.normalize({}, ctx.listing)
+        extraction = None
+
+        # 1. Dedicated reviews actor
+        if self._review_source is not None and ctx.listing.source_url:
+            try:
+                items = await self._review_source.fetch(ctx.listing.source_url)
+                extraction = self._airbnb_normalizer.normalize_from_actor_items(
+                    items, ctx.listing
+                )
+            except Exception:
+                logger.warning(
+                    "Airbnb reviews actor fetch failed; falling back to listing payload",
+                    exc_info=True,
+                )
+
+        # 2. Listing raw payload fallback
+        if extraction is None:
+            if ctx.raw_payload is not None:
+                extraction = self._airbnb_normalizer.normalize(
+                    ctx.raw_payload.payload, ctx.listing
+                )
+            else:
+                extraction = self._generic_normalizer.normalize({}, ctx.listing)
 
         corpus = extraction.corpus
 
