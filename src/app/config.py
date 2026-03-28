@@ -75,9 +75,10 @@ class Settings(BaseSettings):
     apify_api_token: str = ""
     # Actor used to scrape Airbnb listing detail URLs. Override to switch to a
     # different compatible actor without changing application code.
-    # Default is tri_angle/airbnb-rooms-urls-scraper which provides reliable
-    # dated price data, photos, host, amenities, and rules.
-    apify_airbnb_actor_id: str = "tri_angle/airbnb-rooms-urls-scraper"
+    # Default is tri_angle~airbnb-rooms-urls-scraper (tilde form required by
+    # the Apify API; slash form returns 404) which provides reliable dated
+    # price data, photos, host, amenities, and rules.
+    apify_airbnb_actor_id: str = "tri_angle~airbnb-rooms-urls-scraper"
 
     # Geoapify
     # Required outside development/testing because transport and nearby-places

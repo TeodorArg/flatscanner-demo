@@ -72,7 +72,11 @@ def _full_airbnb_payload(listing_id: str = "12345") -> dict[str, Any]:
 
 
 def _tri_angle_rooms_payload(listing_id: str = "55443322") -> dict[str, Any]:
-    """Return a listing item in the ``tri_angle/airbnb-rooms-urls-scraper`` schema."""
+    """Return a listing item in the ``tri_angle~airbnb-rooms-urls-scraper`` schema.
+
+    Reflects live actor output: ``price`` is an object with sub-fields, and
+    photos are under ``images`` (not ``photos``).
+    """
     return {
         "id": listing_id,
         "url": f"https://www.airbnb.com/rooms/{listing_id}",
@@ -83,11 +87,19 @@ def _tri_angle_rooms_payload(listing_id: str = "55443322") -> dict[str, Any]:
         "address": "Alfama, Lisbon, Portugal",
         "city": "Lisbon",
         "country": "Portugal",
-        "price": 120.0,
+        "price": {
+            "label": "$120",
+            "qualifier": "night",
+            "price": "$120",
+            "originalPrice": "$150",
+            "discountedPrice": "$120",
+            "basePrice": {"price": "$120"},
+            "breakDown": {"total": {"price": "$840"}},
+        },
         "currency": "USD",
         "cleaningFee": 25.0,
         "serviceFee": 18.0,
-        "photos": [
+        "images": [
             {"id": "p1", "url": "https://a0.muscache.com/im/photos/p1.jpg", "caption": "Living room"},
             {"id": "p2", "url": "https://a0.muscache.com/im/photos/p2.jpg", "caption": "Bedroom"},
         ],
@@ -314,7 +326,7 @@ class TestAirbnbAdapterFetch:
 
     @pytest.mark.asyncio
     async def test_fetch_uses_actor_specific_input_for_tri_angle_rooms(self):
-        settings = _make_settings(apify_airbnb_actor_id="tri_angle/airbnb-rooms-urls-scraper")
+        settings = _make_settings(apify_airbnb_actor_id="tri_angle~airbnb-rooms-urls-scraper")
         adapter = AirbnbAdapter(settings=settings)
 
         with patch.object(ApifyClient, "run_and_get_items", new_callable=AsyncMock) as mock_run:
@@ -568,8 +580,42 @@ class TestNormalize:
         assert listing.host_name == "Carlos"
         assert listing.host_is_superhost is True
 
-    def test_tri_angle_price_field_accepted(self):
-        """Direct ``price`` field (tri_angle schema) is mapped to PriceInfo."""
+    def test_tri_angle_price_object_accepted(self):
+        """``price`` as an object (live tri_angle schema) is mapped to PriceInfo."""
+        payload = {
+            "name": "Test",
+            "price": {
+                "label": "$75.50",
+                "qualifier": "night",
+                "price": "$75.50",
+                "basePrice": {"price": "$75.50"},
+            },
+            "currency": "EUR",
+        }
+        listing = _normalize(self._URL, payload)
+        assert listing.price is not None
+        assert listing.price.amount == Decimal("75.50")
+        assert listing.price.currency == "EUR"
+        assert listing.price.period == "night"
+        assert listing.price.cleaning_fee is None
+        assert listing.price.service_fee is None
+
+    def test_tri_angle_price_object_prefers_base_price(self):
+        """``basePrice.price`` wins over the top-level ``price`` field inside the object."""
+        payload = {
+            "name": "Test",
+            "price": {
+                "price": "$200",  # formatted display price (may be stay total)
+                "basePrice": {"price": "$100"},
+            },
+            "currency": "USD",
+        }
+        listing = _normalize(self._URL, payload)
+        assert listing.price is not None
+        assert listing.price.amount == Decimal("100")
+
+    def test_tri_angle_price_scalar_still_accepted(self):
+        """Flat numeric ``price`` (e.g. older schema) is still mapped correctly."""
         payload = {"name": "Test", "price": 75.5, "currency": "EUR"}
         listing = _normalize(self._URL, payload)
         assert listing.price is not None
@@ -602,22 +648,37 @@ class TestNormalize:
         assert listing.price.amount == Decimal("90")
 
     def test_tri_angle_photos_preserved_in_raw(self):
-        """Photos are passed through in the raw dict; no normalization needed yet."""
+        """Photos are passed through in the raw dict under ``images``; no normalization needed yet."""
         raw = _tri_angle_rooms_payload()
-        assert len(raw["photos"]) == 2
-        assert raw["photos"][0]["url"].startswith("https://")
+        assert len(raw["images"]) == 2
+        assert raw["images"][0]["url"].startswith("https://")
 
 
 class TestBuildActorInput:
     def test_tri_angle_rooms_actor_uses_start_urls_and_currency(self):
         payload = _build_actor_input(
             "https://www.airbnb.com/rooms/12345",
-            "tri_angle/airbnb-rooms-urls-scraper",
+            "tri_angle~airbnb-rooms-urls-scraper",
         )
         assert payload == {
             "startUrls": [{"url": "https://www.airbnb.com/rooms/12345"}],
             "currency": "USD",
         }
+
+    def test_tri_angle_rooms_actor_passes_check_in_check_out_from_url(self):
+        url = "https://www.airbnb.com/rooms/12345?check_in=2025-06-01&check_out=2025-06-08"
+        payload = _build_actor_input(url, "tri_angle~airbnb-rooms-urls-scraper")
+        assert payload["checkIn"] == "2025-06-01"
+        assert payload["checkOut"] == "2025-06-08"
+        assert payload["startUrls"][0]["url"] == url
+
+    def test_tri_angle_rooms_actor_no_dates_when_url_has_none(self):
+        payload = _build_actor_input(
+            "https://www.airbnb.com/rooms/12345",
+            "tri_angle~airbnb-rooms-urls-scraper",
+        )
+        assert "checkIn" not in payload
+        assert "checkOut" not in payload
 
     def test_default_actor_uses_start_urls_contract(self):
         payload = _build_actor_input(

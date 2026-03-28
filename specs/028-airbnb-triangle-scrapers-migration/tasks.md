@@ -5,10 +5,14 @@
 ### Slice 1 - Listing / Details / Price / Photos
 
 - [x] Create spec, plan, and tasks files
-- [x] Switch the default Airbnb listing actor to `tri_angle/airbnb-rooms-urls-scraper`
+- [x] Switch the default Airbnb listing actor to `tri_angle~airbnb-rooms-urls-scraper`
 - [x] Adapt `src/adapters/airbnb.py` to the new listing actor input/output schema
 - [x] Update Airbnb extraction tests for the new schema
 - [x] Update durable backend docs for the new default listing actor
+- [x] Follow-up: fix actor ID to tilde form (slash form returns 404 in Apify client)
+- [x] Follow-up: parse check_in/check_out from URL and pass as checkIn/checkOut actor input
+- [x] Follow-up: normalize tri_angle price object (label/price/basePrice.price) into PriceInfo
+- [x] Follow-up: fix photos field — live actor uses `images`, not `photos`
 - [ ] Open PR for Slice 1 and drive checks to green
 
 ### Slice 2 - Dedicated Reviews Source

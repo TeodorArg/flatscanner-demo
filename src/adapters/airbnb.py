@@ -20,7 +20,7 @@ from __future__ import annotations
 import re
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 from src.adapters.apify_client import ApifyClient, ApifyError
 from src.adapters.base import AdapterResult, ListingAdapter
@@ -49,7 +49,8 @@ _CURIOUS_CODER_ACTOR_IDS: frozenset[str] = frozenset({
     "curious_coder~airbnb-scraper",
 })
 _TRI_ANGLE_ROOMS_ACTOR_IDS: frozenset[str] = frozenset({
-    "tri_angle/airbnb-rooms-urls-scraper",
+    # Tilde form is required by the Apify REST API; slash form returns 404.
+    "tri_angle~airbnb-rooms-urls-scraper",
 })
 
 
@@ -93,6 +94,30 @@ def _first_present(*values: Any) -> Any:
     return None
 
 
+def _parse_price_amount(val: Any) -> Decimal | None:
+    """Parse a price value that may be a number or a formatted string like ``'$120'``.
+
+    Strips common leading currency symbols (``$``, ``€``, ``£``, ``¥``, ``₹``)
+    and internal commas before attempting a ``Decimal`` conversion.  Returns
+    ``None`` on any parse failure so callers can fall through to the next
+    candidate field.
+    """
+    if val is None:
+        return None
+    if isinstance(val, (int, float)):
+        try:
+            return Decimal(str(val))
+        except Exception:
+            return None
+    if isinstance(val, str):
+        cleaned = val.strip().lstrip("$€£¥₹").replace(",", "").strip()
+        try:
+            return Decimal(cleaned)
+        except Exception:
+            return None
+    return None
+
+
 def _build_actor_input(url: str, actor_id: str) -> dict[str, Any]:
     """Return the actor-specific Apify input payload for *url*.
 
@@ -104,10 +129,24 @@ def _build_actor_input(url: str, actor_id: str) -> dict[str, Any]:
     - Generic fallback: ``startUrls`` array with ``maxListings=1``.
     """
     if actor_id in _TRI_ANGLE_ROOMS_ACTOR_IDS:
-        return {
+        payload: dict[str, Any] = {
             "startUrls": [{"url": url}],
             "currency": "USD",
         }
+        # Dated price is only returned by the actor when checkIn/checkOut are
+        # passed explicitly in the input; dated query params in the URL alone
+        # are not enough for the tri_angle actor.
+        try:
+            qs = parse_qs(urlparse(url).query)
+            check_in = (qs.get("check_in") or [None])[0]
+            check_out = (qs.get("check_out") or [None])[0]
+            if check_in:
+                payload["checkIn"] = check_in
+            if check_out:
+                payload["checkOut"] = check_out
+        except Exception:
+            pass
+        return payload
 
     if actor_id in _CURIOUS_CODER_ACTOR_IDS:
         return {
@@ -171,14 +210,40 @@ def _normalize(url: str, raw: dict[str, Any]) -> NormalizedListing:
         except Exception:
             pass
     if price is None and raw.get("price") is not None:
-        try:
-            price = PriceInfo(
-                amount=Decimal(str(raw["price"])),
-                currency=str(raw.get("currency") or "USD"),
-                period="night",
-            )
-        except Exception:
-            pass
+        price_raw = raw["price"]
+        # tri_angle actor returns price as an object; scalar (numeric/string)
+        # values are also accepted for backward compatibility.
+        if isinstance(price_raw, dict):
+            # Prefer basePrice.price (nightly base rate) over the top-level
+            # price field which may be a formatted display string.
+            # breakDown.total.price is intentionally NOT used here — that is
+            # the stay total, not a nightly rate.
+            amount: Decimal | None = None
+            base_price = price_raw.get("basePrice")
+            if isinstance(base_price, dict):
+                amount = _parse_price_amount(base_price.get("price"))
+            if amount is None:
+                amount = _parse_price_amount(price_raw.get("price"))
+            if amount is not None:
+                try:
+                    price = PriceInfo(
+                        amount=amount,
+                        currency=str(raw.get("currency") or "USD"),
+                        period="night",
+                    )
+                except Exception:
+                    pass
+        else:
+            amount = _parse_price_amount(price_raw)
+            if amount is not None:
+                try:
+                    price = PriceInfo(
+                        amount=amount,
+                        currency=str(raw.get("currency") or "USD"),
+                        period="night",
+                    )
+                except Exception:
+                    pass
     # Attach cleaning/service fees when present (tri_angle actor fields).
     if price is not None:
         cleaning_fee_raw = raw.get("cleaningFee")
