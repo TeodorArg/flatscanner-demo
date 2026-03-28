@@ -1,6 +1,6 @@
 # Tasks 028 - Airbnb Migration to Tri_angle Scrapers
 
-## Status: in progress
+## Status: complete
 
 ### Slice 1 - Listing / Details / Price / Photos
 
@@ -28,4 +28,8 @@
 
 ### Final validation
 
-- [ ] Run end-to-end smoke after both slices land
+- [x] Run end-to-end smoke after both slices land
+
+### Follow-up
+
+- [ ] Investigate intermittent/no-price live responses from `tri_angle~airbnb-rooms-urls-scraper` for dated Airbnb URLs even when explicit `checkIn` / `checkOut` are passed
