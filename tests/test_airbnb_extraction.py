@@ -784,7 +784,8 @@ class TestBuildActorInput:
         payload = _build_actor_input(url, "tri_angle~airbnb-rooms-urls-scraper")
         assert payload["checkIn"] == "2025-06-01"
         assert payload["checkOut"] == "2025-06-08"
-        assert payload["startUrls"][0]["url"] == url
+        # startUrls must contain the canonical URL without query params (spec 029 fix)
+        assert payload["startUrls"][0]["url"] == "https://www.airbnb.com/rooms/12345"
 
     def test_tri_angle_rooms_actor_no_dates_when_url_has_none(self):
         payload = _build_actor_input(

@@ -119,6 +119,42 @@ def _period_from_qualifier(qualifier: Any) -> str:
     return "stay"
 
 
+def _parse_stay_nights(qualifier: Any) -> int | None:
+    """Extract the number of nights from a tri_angle qualifier string like ``'for 5 nights'``.
+
+    Returns ``None`` when no integer night count can be parsed.
+    """
+    if not isinstance(qualifier, str):
+        return None
+    import re as _re
+    m = _re.search(r"(\d+)\s+night", qualifier.strip(), _re.IGNORECASE)
+    if m:
+        try:
+            return int(m.group(1))
+        except ValueError:
+            pass
+    return None
+
+
+def _parse_nightly_rate_from_description(description: Any) -> Decimal | None:
+    """Extract the per-night rate from a breakDown.basePrice.description string.
+
+    Handles the live actor format ``'N nights x $X.XX'`` (e.g. ``'5 nights x $130.49'``).
+    Returns ``None`` when the pattern does not match.
+    """
+    if not isinstance(description, str):
+        return None
+    import re as _re
+    m = _re.search(r"\d+\s+nights?\s+x\s+[\$€£¥₹]?([\d,]+\.?\d*)", description.strip(), _re.IGNORECASE)
+    if m:
+        cleaned = m.group(1).replace(",", "")
+        try:
+            return Decimal(cleaned)
+        except Exception:
+            pass
+    return None
+
+
 def _parse_price_amount(val: Any) -> Decimal | None:
     """Parse a price value that may be a number or a formatted string like ``'$120'``.
 
@@ -154,23 +190,40 @@ def _build_actor_input(url: str, actor_id: str) -> dict[str, Any]:
     - Generic fallback: ``startUrls`` array with ``maxListings=1``.
     """
     if actor_id in _TRI_ANGLE_ROOMS_ACTOR_IDS:
+        # Parse query params before stripping them from the URL.
+        # The tri_angle actor needs the canonical room URL (no query params) in
+        # startUrls; sending a dated URL causes it to ignore explicit checkIn/
+        # checkOut and return the fallback no-price label.
+        try:
+            parsed = urlparse(url)
+            qs = parse_qs(parsed.query)
+            canonical_url = parsed._replace(query="", fragment="").geturl()
+        except Exception:
+            qs = {}
+            canonical_url = url
+
         payload: dict[str, Any] = {
-            "startUrls": [{"url": url}],
+            "startUrls": [{"url": canonical_url}],
             "currency": "USD",
         }
         # Dated price is only returned by the actor when checkIn/checkOut are
         # passed explicitly in the input; dated query params in the URL alone
         # are not enough for the tri_angle actor.
-        try:
-            qs = parse_qs(urlparse(url).query)
-            check_in = (qs.get("check_in") or [None])[0]
-            check_out = (qs.get("check_out") or [None])[0]
-            if check_in:
-                payload["checkIn"] = check_in
-            if check_out:
-                payload["checkOut"] = check_out
-        except Exception:
-            pass
+        check_in = (qs.get("check_in") or [None])[0]
+        check_out = (qs.get("check_out") or [None])[0]
+        if check_in:
+            payload["checkIn"] = check_in
+        if check_out:
+            payload["checkOut"] = check_out
+        # Forward occupancy params when present so the actor prices the stay
+        # for the correct party size.
+        for qparam in ("adults", "children", "infants", "pets"):
+            val = (qs.get(qparam) or [None])[0]
+            if val is not None:
+                try:
+                    payload[qparam] = int(val)
+                except (ValueError, TypeError):
+                    pass
         return payload
 
     if actor_id in _CURIOUS_CODER_ACTOR_IDS:
@@ -241,7 +294,8 @@ def _normalize(url: str, raw: dict[str, Any]) -> NormalizedListing:
         if isinstance(price_raw, dict):
             # Derive the period from the qualifier so dated stays (weekly,
             # monthly, etc.) are not mislabelled as nightly.
-            period = _period_from_qualifier(price_raw.get("qualifier"))
+            qualifier = price_raw.get("qualifier")
+            period = _period_from_qualifier(qualifier)
             # Amount priority for the tri_angle price object:
             # 1. discountedPrice — the actual discounted amount for the period;
             #    populated for both undated and dated requests.
@@ -254,9 +308,9 @@ def _normalize(url: str, raw: dict[str, Any]) -> NormalizedListing:
             if amount is None:
                 amount = _parse_price_amount(price_raw.get("price"))
             if amount is None:
-                base_price = price_raw.get("basePrice")
-                if isinstance(base_price, dict):
-                    amount = _parse_price_amount(base_price.get("price"))
+                base_price_obj = price_raw.get("basePrice")
+                if isinstance(base_price_obj, dict):
+                    amount = _parse_price_amount(base_price_obj.get("price"))
             if amount is not None:
                 try:
                     price = PriceInfo(
@@ -266,6 +320,19 @@ def _normalize(url: str, raw: dict[str, Any]) -> NormalizedListing:
                     )
                 except Exception:
                     pass
+            # For dated/stay-period results, extract richer stay details.
+            if price is not None and period == "stay":
+                stay_nights = _parse_stay_nights(qualifier)
+                if stay_nights is not None:
+                    price = price.model_copy(update={"stay_nights": stay_nights})
+                # Nightly rate from breakDown.basePrice.description
+                break_down = price_raw.get("breakDown")
+                if isinstance(break_down, dict):
+                    bd_base = break_down.get("basePrice")
+                    if isinstance(bd_base, dict):
+                        nightly_rate = _parse_nightly_rate_from_description(bd_base.get("description"))
+                        if nightly_rate is not None:
+                            price = price.model_copy(update={"nightly_rate": nightly_rate})
         else:
             amount = _parse_price_amount(price_raw)
             if amount is not None:
@@ -287,6 +354,22 @@ def _normalize(url: str, raw: dict[str, Any]) -> NormalizedListing:
         service_fee_amount = _parse_price_amount(raw.get("serviceFee"))
         if service_fee_amount is not None:
             price = price.model_copy(update={"service_fee": service_fee_amount})
+    # Attach stay dates parsed from the source URL query params so downstream
+    # consumers can show the exact check-in / check-out without re-parsing.
+    if price is not None and price.period == "stay":
+        try:
+            qs = parse_qs(urlparse(url).query)
+            check_in_val = (qs.get("check_in") or [None])[0]
+            check_out_val = (qs.get("check_out") or [None])[0]
+            updates: dict[str, Any] = {}
+            if check_in_val:
+                updates["check_in"] = check_in_val
+            if check_out_val:
+                updates["check_out"] = check_out_val
+            if updates:
+                price = price.model_copy(update=updates)
+        except Exception:
+            pass
 
     # --- location ------------------------------------------------------------
     raw_location = raw.get("location")
