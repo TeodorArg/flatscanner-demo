@@ -718,6 +718,27 @@ class TestNormalize:
         assert listing.price is not None
         assert listing.price.service_fee == Decimal("15")
 
+    def test_tri_angle_cleaning_fee_formatted_string(self):
+        """Formatted string cleaningFee like '$25' is parsed via _parse_price_amount."""
+        payload = {"name": "Test", "price": 100, "currency": "USD", "cleaningFee": "$25"}
+        listing = _normalize(self._URL, payload)
+        assert listing.price is not None
+        assert listing.price.cleaning_fee == Decimal("25")
+
+    def test_tri_angle_service_fee_formatted_string(self):
+        """Formatted string serviceFee like '$18' is parsed via _parse_price_amount."""
+        payload = {"name": "Test", "price": 100, "currency": "USD", "serviceFee": "$18"}
+        listing = _normalize(self._URL, payload)
+        assert listing.price is not None
+        assert listing.price.service_fee == Decimal("18")
+
+    def test_tri_angle_cleaning_fee_invalid_string_silently_dropped(self):
+        """An unparseable cleaningFee value (empty string) does not crash and is dropped."""
+        payload = {"name": "Test", "price": 100, "currency": "USD", "cleaningFee": ""}
+        listing = _normalize(self._URL, payload)
+        assert listing.price is not None
+        assert listing.price.cleaning_fee is None
+
     def test_tri_angle_pricing_nested_takes_precedence_over_price_field(self):
         """pricing.rate.amount wins over the flat price field."""
         payload = {
@@ -729,11 +750,22 @@ class TestNormalize:
         assert listing.price is not None
         assert listing.price.amount == Decimal("90")
 
-    def test_tri_angle_photos_preserved_in_raw(self):
-        """Photos are passed through in the raw dict under ``images``; no normalization needed yet."""
-        raw = _tri_angle_rooms_payload()
-        assert len(raw["images"]) == 2
-        assert raw["images"][0]["url"].startswith("https://")
+    def test_tri_angle_images_in_raw_do_not_break_normalization(self):
+        """``_normalize`` completes without error and extracts correct fields
+        even when the payload contains an ``images`` list (tri_angle schema).
+        The images are not yet mapped to a domain field; this test guards against
+        future regressions that might accidentally crash or discard other fields
+        when ``images`` is present.
+        """
+        raw = _tri_angle_rooms_payload("55443322")
+        listing = _normalize(self._URL, raw)
+
+        # Core fields must be extracted correctly despite the images list.
+        assert listing.title == "Modern Flat in Lisbon"
+        assert listing.price is not None
+        assert listing.price.amount == Decimal("120")
+        assert listing.price.cleaning_fee == Decimal("25")
+        assert listing.price.service_fee == Decimal("18")
 
 
 class TestBuildActorInput:

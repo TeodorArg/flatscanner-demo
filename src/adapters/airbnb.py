@@ -100,8 +100,10 @@ def _period_from_qualifier(qualifier: Any) -> str:
     Returns ``'night'`` for nightly rates, ``'month'`` for monthly stays,
     ``'week'`` for weekly stays, and ``'stay'`` for any multi-night qualifier
     (e.g. ``'for 7 nights'``) where the amount is a stay total rather than a
-    per-night rate.  Defaults to ``'night'`` for absent or unknown qualifiers
-    so undated (nightly) requests are not affected.
+    per-night rate.  Defaults to ``'night'`` when *qualifier* is absent or not
+    a string (so undated/nightly requests are not affected); defaults to
+    ``'stay'`` for any unrecognised string qualifier so unknown rates are not
+    mislabelled as nightly.
     """
     if not isinstance(qualifier, str):
         return "night"
@@ -276,23 +278,15 @@ def _normalize(url: str, raw: dict[str, Any]) -> NormalizedListing:
                 except Exception:
                     pass
     # Attach cleaning/service fees when present (tri_angle actor fields).
+    # _parse_price_amount handles both numeric values and formatted strings
+    # like '$25' so fees are not silently dropped when the actor returns strings.
     if price is not None:
-        cleaning_fee_raw = raw.get("cleaningFee")
-        if cleaning_fee_raw is not None:
-            try:
-                price = price.model_copy(
-                    update={"cleaning_fee": Decimal(str(cleaning_fee_raw))}
-                )
-            except Exception:
-                pass
-        service_fee_raw = raw.get("serviceFee")
-        if service_fee_raw is not None:
-            try:
-                price = price.model_copy(
-                    update={"service_fee": Decimal(str(service_fee_raw))}
-                )
-            except Exception:
-                pass
+        cleaning_fee_amount = _parse_price_amount(raw.get("cleaningFee"))
+        if cleaning_fee_amount is not None:
+            price = price.model_copy(update={"cleaning_fee": cleaning_fee_amount})
+        service_fee_amount = _parse_price_amount(raw.get("serviceFee"))
+        if service_fee_amount is not None:
+            price = price.model_copy(update={"service_fee": service_fee_amount})
 
     # --- location ------------------------------------------------------------
     raw_location = raw.get("location")
