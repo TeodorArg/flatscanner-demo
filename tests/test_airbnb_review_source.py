@@ -50,17 +50,34 @@ _SAMPLE_ITEMS = [
 
 class TestAirbnbReviewSourceInit:
     def test_default_actor_id(self):
-        source = AirbnbReviewSource(api_token="tok")
-        # The internal client should use the default actor ID
-        assert source._client._actor_id == "tri_angle~airbnb-reviews-scraper"
+        """AirbnbReviewSource passes the default actor ID to ApifyClient."""
+        with patch("src.analysis.reviews.airbnb_source.ApifyClient") as MockClient:
+            AirbnbReviewSource(api_token="tok")
+            MockClient.assert_called_once_with(
+                api_token="tok",
+                actor_id="tri_angle~airbnb-reviews-scraper",
+                timeout=120.0,
+            )
 
     def test_custom_actor_id(self):
-        source = AirbnbReviewSource(api_token="tok", actor_id="other~actor")
-        assert source._client._actor_id == "other~actor"
+        """A custom actor_id is forwarded to ApifyClient unchanged."""
+        with patch("src.analysis.reviews.airbnb_source.ApifyClient") as MockClient:
+            AirbnbReviewSource(api_token="tok", actor_id="other~actor")
+            MockClient.assert_called_once_with(
+                api_token="tok",
+                actor_id="other~actor",
+                timeout=120.0,
+            )
 
     def test_custom_timeout_passed_through(self):
-        source = AirbnbReviewSource(api_token="tok", timeout=60.0)
-        assert source._client._timeout == 60.0
+        """A custom timeout is forwarded to ApifyClient unchanged."""
+        with patch("src.analysis.reviews.airbnb_source.ApifyClient") as MockClient:
+            AirbnbReviewSource(api_token="tok", timeout=60.0)
+            MockClient.assert_called_once_with(
+                api_token="tok",
+                actor_id="tri_angle~airbnb-reviews-scraper",
+                timeout=60.0,
+            )
 
 
 class TestAirbnbReviewSourceFetch:

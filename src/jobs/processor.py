@@ -268,9 +268,13 @@ async def process_job(
         # --- 3. Analyse (via module framework) -------------------------------
         service = analysis_service or AnalysisService(settings)
         review_service = ReviewAnalysisService(settings)
-        review_source = AirbnbReviewSource(
-            api_token=settings.apify_api_token,
-            actor_id=settings.apify_airbnb_reviews_actor_id,
+        review_source = (
+            AirbnbReviewSource(
+                api_token=settings.apify_api_token,
+                actor_id=settings.apify_airbnb_reviews_actor_id,
+            )
+            if settings.apify_api_token
+            else None
         )
         registry = ModuleRegistry()
         registry.register(AISummaryModule(service))
