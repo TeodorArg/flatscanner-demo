@@ -81,9 +81,23 @@ def build_prompt(
 
     if listing.price is not None:
         p = listing.price
-        lines.append(f"Price: {p.amount} {p.currency} per {p.period}")
+        if p.period == "stay" and (p.check_in or p.stay_nights):
+            # Richer context for dated stays: show exact stay window and breakdown.
+            stay_desc_parts = []
+            if p.check_in and p.check_out:
+                stay_desc_parts.append(f"{p.check_in} to {p.check_out}")
+            if p.stay_nights is not None:
+                stay_desc_parts.append(f"{p.stay_nights} nights")
+            stay_desc = f" ({', '.join(stay_desc_parts)})" if stay_desc_parts else ""
+            lines.append(f"Price: {p.amount} {p.currency} total for stay{stay_desc}")
+            if p.nightly_rate is not None:
+                lines.append(f"Nightly rate: {p.nightly_rate} {p.currency}")
+        else:
+            lines.append(f"Price: {p.amount} {p.currency} per {p.period}")
         if p.cleaning_fee is not None:
             lines.append(f"Cleaning fee: {p.cleaning_fee} {p.currency}")
+        if p.service_fee is not None:
+            lines.append(f"Service fee: {p.service_fee} {p.currency}")
 
     if listing.bedrooms is not None:
         lines.append(f"Bedrooms: {listing.bedrooms}")

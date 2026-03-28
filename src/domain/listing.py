@@ -64,10 +64,15 @@ class PriceInfo(BaseModel):
 
     amount: Decimal
     currency: str
-    # Billing period as reported by the provider, e.g. "night", "week", "month"
+    # Billing period as reported by the provider, e.g. "night", "week", "month", "stay"
     period: str = "night"
     cleaning_fee: Decimal | None = None
     service_fee: Decimal | None = None
+    # Stay-level details — populated for dated/priced stays only
+    check_in: str | None = None
+    check_out: str | None = None
+    stay_nights: int | None = None
+    nightly_rate: Decimal | None = None
 
 
 # ---------------------------------------------------------------------------

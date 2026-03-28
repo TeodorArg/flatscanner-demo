@@ -148,6 +148,32 @@ _CATALOG: dict[str, dict[Language, str]] = {
         Language.EN: "Window view:",
         Language.ES: "Vista desde la ventana:",
     },
+    # --- Stay-price block ---
+    "fmt.stay_price_label": {
+        Language.RU: "Стоимость проживания:",
+        Language.EN: "Stay price:",
+        Language.ES: "Precio de la estancia:",
+    },
+    "fmt.stay_nights_label": {
+        Language.RU: "Ночей:",
+        Language.EN: "Nights:",
+        Language.ES: "Noches:",
+    },
+    "fmt.nightly_rate_label": {
+        Language.RU: "За ночь:",
+        Language.EN: "Per night:",
+        Language.ES: "Por noche:",
+    },
+    "fmt.cleaning_fee_label": {
+        Language.RU: "Уборка:",
+        Language.EN: "Cleaning fee:",
+        Language.ES: "Tarifa de limpieza:",
+    },
+    "fmt.service_fee_label": {
+        Language.RU: "Сервисный сбор:",
+        Language.EN: "Service fee:",
+        Language.ES: "Tarifa de servicio:",
+    },
     # --- Formatter system strings ---
     "fmt.truncated": {
         Language.RU: "\n\n[Сообщение обрезано]",

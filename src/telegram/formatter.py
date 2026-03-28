@@ -87,6 +87,10 @@ def format_analysis_message(
     if reviews_section:
         parts.append(reviews_section)
 
+    stay_price_section = _format_stay_price(listing, language)
+    if stay_price_section:
+        parts.append(stay_price_section)
+
     price_label = get_string("fmt.price_label", language)
     verdict_key = _VERDICT_KEY.get(result.price_verdict, "fmt.verdict.unknown")
     verdict_label = get_string(verdict_key, language)
@@ -162,6 +166,48 @@ def _format_review_insights(result: AnalysisResult, language: Language) -> str:
     if ri.window_view_summary:
         window_label = get_string("fmt.reviews_window_label", language)
         lines.append(f"{window_label} {ri.window_view_summary}")
+
+    return "\n".join(lines)
+
+
+def _format_stay_price(listing: NormalizedListing, language: Language) -> str:
+    """Return a compact stay-price block when the listing has dated stay details.
+
+    Included when ``listing.price.period == 'stay'`` and at least check-in or
+    stay_nights is present.  Returns an empty string otherwise so the caller
+    can omit the section cleanly.
+    """
+    p = listing.price
+    if p is None or p.period != "stay":
+        return ""
+    if not (p.check_in or p.stay_nights):
+        return ""
+
+    label = get_string("fmt.stay_price_label", language)
+    lines: list[str] = []
+
+    header_parts: list[str] = [label]
+    if p.check_in and p.check_out:
+        header_parts.append(f"{p.check_in} → {p.check_out}")
+    if p.stay_nights is not None:
+        nights_label = get_string("fmt.stay_nights_label", language)
+        header_parts.append(f"{nights_label} {p.stay_nights}")
+    lines.append(" ".join(header_parts))
+
+    total_line = f"{p.amount} {p.currency}"
+    lines.append(total_line)
+
+    if p.nightly_rate is not None:
+        per_night_label = get_string("fmt.nightly_rate_label", language)
+        lines.append(f"{per_night_label} {p.nightly_rate} {p.currency}")
+
+    if p.cleaning_fee is not None:
+        cleaning_label = get_string("fmt.cleaning_fee_label", language)
+        lines.append(f"{cleaning_label} {p.cleaning_fee} {p.currency}")
+
+    if p.service_fee is not None:
+        service_label = get_string("fmt.service_fee_label", language)
+        lines.append(f"{service_label} {p.service_fee} {p.currency}")
 
     return "\n".join(lines)
 
