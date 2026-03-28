@@ -1,23 +1,31 @@
 # Tasks 029 - Airbnb Priced URL Fix
 
-## Status: implementation complete (price completeness pass added) — PR pending
+## Status: complete
 
 - [x] Reproduce and document the live `tri_angle` dated-price failure mode
+      - canonical room URL in `startUrls` was required; dated query-string URLs caused the actor to return the no-price fallback label
 - [x] Fix `src/adapters/airbnb.py` actor input for dated Airbnb URLs
-      — canonical room URL in startUrls (no query params); explicit checkIn/checkOut; occupancy forwarding
+      - canonical room URL in `startUrls` (no query params)
+      - explicit `checkIn` / `checkOut`
+      - occupancy forwarding from URL query (`adults`, `children`, `infants`, `pets`)
 - [x] Extend normalized `PriceInfo` with dated-stay details needed downstream
-      — check_in, check_out, stay_nights, nightly_rate added to PriceInfo domain model
+      - `check_in`, `check_out`, `stay_nights`, `nightly_rate`
 - [x] Improve analysis prompt price context for dated stays
-      — build_prompt shows total + dates + nights + nightly rate for stay-period prices
+      - total stay price
+      - stay window and number of nights
+      - nightly rate when derivable
+      - service / cleaning fee lines when present
 - [x] Add exact stay-price block to Telegram output
-      — _format_stay_price added; i18n keys: fmt.stay_price_label, fmt.stay_nights_label, fmt.nightly_rate_label
-- [x] Add/extend tests for actor input, normalization, prompt, and formatter
-      — tests/test_029_priced_url.py (46 new tests); updated test_airbnb_extraction.py
-      — full suite: 1118 passed
-- [x] Price completeness pass: breakDown fee fallback, breakDown amount fallback, service fee in prompt/formatter
-      — airbnb.py: fee from breakDown.cleaningFee/serviceFee when top-level absent; amount fallback from breakDown.total/basePrice
-      — service.py: service fee line added to build_prompt alongside cleaning fee
-      — formatter.py + i18n: cleaning/service fee lines in stay-price block (fmt.cleaning_fee_label, fmt.service_fee_label)
-      — 16 new tests in test_029_priced_url.py; full suite: 1134 passed
-- [ ] Open PR and drive checks to green
-- [ ] Deploy the merged fix to the server and run a live smoke
+      - exact stay dates
+      - total amount
+      - nightly rate
+      - service / cleaning fee lines when present
+- [x] Add and extend tests for actor input, normalization, prompt, and formatter
+      - `tests/test_029_priced_url.py`
+      - updated `tests/test_airbnb_extraction.py`
+      - full suite: `1134 passed`
+- [x] Open PR and drive checks to green
+      - PR [#48](https://github.com/alexgoodman53/flatscanner/pull/48)
+- [x] Deploy the merged fix to the server and run a live smoke
+      - VPS stack recreated successfully
+      - live smoke confirmed exact stay price now appears for a priced Airbnb URL
