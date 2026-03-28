@@ -19,11 +19,12 @@
 
 ### Slice 2 - Dedicated Reviews Source
 
-- [ ] Add dedicated `tri_angle~airbnb-reviews-scraper` configuration
-- [ ] Introduce Airbnb review-source fetching via the dedicated reviews actor
-- [ ] Update Airbnb review normalization/tests for the new reviews schema
-- [ ] Update the reviews module to use the dedicated reviews source
-- [ ] Open PR for Slice 2 and drive checks to green
+- [x] Add dedicated `tri_angle~airbnb-reviews-scraper` configuration (`apify_airbnb_reviews_actor_id` in `src/app/config.py`)
+- [x] Introduce Airbnb review-source fetching via the dedicated reviews actor (`src/analysis/reviews/airbnb_source.py` — `AirbnbReviewSource`)
+- [x] Update Airbnb review normalization for the new reviews schema (`normalize_from_actor_items()` + `localizedReviewerLocation` support in `AirbnbReviewNormalizer`)
+- [x] Update the reviews module to use the dedicated reviews source (`AirbnbReviewsModule` accepts optional `review_source`; fallback chain: actor → listing payload → generic)
+- [x] Add/extend tests: `tests/test_airbnb_review_source.py`, additions to `test_review_corpus_normalization.py` and `test_reviews_module.py`
+- [x] Open PR for Slice 2 and drive checks to green
 
 ### Final validation
 

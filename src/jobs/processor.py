@@ -40,6 +40,7 @@ from src.analysis.context import AnalysisContext
 from src.analysis.modules.ai_summary import AISummaryModule, AISummaryResult
 from src.analysis.modules.reviews import AirbnbReviewsModule, GenericReviewsModule, ReviewsResult
 from src.analysis.openrouter_client import OpenRouterError
+from src.analysis.reviews.airbnb_source import AirbnbReviewSource
 from src.analysis.registry import ModuleRegistry
 from src.analysis.result import ReviewInsightsBlock
 from src.analysis.reviews.service import ReviewAnalysisService
@@ -267,9 +268,17 @@ async def process_job(
         # --- 3. Analyse (via module framework) -------------------------------
         service = analysis_service or AnalysisService(settings)
         review_service = ReviewAnalysisService(settings)
+        review_source = (
+            AirbnbReviewSource(
+                api_token=settings.apify_api_token,
+                actor_id=settings.apify_airbnb_reviews_actor_id,
+            )
+            if settings.apify_api_token
+            else None
+        )
         registry = ModuleRegistry()
         registry.register(AISummaryModule(service))
-        registry.register(AirbnbReviewsModule(review_service))
+        registry.register(AirbnbReviewsModule(review_service, review_source=review_source))
         registry.register(GenericReviewsModule())
         runner = ModuleRunner(registry)
         ctx = AnalysisContext(

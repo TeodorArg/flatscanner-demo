@@ -1,34 +1,58 @@
 """Airbnb review normalizer.
 
-``AirbnbReviewNormalizer`` maps a raw Apify actor payload for an Airbnb
-listing into the unified ``ReviewCorpus`` contract.  Field extraction is
-deliberately defensive: all lookups fall back gracefully when a key is absent
-or holds an unexpected type.
+``AirbnbReviewNormalizer`` maps Airbnb review data into the unified
+``ReviewCorpus`` contract.  Field extraction is deliberately defensive:
+all lookups fall back gracefully when a key is absent or holds an
+unexpected type.
 
-Expected raw payload shape (curious_coder~airbnb-scraper with scrapeReviews=True):
+Two input shapes are supported:
 
-.. code-block:: json
+1. **Listing payload** (legacy ``curious_coder`` actor or listing actor
+   with embedded reviews) — use ``normalize()``:
 
-    {
-      "reviews": [
-        {
-          "id": "abc123",
-          "reviewer": {"firstName": "Alice", "location": "London"},
-          "createdAt": "2024-06-01",
-          "rating": 5,
-          "comments": "Great place!",
-          "response": "Thanks for staying!"
-        }
-      ],
-      "reviewsCount": 42,
-      "starRating": 4.8
-    }
+   .. code-block:: json
 
-Alternative field names handled:
-- Reviews array: ``reviews`` or ``feedbacks``
+       {
+         "reviews": [
+           {
+             "id": "abc123",
+             "reviewer": {"firstName": "Alice", "location": "London"},
+             "createdAt": "2024-06-01",
+             "rating": 5,
+             "comments": "Great place!",
+             "response": "Thanks for staying!"
+           }
+         ],
+         "reviewsCount": 42,
+         "starRating": 4.8
+       }
+
+2. **Flat review items** from ``tri_angle~airbnb-reviews-scraper`` — use
+   ``normalize_from_actor_items()``:
+
+   .. code-block:: json
+
+       [
+         {
+           "id": "abc123",
+           "language": "en",
+           "text": "Great place!",
+           "localizedDate": "March 2024",
+           "createdAt": "2024-03-15",
+           "localizedReviewerLocation": "New York",
+           "reviewer": {"firstName": "Alice"},
+           "rating": 5,
+           "response": "Thanks for staying!",
+           "reviewHighlight": null
+         }
+       ]
+
+Alternative field names handled per review item:
+- Reviews array (``normalize()`` only): ``reviews`` or ``feedbacks``
 - Comment id: ``id`` or ``reviewId``
 - Reviewer name: ``reviewer.firstName``, ``reviewer.name``, ``authorName``
-- Reviewer origin: ``reviewer.location``, ``reviewer.hometown``
+- Reviewer origin: ``reviewer.location``, ``reviewer.hometown``,
+  ``localizedReviewerLocation`` (tri_angle reviews actor top-level field)
 - Date: ``createdAt``, ``localizedDate``, ``date``
 - Review text: ``comments``, ``text``, ``body``
 - Host response: ``response``, ``hostReply``, ``hostResponse``
@@ -82,11 +106,14 @@ def _extract_reviewer_name(item: dict[str, Any]) -> str | None:
 def _extract_reviewer_origin(item: dict[str, Any]) -> str | None:
     reviewer = item.get("reviewer")
     if isinstance(reviewer, dict):
-        return (
+        origin = (
             _str_or_none(reviewer.get("location"))
             or _str_or_none(reviewer.get("hometown"))
         )
-    return None
+        if origin:
+            return origin
+    # tri_angle reviews actor surfaces reviewer location at the top level
+    return _str_or_none(item.get("localizedReviewerLocation"))
 
 
 def _extract_date(item: dict[str, Any]) -> str | None:
@@ -146,12 +173,18 @@ def _parse_comment(item: Any) -> UnifiedReviewComment | None:
 
 
 class AirbnbReviewNormalizer:
-    """Normalizes a raw Airbnb Apify payload into a unified ``ReviewCorpus``.
+    """Normalizes Airbnb review data into a unified ``ReviewCorpus``.
 
     Usage::
 
         normalizer = AirbnbReviewNormalizer()
+
+        # From listing payload (embedded reviews array):
         result = normalizer.normalize(raw_payload, listing)
+
+        # From tri_angle reviews actor (flat item list):
+        result = normalizer.normalize_from_actor_items(items, listing)
+
         corpus = result.corpus
     """
 
@@ -160,7 +193,11 @@ class AirbnbReviewNormalizer:
         payload: dict[str, Any],
         listing: Any,  # NormalizedListing — kept as Any to avoid circular import
     ) -> ReviewExtractionResult:
-        """Normalize *payload* into a ``ReviewExtractionResult``.
+        """Normalize a listing payload dict into a ``ReviewExtractionResult``.
+
+        Expects reviews embedded under a ``reviews`` or ``feedbacks`` key in
+        *payload*, along with optional aggregate fields ``reviewsCount`` and
+        ``starRating``.
 
         Parameters
         ----------
@@ -204,6 +241,71 @@ class AirbnbReviewNormalizer:
         raw_rating = payload.get("starRating") or payload.get("rating")
         average_rating = _float_or_none(raw_rating)
         if average_rating is None and listing is not None:
+            average_rating = getattr(listing, "rating", None)
+
+        source_id = getattr(listing, "source_id", None) if listing is not None else None
+        source_url = getattr(listing, "source_url", None) if listing is not None else None
+
+        corpus = ReviewCorpus(
+            source_provider=_SOURCE_PROVIDER,
+            source_listing_id=str(source_id) if source_id is not None else None,
+            source_url=source_url,
+            total_review_count=total_count,
+            average_rating=average_rating,
+            comments=comments,
+        )
+        return ReviewExtractionResult(
+            corpus=corpus,
+            extracted_comment_count=len(comments),
+            dropped_comment_count=dropped,
+        )
+
+    def normalize_from_actor_items(
+        self,
+        items: list[Any],
+        listing: Any,  # NormalizedListing — kept as Any to avoid circular import
+    ) -> ReviewExtractionResult:
+        """Normalize a flat list of review items from the tri_angle reviews actor.
+
+        The ``tri_angle~airbnb-reviews-scraper`` actor returns one dict per
+        review (unlike the listing actor which embeds reviews under a
+        ``reviews`` key in the listing payload).  Aggregate metadata
+        (total review count, average rating) is sourced from the listing
+        because the reviews actor does not provide these fields.
+
+        Parameters
+        ----------
+        items:
+            Flat list of raw review dicts from the actor dataset.  Non-dict
+            entries are silently dropped and counted.
+        listing:
+            Normalized listing; used as the source of ``total_review_count``
+            and ``average_rating`` fallbacks.
+
+        Returns
+        -------
+        ReviewExtractionResult
+            Always valid; empty corpus when *items* is empty or all malformed.
+        """
+        comments: list[UnifiedReviewComment] = []
+        dropped = 0
+        for item in items:
+            parsed = _parse_comment(item)
+            if parsed is not None:
+                comments.append(parsed)
+            else:
+                dropped += 1
+
+        # total_review_count: prefer listing metadata (actor does not provide aggregate)
+        total_count: int | None
+        if listing is not None and getattr(listing, "review_count", None) is not None:
+            total_count = listing.review_count
+        else:
+            total_count = len(comments) if comments else None
+
+        # average_rating: prefer listing metadata
+        average_rating: float | None = None
+        if listing is not None:
             average_rating = getattr(listing, "rating", None)
 
         source_id = getattr(listing, "source_id", None) if listing is not None else None

@@ -319,6 +319,163 @@ class TestAirbnbReviewNormalizer:
         result = self.normalizer.normalize(payload, _listing())
         assert result.extracted_comment_count == 3
 
+    def test_reviewer_origin_from_localized_reviewer_location(self):
+        """localizedReviewerLocation (tri_angle reviews actor top-level field) is handled."""
+        payload = {
+            "reviews": [
+                {"comments": "Nice.", "localizedReviewerLocation": "Tokyo"}
+            ]
+        }
+        result = self.normalizer.normalize(payload, _listing())
+        assert result.corpus.comments[0].reviewer_origin == "Tokyo"
+
+    def test_reviewer_origin_prefers_reviewer_dict_location(self):
+        """reviewer.location takes precedence over localizedReviewerLocation."""
+        payload = {
+            "reviews": [
+                {
+                    "comments": "Good.",
+                    "reviewer": {"firstName": "Bob", "location": "London"},
+                    "localizedReviewerLocation": "Berlin",
+                }
+            ]
+        }
+        result = self.normalizer.normalize(payload, _listing())
+        assert result.corpus.comments[0].reviewer_origin == "London"
+
+
+# ---------------------------------------------------------------------------
+# AirbnbReviewNormalizer — normalize_from_actor_items (tri_angle reviews actor)
+# ---------------------------------------------------------------------------
+
+
+_ACTOR_ITEM = {
+    "id": "rv-1",
+    "language": "en",
+    "text": "Lovely flat, great location.",
+    "localizedText": "Lovely flat, great location.",
+    "localizedDate": "March 2024",
+    "createdAt": "2024-03-15",
+    "localizedReviewerLocation": "London",
+    "reviewer": {"firstName": "Alice"},
+    "reviewee": "Host",
+    "rating": 5,
+    "response": "Thank you Alice!",
+    "reviewHighlight": None,
+    "startUrl": "https://www.airbnb.com/rooms/1",
+}
+
+
+class TestAirbnbReviewNormalizerFromActorItems:
+    def setup_method(self):
+        self.normalizer = AirbnbReviewNormalizer()
+
+    def test_returns_review_extraction_result(self):
+        result = self.normalizer.normalize_from_actor_items([_ACTOR_ITEM], _listing())
+        assert isinstance(result, ReviewExtractionResult)
+        assert isinstance(result.corpus, ReviewCorpus)
+
+    def test_corpus_source_provider_is_airbnb(self):
+        result = self.normalizer.normalize_from_actor_items([_ACTOR_ITEM], _listing())
+        assert result.corpus.source_provider == "airbnb"
+
+    def test_maps_text_field(self):
+        result = self.normalizer.normalize_from_actor_items([_ACTOR_ITEM], _listing())
+        assert result.corpus.comments[0].comment_text == "Lovely flat, great location."
+
+    def test_maps_language_field(self):
+        result = self.normalizer.normalize_from_actor_items([_ACTOR_ITEM], _listing())
+        assert result.corpus.comments[0].language == "en"
+
+    def test_maps_localized_date_field(self):
+        # createdAt is preferred over localizedDate
+        result = self.normalizer.normalize_from_actor_items([_ACTOR_ITEM], _listing())
+        assert result.corpus.comments[0].review_date == "2024-03-15"
+
+    def test_maps_localized_reviewer_location(self):
+        result = self.normalizer.normalize_from_actor_items([_ACTOR_ITEM], _listing())
+        assert result.corpus.comments[0].reviewer_origin == "London"
+
+    def test_maps_reviewer_first_name(self):
+        result = self.normalizer.normalize_from_actor_items([_ACTOR_ITEM], _listing())
+        assert result.corpus.comments[0].reviewer_name == "Alice"
+
+    def test_maps_rating(self):
+        result = self.normalizer.normalize_from_actor_items([_ACTOR_ITEM], _listing())
+        assert result.corpus.comments[0].rating == pytest.approx(5.0)
+
+    def test_maps_response_as_host_response(self):
+        result = self.normalizer.normalize_from_actor_items([_ACTOR_ITEM], _listing())
+        assert result.corpus.comments[0].host_response_text == "Thank you Alice!"
+
+    def test_maps_id_field(self):
+        result = self.normalizer.normalize_from_actor_items([_ACTOR_ITEM], _listing())
+        assert result.corpus.comments[0].source_comment_id == "rv-1"
+
+    def test_empty_items_list(self):
+        result = self.normalizer.normalize_from_actor_items([], _listing())
+        assert result.corpus.comments == []
+        assert result.extracted_comment_count == 0
+
+    def test_non_dict_items_dropped(self):
+        result = self.normalizer.normalize_from_actor_items(
+            ["not a dict", None, _ACTOR_ITEM], _listing()
+        )
+        assert len(result.corpus.comments) == 1
+        assert result.dropped_comment_count == 2
+
+    def test_multiple_items_all_normalized(self):
+        item2 = dict(_ACTOR_ITEM, id="rv-2", text="Good stay.", reviewer={"firstName": "Bob"})
+        result = self.normalizer.normalize_from_actor_items([_ACTOR_ITEM, item2], _listing())
+        assert result.extracted_comment_count == 2
+        assert result.corpus.comments[1].reviewer_name == "Bob"
+
+    def test_total_count_from_listing_review_count(self):
+        result = self.normalizer.normalize_from_actor_items([_ACTOR_ITEM], _listing(review_count=42))
+        assert result.corpus.total_review_count == 42
+
+    def test_total_count_falls_back_to_comment_count_when_listing_none(self):
+        result = self.normalizer.normalize_from_actor_items([_ACTOR_ITEM], _listing(review_count=None))
+        assert result.corpus.total_review_count == 1
+
+    def test_total_count_none_when_empty_and_no_listing_count(self):
+        result = self.normalizer.normalize_from_actor_items([], _listing(review_count=None))
+        assert result.corpus.total_review_count is None
+
+    def test_average_rating_from_listing(self):
+        result = self.normalizer.normalize_from_actor_items([_ACTOR_ITEM], _listing(rating=4.7))
+        assert result.corpus.average_rating == pytest.approx(4.7)
+
+    def test_average_rating_none_when_listing_rating_none(self):
+        result = self.normalizer.normalize_from_actor_items([_ACTOR_ITEM], _listing(rating=None))
+        assert result.corpus.average_rating is None
+
+    def test_source_listing_id_from_listing(self):
+        result = self.normalizer.normalize_from_actor_items([], _listing(source_id="rooms-99"))
+        assert result.corpus.source_listing_id == "rooms-99"
+
+    def test_source_url_from_listing(self):
+        result = self.normalizer.normalize_from_actor_items(
+            [], _listing(source_url="https://www.airbnb.com/rooms/99")
+        )
+        assert result.corpus.source_url == "https://www.airbnb.com/rooms/99"
+
+    def test_localized_date_used_when_created_at_absent(self):
+        item = {
+            "id": "rv-3",
+            "text": "Nice!",
+            "localizedDate": "January 2024",
+            "reviewer": {"firstName": "Carol"},
+            "rating": 4,
+        }
+        result = self.normalizer.normalize_from_actor_items([item], _listing())
+        assert result.corpus.comments[0].review_date == "January 2024"
+
+    def test_no_response_maps_to_none(self):
+        item = dict(_ACTOR_ITEM, response=None)
+        result = self.normalizer.normalize_from_actor_items([item], _listing())
+        assert result.corpus.comments[0].host_response_text is None
+
 
 # ---------------------------------------------------------------------------
 # GenericReviewNormalizer

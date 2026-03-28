@@ -815,3 +815,177 @@ class TestAirbnbReviewsModuleDegradation:
         assert len(results) == 1
         assert isinstance(results[0], ReviewsResult)
         assert results[0].overall_assessment is None
+
+
+# ---------------------------------------------------------------------------
+# AirbnbReviewsModule — dedicated reviews source (Slice 2)
+# ---------------------------------------------------------------------------
+
+
+def _make_review_source(items=None, error=None):
+    """Build a mock AirbnbReviewSource."""
+    from src.analysis.reviews.airbnb_source import AirbnbReviewSource
+
+    source = MagicMock(spec=AirbnbReviewSource)
+    if error is not None:
+        source.fetch = AsyncMock(side_effect=error)
+    else:
+        source.fetch = AsyncMock(return_value=items or [])
+    return source
+
+
+_ACTOR_REVIEW_ITEM = {
+    "id": "rv-1",
+    "language": "en",
+    "text": "Excellent stay, highly recommend!",
+    "localizedDate": "March 2024",
+    "createdAt": "2024-03-15",
+    "localizedReviewerLocation": "London",
+    "reviewer": {"firstName": "Alice"},
+    "rating": 5,
+    "response": "Thanks Alice!",
+    "reviewHighlight": None,
+    "startUrl": "https://www.airbnb.com/rooms/1",
+}
+
+
+class TestAirbnbReviewsModuleWithReviewSource:
+    """AirbnbReviewsModule with a dedicated AirbnbReviewSource configured."""
+
+    @pytest.mark.asyncio
+    async def test_uses_review_source_when_available(self):
+        svc = _make_review_service()
+        source = _make_review_source(items=[_ACTOR_REVIEW_ITEM])
+        mod = AirbnbReviewsModule(service=svc, review_source=source)
+
+        ctx = AnalysisContext(listing=_listing())
+        result = await mod.run(ctx)
+
+        source.fetch.assert_awaited_once_with("https://www.airbnb.com/rooms/1")
+        assert isinstance(result, ReviewsResult)
+        assert result.module_name == "reviews"
+        svc.analyse.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_review_source_fetched_with_listing_url(self):
+        svc = _make_review_service()
+        source = _make_review_source(items=[_ACTOR_REVIEW_ITEM])
+        mod = AirbnbReviewsModule(service=svc, review_source=source)
+        listing = _listing()
+        ctx = AnalysisContext(listing=listing)
+
+        await mod.run(ctx)
+
+        source.fetch.assert_awaited_once_with(listing.source_url)
+
+    @pytest.mark.asyncio
+    async def test_falls_back_to_raw_payload_when_source_fails(self):
+        from src.adapters.apify_client import ApifyError
+
+        svc = _make_review_service()
+        source = _make_review_source(error=ApifyError("actor error"))
+        mod = AirbnbReviewsModule(service=svc, review_source=source)
+
+        payload = {"reviews": [{"comments": "Good."}], "reviewsCount": 1}
+        ctx = AnalysisContext(listing=_listing(), raw_payload=_raw_payload(payload))
+
+        result = await mod.run(ctx)
+
+        # Should still succeed using the listing payload fallback
+        assert isinstance(result, ReviewsResult)
+        svc.analyse.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_falls_back_to_generic_when_source_fails_and_no_raw_payload(self):
+        from src.adapters.apify_client import ApifyError
+
+        svc = _make_review_service()
+        source = _make_review_source(error=ApifyError("actor error"))
+        mod = AirbnbReviewsModule(service=svc, review_source=source)
+
+        ctx = AnalysisContext(listing=_listing(review_count=10, rating=4.3))
+
+        result = await mod.run(ctx)
+
+        # No comment texts → no AI call, metadata-only result
+        svc.analyse.assert_not_awaited()
+        assert result.review_count == 10
+        assert result.average_rating == pytest.approx(4.3)
+
+    @pytest.mark.asyncio
+    async def test_empty_actor_response_degrades_gracefully(self):
+        svc = _make_review_service()
+        source = _make_review_source(items=[])
+        mod = AirbnbReviewsModule(service=svc, review_source=source)
+
+        ctx = AnalysisContext(listing=_listing(review_count=5, rating=4.0))
+        result = await mod.run(ctx)
+
+        svc.analyse.assert_not_awaited()
+        assert result.review_count == 5
+        assert result.average_rating == pytest.approx(4.0)
+        assert result.overall_assessment is None
+
+    @pytest.mark.asyncio
+    async def test_no_review_source_still_uses_raw_payload(self):
+        """Backward compat: no review_source falls back to raw payload as before."""
+        svc = _make_review_service()
+        mod = AirbnbReviewsModule(service=svc, review_source=None)
+
+        payload = {"reviews": [{"comments": "Great."}], "reviewsCount": 1, "starRating": 5.0}
+        ctx = AnalysisContext(listing=_listing(), raw_payload=_raw_payload(payload))
+
+        result = await mod.run(ctx)
+
+        assert isinstance(result, ReviewsResult)
+        svc.analyse.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_actor_reviews_ai_analysis_result_fields_populated(self):
+        svc = _make_review_service()
+        source = _make_review_source(items=[_ACTOR_REVIEW_ITEM])
+        mod = AirbnbReviewsModule(service=svc, review_source=source)
+
+        ctx = AnalysisContext(listing=_listing())
+        result = await mod.run(ctx)
+
+        assert result.overall_assessment == "Generally positive stay."
+        assert result.overall_risk_level == "low"
+        assert result.positive_signals == ["Clean", "Good location"]
+        assert result.window_view_summary == "City view mentioned by several guests."
+
+    @pytest.mark.asyncio
+    async def test_review_source_not_called_when_listing_url_absent(self):
+        """Source should not be called when listing has no URL."""
+        svc = _make_review_service()
+        source = _make_review_source(items=[_ACTOR_REVIEW_ITEM])
+        mod = AirbnbReviewsModule(service=svc, review_source=source)
+
+        listing = NormalizedListing(
+            provider=ListingProvider.AIRBNB,
+            source_url="",
+            source_id="1",
+            title="Test",
+        )
+        ctx = AnalysisContext(listing=listing)
+
+        await mod.run(ctx)
+
+        source.fetch.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_degrades_on_ai_failure_after_actor_fetch(self):
+        from src.analysis.openrouter_client import OpenRouterError
+
+        svc = MagicMock(spec=ReviewAnalysisService)
+        svc.analyse = AsyncMock(side_effect=OpenRouterError("API down"))
+        source = _make_review_source(items=[_ACTOR_REVIEW_ITEM])
+        mod = AirbnbReviewsModule(service=svc, review_source=source)
+
+        ctx = AnalysisContext(listing=_listing(review_count=10, rating=4.5))
+        result = await mod.run(ctx)
+
+        assert result.overall_assessment is None
+        assert result.incident_timeline == []
+        assert result.review_count == 10
+        assert result.average_rating == pytest.approx(4.5)

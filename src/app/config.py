@@ -79,6 +79,11 @@ class Settings(BaseSettings):
     # the Apify API; slash form returns 404) which provides reliable dated
     # price data, photos, host, amenities, and rules.
     apify_airbnb_actor_id: str = "tri_angle~airbnb-rooms-urls-scraper"
+    # Actor used to scrape Airbnb reviews. Dedicated reviews corpus for the
+    # reviews analysis module (spec 028 Slice 2).
+    # Input: startUrls=[{"url": <listing-url>}]
+    # Output: flat list of review items, one item per review.
+    apify_airbnb_reviews_actor_id: str = "tri_angle~airbnb-reviews-scraper"
 
     # Geoapify
     # Required outside development/testing because transport and nearby-places
