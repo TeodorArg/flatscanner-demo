@@ -46,7 +46,12 @@ Migration is broken into phases P1-P7 in `specs/015-post-mvp-architecture-founda
 
 - Airbnb is the first provider, but parsing must stay adapter-based.
 - Apify is the default extraction source where supported.
-  - Default Airbnb actor: `curious_coder~airbnb-scraper` (overridable via `APIFY_AIRBNB_ACTOR_ID`).
+  - Airbnb ingestion uses two specialized `tri_angle` actors (split introduced in spec 028):
+    - **Listing actor** (`tri_angle/airbnb-rooms-urls-scraper`, default via `APIFY_AIRBNB_ACTOR_ID`):
+      listing details, dated price data, photos, host, amenities, and rules.
+      Replaced `curious_coder~airbnb-scraper` which could not reliably return priced output.
+    - **Reviews actor** (`tri_angle/airbnb-reviews-scraper`, to be wired in spec 028 Slice 2):
+      dedicated review corpus for the reviews analysis module.
   - `APIFY_API_TOKEN` is required in all non-development/testing environments and validated at startup.
   - The client authenticates using an `Authorization: Bearer <token>` header (not a query parameter).
 - OpenRouter is the model gateway.

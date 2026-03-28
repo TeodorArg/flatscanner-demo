@@ -48,6 +48,9 @@ _AIRBNB_LISTING_PATH_RE = re.compile(r"^/rooms/([^/?#\s]+)/?$", re.IGNORECASE)
 _CURIOUS_CODER_ACTOR_IDS: frozenset[str] = frozenset({
     "curious_coder~airbnb-scraper",
 })
+_TRI_ANGLE_ROOMS_ACTOR_IDS: frozenset[str] = frozenset({
+    "tri_angle/airbnb-rooms-urls-scraper",
+})
 
 
 def _is_airbnb_host(host: str) -> bool:
@@ -93,10 +96,19 @@ def _first_present(*values: Any) -> Any:
 def _build_actor_input(url: str, actor_id: str) -> dict[str, Any]:
     """Return the actor-specific Apify input payload for *url*.
 
-    Different public Airbnb actors expect different input contracts. The
-    rollout actor for this MVP (`curious_coder~airbnb-scraper`) accepts a
-    `urls` array rather than `startUrls`.
+    Different public Airbnb actors expect different input contracts:
+    - ``tri_angle/airbnb-rooms-urls-scraper``: ``startUrls`` array with
+      ``currency`` to request priced output (listing details, dated price,
+      photos, host, amenities, rules).
+    - ``curious_coder~airbnb-scraper``: ``urls`` array with scrape flags.
+    - Generic fallback: ``startUrls`` array with ``maxListings=1``.
     """
+    if actor_id in _TRI_ANGLE_ROOMS_ACTOR_IDS:
+        return {
+            "startUrls": [{"url": url}],
+            "currency": "USD",
+        }
+
     if actor_id in _CURIOUS_CODER_ACTOR_IDS:
         return {
             "urls": [url],
@@ -132,6 +144,10 @@ def _normalize(url: str, raw: dict[str, Any]) -> NormalizedListing:
         source_id = _extract_listing_id_from_url(url)
 
     # --- price ---------------------------------------------------------------
+    # Field lookup order (most-specific to least-specific):
+    # 1. pricing.rate.amount  — curious_coder actor nested structure
+    # 2. costPerNight         — curious_coder actor flat field
+    # 3. price                — tri_angle actor flat nightly-rate field
     price: PriceInfo | None = None
     pricing = raw.get("pricing")
     if isinstance(pricing, dict):
@@ -154,6 +170,33 @@ def _normalize(url: str, raw: dict[str, Any]) -> NormalizedListing:
             )
         except Exception:
             pass
+    if price is None and raw.get("price") is not None:
+        try:
+            price = PriceInfo(
+                amount=Decimal(str(raw["price"])),
+                currency=str(raw.get("currency") or "USD"),
+                period="night",
+            )
+        except Exception:
+            pass
+    # Attach cleaning/service fees when present (tri_angle actor fields).
+    if price is not None:
+        cleaning_fee_raw = raw.get("cleaningFee")
+        if cleaning_fee_raw is not None:
+            try:
+                price = price.model_copy(
+                    update={"cleaning_fee": Decimal(str(cleaning_fee_raw))}
+                )
+            except Exception:
+                pass
+        service_fee_raw = raw.get("serviceFee")
+        if service_fee_raw is not None:
+            try:
+                price = price.model_copy(
+                    update={"service_fee": Decimal(str(service_fee_raw))}
+                )
+            except Exception:
+                pass
 
     # --- location ------------------------------------------------------------
     raw_location = raw.get("location")

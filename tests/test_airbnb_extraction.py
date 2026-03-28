@@ -71,6 +71,40 @@ def _full_airbnb_payload(listing_id: str = "12345") -> dict[str, Any]:
     }
 
 
+def _tri_angle_rooms_payload(listing_id: str = "55443322") -> dict[str, Any]:
+    """Return a listing item in the ``tri_angle/airbnb-rooms-urls-scraper`` schema."""
+    return {
+        "id": listing_id,
+        "url": f"https://www.airbnb.com/rooms/{listing_id}",
+        "name": "Modern Flat in Lisbon",
+        "description": "Bright flat with river views.",
+        "lat": 38.7169,
+        "lng": -9.1395,
+        "address": "Alfama, Lisbon, Portugal",
+        "city": "Lisbon",
+        "country": "Portugal",
+        "price": 120.0,
+        "currency": "USD",
+        "cleaningFee": 25.0,
+        "serviceFee": 18.0,
+        "photos": [
+            {"id": "p1", "url": "https://a0.muscache.com/im/photos/p1.jpg", "caption": "Living room"},
+            {"id": "p2", "url": "https://a0.muscache.com/im/photos/p2.jpg", "caption": "Bedroom"},
+        ],
+        "host": {
+            "id": "host-42",
+            "name": "Carlos",
+            "isSuperHost": True,
+        },
+        "amenities": ["WiFi", "Kitchen", "Washer"],
+        "bedrooms": 2,
+        "bathrooms": 1.0,
+        "personCapacity": 4,
+        "starRating": 4.92,
+        "reviewsCount": 87,
+    }
+
+
 def _curious_coder_payload(listing_id: str = "33166539") -> dict[str, Any]:
     """Return a listing item in the `curious_coder` actor schema."""
     return {
@@ -277,6 +311,20 @@ class TestAirbnbAdapterFetch:
 
         call_input = mock_run.call_args.args[0]
         assert call_input["startUrls"][0]["url"] == self._URL
+
+    @pytest.mark.asyncio
+    async def test_fetch_uses_actor_specific_input_for_tri_angle_rooms(self):
+        settings = _make_settings(apify_airbnb_actor_id="tri_angle/airbnb-rooms-urls-scraper")
+        adapter = AirbnbAdapter(settings=settings)
+
+        with patch.object(ApifyClient, "run_and_get_items", new_callable=AsyncMock) as mock_run:
+            mock_run.return_value = [_tri_angle_rooms_payload()]
+            await adapter.fetch(self._URL)
+
+        call_input = mock_run.call_args.args[0]
+        assert call_input["startUrls"][0]["url"] == self._URL
+        assert call_input["currency"] == "USD"
+        assert "maxListings" not in call_input
 
     @pytest.mark.asyncio
     async def test_fetch_uses_actor_specific_input_for_curious_coder(self):
@@ -493,8 +541,84 @@ class TestNormalize:
         listing = _normalize(self._URL, payload)
         assert listing.rating == pytest.approx(0.0)
 
+    def test_tri_angle_payload_maps_all_fields(self):
+        listing = _normalize(self._URL, _tri_angle_rooms_payload("55443322"))
+
+        assert listing.source_id == "55443322"
+        assert listing.title == "Modern Flat in Lisbon"
+        assert listing.description == "Bright flat with river views."
+
+        assert listing.price is not None
+        assert listing.price.amount == Decimal("120")
+        assert listing.price.currency == "USD"
+        assert listing.price.period == "night"
+        assert listing.price.cleaning_fee == Decimal("25")
+        assert listing.price.service_fee == Decimal("18")
+
+        assert listing.location.latitude == pytest.approx(38.7169)
+        assert listing.location.longitude == pytest.approx(-9.1395)
+        assert listing.location.city == "Lisbon"
+        assert listing.location.country == "Portugal"
+
+        assert listing.bedrooms == 2
+        assert listing.max_guests == 4
+        assert listing.amenities == ["WiFi", "Kitchen", "Washer"]
+        assert listing.rating == pytest.approx(4.92)
+        assert listing.review_count == 87
+        assert listing.host_name == "Carlos"
+        assert listing.host_is_superhost is True
+
+    def test_tri_angle_price_field_accepted(self):
+        """Direct ``price`` field (tri_angle schema) is mapped to PriceInfo."""
+        payload = {"name": "Test", "price": 75.5, "currency": "EUR"}
+        listing = _normalize(self._URL, payload)
+        assert listing.price is not None
+        assert listing.price.amount == Decimal("75.5")
+        assert listing.price.currency == "EUR"
+        assert listing.price.cleaning_fee is None
+        assert listing.price.service_fee is None
+
+    def test_tri_angle_cleaning_fee_attached(self):
+        payload = {"name": "Test", "price": 100, "currency": "USD", "cleaningFee": 30}
+        listing = _normalize(self._URL, payload)
+        assert listing.price is not None
+        assert listing.price.cleaning_fee == Decimal("30")
+
+    def test_tri_angle_service_fee_attached(self):
+        payload = {"name": "Test", "price": 100, "currency": "USD", "serviceFee": 15}
+        listing = _normalize(self._URL, payload)
+        assert listing.price is not None
+        assert listing.price.service_fee == Decimal("15")
+
+    def test_tri_angle_pricing_nested_takes_precedence_over_price_field(self):
+        """pricing.rate.amount wins over the flat price field."""
+        payload = {
+            "name": "Test",
+            "pricing": {"rate": {"amount": 90, "currency": "USD"}},
+            "price": 50,
+        }
+        listing = _normalize(self._URL, payload)
+        assert listing.price is not None
+        assert listing.price.amount == Decimal("90")
+
+    def test_tri_angle_photos_preserved_in_raw(self):
+        """Photos are passed through in the raw dict; no normalization needed yet."""
+        raw = _tri_angle_rooms_payload()
+        assert len(raw["photos"]) == 2
+        assert raw["photos"][0]["url"].startswith("https://")
+
 
 class TestBuildActorInput:
+    def test_tri_angle_rooms_actor_uses_start_urls_and_currency(self):
+        payload = _build_actor_input(
+            "https://www.airbnb.com/rooms/12345",
+            "tri_angle/airbnb-rooms-urls-scraper",
+        )
+        assert payload == {
+            "startUrls": [{"url": "https://www.airbnb.com/rooms/12345"}],
+            "currency": "USD",
+        }
+
     def test_default_actor_uses_start_urls_contract(self):
         payload = _build_actor_input(
             "https://www.airbnb.com/rooms/12345",
