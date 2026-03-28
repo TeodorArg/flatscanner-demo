@@ -71,6 +71,52 @@ def _full_airbnb_payload(listing_id: str = "12345") -> dict[str, Any]:
     }
 
 
+def _tri_angle_rooms_payload(listing_id: str = "55443322") -> dict[str, Any]:
+    """Return a listing item in the ``tri_angle~airbnb-rooms-urls-scraper`` schema.
+
+    Reflects live actor output: ``price`` is an object with sub-fields, and
+    photos are under ``images`` (not ``photos``).
+    """
+    return {
+        "id": listing_id,
+        "url": f"https://www.airbnb.com/rooms/{listing_id}",
+        "name": "Modern Flat in Lisbon",
+        "description": "Bright flat with river views.",
+        "lat": 38.7169,
+        "lng": -9.1395,
+        "address": "Alfama, Lisbon, Portugal",
+        "city": "Lisbon",
+        "country": "Portugal",
+        "price": {
+            "label": "$120",
+            "qualifier": "night",
+            "price": "$120",
+            "originalPrice": "$150",
+            "discountedPrice": "$120",
+            "basePrice": {"price": "$120"},
+            "breakDown": {"total": {"price": "$840"}},
+        },
+        "currency": "USD",
+        "cleaningFee": 25.0,
+        "serviceFee": 18.0,
+        "images": [
+            {"id": "p1", "url": "https://a0.muscache.com/im/photos/p1.jpg", "caption": "Living room"},
+            {"id": "p2", "url": "https://a0.muscache.com/im/photos/p2.jpg", "caption": "Bedroom"},
+        ],
+        "host": {
+            "id": "host-42",
+            "name": "Carlos",
+            "isSuperHost": True,
+        },
+        "amenities": ["WiFi", "Kitchen", "Washer"],
+        "bedrooms": 2,
+        "bathrooms": 1.0,
+        "personCapacity": 4,
+        "starRating": 4.92,
+        "reviewsCount": 87,
+    }
+
+
 def _curious_coder_payload(listing_id: str = "33166539") -> dict[str, Any]:
     """Return a listing item in the `curious_coder` actor schema."""
     return {
@@ -277,6 +323,20 @@ class TestAirbnbAdapterFetch:
 
         call_input = mock_run.call_args.args[0]
         assert call_input["startUrls"][0]["url"] == self._URL
+
+    @pytest.mark.asyncio
+    async def test_fetch_uses_actor_specific_input_for_tri_angle_rooms(self):
+        settings = _make_settings(apify_airbnb_actor_id="tri_angle~airbnb-rooms-urls-scraper")
+        adapter = AirbnbAdapter(settings=settings)
+
+        with patch.object(ApifyClient, "run_and_get_items", new_callable=AsyncMock) as mock_run:
+            mock_run.return_value = [_tri_angle_rooms_payload()]
+            await adapter.fetch(self._URL)
+
+        call_input = mock_run.call_args.args[0]
+        assert call_input["startUrls"][0]["url"] == self._URL
+        assert call_input["currency"] == "USD"
+        assert "maxListings" not in call_input
 
     @pytest.mark.asyncio
     async def test_fetch_uses_actor_specific_input_for_curious_coder(self):
@@ -493,8 +553,247 @@ class TestNormalize:
         listing = _normalize(self._URL, payload)
         assert listing.rating == pytest.approx(0.0)
 
+    def test_tri_angle_payload_maps_all_fields(self):
+        listing = _normalize(self._URL, _tri_angle_rooms_payload("55443322"))
+
+        assert listing.source_id == "55443322"
+        assert listing.title == "Modern Flat in Lisbon"
+        assert listing.description == "Bright flat with river views."
+
+        assert listing.price is not None
+        assert listing.price.amount == Decimal("120")
+        assert listing.price.currency == "USD"
+        assert listing.price.period == "night"
+        assert listing.price.cleaning_fee == Decimal("25")
+        assert listing.price.service_fee == Decimal("18")
+
+        assert listing.location.latitude == pytest.approx(38.7169)
+        assert listing.location.longitude == pytest.approx(-9.1395)
+        assert listing.location.city == "Lisbon"
+        assert listing.location.country == "Portugal"
+
+        assert listing.bedrooms == 2
+        assert listing.max_guests == 4
+        assert listing.amenities == ["WiFi", "Kitchen", "Washer"]
+        assert listing.rating == pytest.approx(4.92)
+        assert listing.review_count == 87
+        assert listing.host_name == "Carlos"
+        assert listing.host_is_superhost is True
+
+    def test_tri_angle_price_object_accepted(self):
+        """``price`` as an object (live tri_angle schema) is mapped to PriceInfo."""
+        payload = {
+            "name": "Test",
+            "price": {
+                "label": "$75.50",
+                "qualifier": "night",
+                "price": "$75.50",
+                "basePrice": {"price": "$75.50"},
+            },
+            "currency": "EUR",
+        }
+        listing = _normalize(self._URL, payload)
+        assert listing.price is not None
+        assert listing.price.amount == Decimal("75.50")
+        assert listing.price.currency == "EUR"
+        assert listing.price.period == "night"
+        assert listing.price.cleaning_fee is None
+        assert listing.price.service_fee is None
+
+    def test_tri_angle_price_object_discounted_price_takes_priority(self):
+        """``discountedPrice`` wins over ``price`` and ``basePrice`` inside the object."""
+        payload = {
+            "name": "Test",
+            "price": {
+                "qualifier": "night",
+                "price": "$200",
+                "discountedPrice": "$180",
+                "basePrice": {"price": "$200"},
+            },
+            "currency": "USD",
+        }
+        listing = _normalize(self._URL, payload)
+        assert listing.price is not None
+        assert listing.price.amount == Decimal("180")
+
+    def test_tri_angle_price_falls_back_to_price_when_no_discounted(self):
+        """Falls back to ``price.price`` when ``discountedPrice`` is absent."""
+        payload = {
+            "name": "Test",
+            "price": {
+                "qualifier": "night",
+                "price": "$75",
+                "basePrice": {"price": "$75"},
+            },
+            "currency": "USD",
+        }
+        listing = _normalize(self._URL, payload)
+        assert listing.price is not None
+        assert listing.price.amount == Decimal("75")
+        assert listing.price.period == "night"
+
+    def test_tri_angle_weekly_stay_period_and_amount(self):
+        """'for 7 nights' qualifier yields period='stay'; amount from discountedPrice."""
+        payload = {
+            "name": "Test",
+            "price": {
+                "qualifier": "for 7 nights",
+                "price": "",
+                "discountedPrice": "$840",
+                "breakDown": {
+                    "basePrice": {"description": "7 nights x $120", "price": "$840"},
+                    "total": {"price": "$840"},
+                },
+            },
+            "currency": "USD",
+        }
+        listing = _normalize(self._URL, payload)
+        assert listing.price is not None
+        assert listing.price.amount == Decimal("840")
+        assert listing.price.period == "stay"
+
+    def test_tri_angle_monthly_stay_period_and_amount(self):
+        """'monthly' qualifier yields period='month'; amount from discountedPrice."""
+        payload = {
+            "name": "Test",
+            "price": {
+                "qualifier": "monthly",
+                "price": "",
+                "discountedPrice": "$1484.46",
+                "breakDown": {
+                    "basePrice": {
+                        "description": "Average monthly price",
+                        "price": "$1484.46",
+                    },
+                },
+            },
+            "currency": "USD",
+        }
+        listing = _normalize(self._URL, payload)
+        assert listing.price is not None
+        assert listing.price.amount == Decimal("1484.46")
+        assert listing.price.period == "month"
+
+    def test_tri_angle_nightly_qualifier_yields_night_period(self):
+        """Explicit 'night' qualifier yields period='night'."""
+        payload = {
+            "name": "Test",
+            "price": {"qualifier": "night", "price": "$120", "discountedPrice": "$120"},
+            "currency": "USD",
+        }
+        listing = _normalize(self._URL, payload)
+        assert listing.price is not None
+        assert listing.price.period == "night"
+
+    def test_tri_angle_unknown_qualifier_defaults_to_stay(self):
+        """An unrecognised qualifier falls back to 'stay' (safe default)."""
+        payload = {
+            "name": "Test",
+            "price": {"qualifier": "special rate", "discountedPrice": "$500"},
+            "currency": "USD",
+        }
+        listing = _normalize(self._URL, payload)
+        assert listing.price is not None
+        assert listing.price.period == "stay"
+
+    def test_tri_angle_price_scalar_still_accepted(self):
+        """Flat numeric ``price`` (e.g. older schema) is still mapped correctly."""
+        payload = {"name": "Test", "price": 75.5, "currency": "EUR"}
+        listing = _normalize(self._URL, payload)
+        assert listing.price is not None
+        assert listing.price.amount == Decimal("75.5")
+        assert listing.price.currency == "EUR"
+        assert listing.price.cleaning_fee is None
+        assert listing.price.service_fee is None
+
+    def test_tri_angle_cleaning_fee_attached(self):
+        payload = {"name": "Test", "price": 100, "currency": "USD", "cleaningFee": 30}
+        listing = _normalize(self._URL, payload)
+        assert listing.price is not None
+        assert listing.price.cleaning_fee == Decimal("30")
+
+    def test_tri_angle_service_fee_attached(self):
+        payload = {"name": "Test", "price": 100, "currency": "USD", "serviceFee": 15}
+        listing = _normalize(self._URL, payload)
+        assert listing.price is not None
+        assert listing.price.service_fee == Decimal("15")
+
+    def test_tri_angle_cleaning_fee_formatted_string(self):
+        """Formatted string cleaningFee like '$25' is parsed via _parse_price_amount."""
+        payload = {"name": "Test", "price": 100, "currency": "USD", "cleaningFee": "$25"}
+        listing = _normalize(self._URL, payload)
+        assert listing.price is not None
+        assert listing.price.cleaning_fee == Decimal("25")
+
+    def test_tri_angle_service_fee_formatted_string(self):
+        """Formatted string serviceFee like '$18' is parsed via _parse_price_amount."""
+        payload = {"name": "Test", "price": 100, "currency": "USD", "serviceFee": "$18"}
+        listing = _normalize(self._URL, payload)
+        assert listing.price is not None
+        assert listing.price.service_fee == Decimal("18")
+
+    def test_tri_angle_cleaning_fee_invalid_string_silently_dropped(self):
+        """An unparseable cleaningFee value (empty string) does not crash and is dropped."""
+        payload = {"name": "Test", "price": 100, "currency": "USD", "cleaningFee": ""}
+        listing = _normalize(self._URL, payload)
+        assert listing.price is not None
+        assert listing.price.cleaning_fee is None
+
+    def test_tri_angle_pricing_nested_takes_precedence_over_price_field(self):
+        """pricing.rate.amount wins over the flat price field."""
+        payload = {
+            "name": "Test",
+            "pricing": {"rate": {"amount": 90, "currency": "USD"}},
+            "price": 50,
+        }
+        listing = _normalize(self._URL, payload)
+        assert listing.price is not None
+        assert listing.price.amount == Decimal("90")
+
+    def test_tri_angle_images_in_raw_do_not_break_normalization(self):
+        """``_normalize`` completes without error and extracts correct fields
+        even when the payload contains an ``images`` list (tri_angle schema).
+        The images are not yet mapped to a domain field; this test guards against
+        future regressions that might accidentally crash or discard other fields
+        when ``images`` is present.
+        """
+        raw = _tri_angle_rooms_payload("55443322")
+        listing = _normalize(self._URL, raw)
+
+        # Core fields must be extracted correctly despite the images list.
+        assert listing.title == "Modern Flat in Lisbon"
+        assert listing.price is not None
+        assert listing.price.amount == Decimal("120")
+        assert listing.price.cleaning_fee == Decimal("25")
+        assert listing.price.service_fee == Decimal("18")
+
 
 class TestBuildActorInput:
+    def test_tri_angle_rooms_actor_uses_start_urls_and_currency(self):
+        payload = _build_actor_input(
+            "https://www.airbnb.com/rooms/12345",
+            "tri_angle~airbnb-rooms-urls-scraper",
+        )
+        assert payload == {
+            "startUrls": [{"url": "https://www.airbnb.com/rooms/12345"}],
+            "currency": "USD",
+        }
+
+    def test_tri_angle_rooms_actor_passes_check_in_check_out_from_url(self):
+        url = "https://www.airbnb.com/rooms/12345?check_in=2025-06-01&check_out=2025-06-08"
+        payload = _build_actor_input(url, "tri_angle~airbnb-rooms-urls-scraper")
+        assert payload["checkIn"] == "2025-06-01"
+        assert payload["checkOut"] == "2025-06-08"
+        assert payload["startUrls"][0]["url"] == url
+
+    def test_tri_angle_rooms_actor_no_dates_when_url_has_none(self):
+        payload = _build_actor_input(
+            "https://www.airbnb.com/rooms/12345",
+            "tri_angle~airbnb-rooms-urls-scraper",
+        )
+        assert "checkIn" not in payload
+        assert "checkOut" not in payload
+
     def test_default_actor_uses_start_urls_contract(self):
         payload = _build_actor_input(
             "https://www.airbnb.com/rooms/12345",
