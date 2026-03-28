@@ -331,3 +331,242 @@ class TestFormatterStayPriceBlock:
         assert "Stay price:" in msg
         assert "600 USD" in msg
         assert "Per night:" not in msg
+
+    def test_cleaning_fee_in_stay_block_en(self):
+        listing = _listing(
+            price=PriceInfo(
+                amount=Decimal("600"),
+                currency="USD",
+                period="stay",
+                check_in="2026-04-13",
+                check_out="2026-04-18",
+                stay_nights=5,
+                cleaning_fee=Decimal("75"),
+            )
+        )
+        msg = format_analysis_message(listing, _result(), Language.EN)
+        assert "Cleaning fee: 75 USD" in msg
+
+    def test_service_fee_in_stay_block_en(self):
+        listing = _listing(
+            price=PriceInfo(
+                amount=Decimal("600"),
+                currency="USD",
+                period="stay",
+                check_in="2026-04-13",
+                check_out="2026-04-18",
+                stay_nights=5,
+                service_fee=Decimal("50"),
+            )
+        )
+        msg = format_analysis_message(listing, _result(), Language.EN)
+        assert "Service fee: 50 USD" in msg
+
+    def test_cleaning_fee_label_ru(self):
+        listing = _listing(
+            price=PriceInfo(
+                amount=Decimal("600"),
+                currency="USD",
+                period="stay",
+                check_in="2026-04-13",
+                check_out="2026-04-18",
+                stay_nights=5,
+                cleaning_fee=Decimal("75"),
+            )
+        )
+        msg = format_analysis_message(listing, _result())
+        assert "Уборка:" in msg
+
+    def test_no_fee_lines_when_fees_absent(self):
+        listing = _listing(
+            price=PriceInfo(
+                amount=Decimal("600"),
+                currency="USD",
+                period="stay",
+                check_in="2026-04-13",
+                check_out="2026-04-18",
+                stay_nights=5,
+            )
+        )
+        msg = format_analysis_message(listing, _result(), Language.EN)
+        assert "Cleaning fee:" not in msg
+        assert "Service fee:" not in msg
+
+
+# ---------------------------------------------------------------------------
+# _normalize — fee extraction from breakDown
+# ---------------------------------------------------------------------------
+
+
+class TestNormalizeBreakDownFees:
+    _DATED_URL = "https://www.airbnb.com/rooms/12345?check_in=2026-04-13&check_out=2026-04-18"
+
+    def _payload_with_breakdown_fees(self, cleaning: str = "$80", service: str = "$60") -> dict:
+        """tri_angle response with fees only inside price.breakDown (no top-level fees)."""
+        return {
+            "name": "Beach Retreat",
+            "price": {
+                "qualifier": "for 5 nights",
+                "price": "",
+                "discountedPrice": "$652.45",
+                "breakDown": {
+                    "basePrice": {
+                        "description": "5 nights x $130.49",
+                        "price": "$652.45",
+                    },
+                    "cleaningFee": {"price": cleaning},
+                    "serviceFee": {"price": service},
+                    "total": {"price": "$652.45"},
+                },
+            },
+            "currency": "USD",
+        }
+
+    def test_cleaning_fee_from_breakdown(self):
+        listing = _normalize(self._DATED_URL, self._payload_with_breakdown_fees())
+        assert listing.price is not None
+        assert listing.price.cleaning_fee == Decimal("80")
+
+    def test_service_fee_from_breakdown(self):
+        listing = _normalize(self._DATED_URL, self._payload_with_breakdown_fees())
+        assert listing.price is not None
+        assert listing.price.service_fee == Decimal("60")
+
+    def test_top_level_fee_takes_priority_over_breakdown(self):
+        """Top-level cleaningFee/serviceFee must shadow breakDown values."""
+        payload = self._payload_with_breakdown_fees()
+        payload["cleaningFee"] = 99
+        payload["serviceFee"] = 45
+        listing = _normalize(self._DATED_URL, payload)
+        assert listing.price is not None
+        assert listing.price.cleaning_fee == Decimal("99")
+        assert listing.price.service_fee == Decimal("45")
+
+    def test_no_fees_when_breakdown_fees_absent(self):
+        payload = {
+            "name": "Test",
+            "price": {
+                "qualifier": "for 5 nights",
+                "discountedPrice": "$500",
+                "breakDown": {"basePrice": {"description": "5 nights x $100", "price": "$500"}},
+            },
+            "currency": "USD",
+        }
+        listing = _normalize(self._DATED_URL, payload)
+        assert listing.price is not None
+        assert listing.price.cleaning_fee is None
+        assert listing.price.service_fee is None
+
+
+# ---------------------------------------------------------------------------
+# _normalize — amount fallback from breakDown.total / breakDown.basePrice
+# ---------------------------------------------------------------------------
+
+
+class TestNormalizeBreakDownAmountFallback:
+    _DATED_URL = "https://www.airbnb.com/rooms/12345?check_in=2026-04-13&check_out=2026-04-18"
+
+    def test_amount_from_breakdown_total_when_discounted_and_price_empty(self):
+        payload = {
+            "name": "Test",
+            "price": {
+                "qualifier": "for 5 nights",
+                "price": "",
+                "discountedPrice": "",
+                "breakDown": {
+                    "total": {"price": "$750"},
+                    "basePrice": {"price": "$750"},
+                },
+            },
+            "currency": "USD",
+        }
+        listing = _normalize(self._DATED_URL, payload)
+        assert listing.price is not None
+        assert listing.price.amount == Decimal("750")
+        assert listing.price.period == "stay"
+
+    def test_amount_from_breakdown_baseprice_when_total_absent(self):
+        payload = {
+            "name": "Test",
+            "price": {
+                "qualifier": "for 5 nights",
+                "price": "",
+                "discountedPrice": "",
+                "breakDown": {
+                    "basePrice": {"description": "5 nights x $100", "price": "$500"},
+                },
+            },
+            "currency": "USD",
+        }
+        listing = _normalize(self._DATED_URL, payload)
+        assert listing.price is not None
+        assert listing.price.amount == Decimal("500")
+
+    def test_discounted_price_takes_priority_over_breakdown_total(self):
+        payload = {
+            "name": "Test",
+            "price": {
+                "qualifier": "for 5 nights",
+                "discountedPrice": "$652.45",
+                "breakDown": {
+                    "total": {"price": "$999"},
+                },
+            },
+            "currency": "USD",
+        }
+        listing = _normalize(self._DATED_URL, payload)
+        assert listing.price is not None
+        assert listing.price.amount == Decimal("652.45")
+
+
+# ---------------------------------------------------------------------------
+# build_prompt — service fee in prompt
+# ---------------------------------------------------------------------------
+
+
+class TestBuildPromptServiceFee:
+    def _stay_price(self, **overrides) -> PriceInfo:
+        base = dict(
+            amount=Decimal("652.45"),
+            currency="USD",
+            period="stay",
+            check_in="2026-04-13",
+            check_out="2026-04-18",
+            stay_nights=5,
+        )
+        base.update(overrides)
+        return PriceInfo(**base)
+
+    def test_service_fee_in_prompt_when_present(self):
+        listing = _listing(price=self._stay_price(service_fee=Decimal("55")))
+        prompt = build_prompt(listing)
+        assert "Service fee: 55 USD" in prompt
+
+    def test_cleaning_fee_in_prompt_when_present(self):
+        listing = _listing(price=self._stay_price(cleaning_fee=Decimal("80")))
+        prompt = build_prompt(listing)
+        assert "Cleaning fee: 80 USD" in prompt
+
+    def test_both_fees_in_prompt(self):
+        listing = _listing(price=self._stay_price(cleaning_fee=Decimal("80"), service_fee=Decimal("55")))
+        prompt = build_prompt(listing)
+        assert "Cleaning fee: 80 USD" in prompt
+        assert "Service fee: 55 USD" in prompt
+
+    def test_no_fee_lines_when_fees_absent(self):
+        listing = _listing(price=self._stay_price())
+        prompt = build_prompt(listing)
+        assert "Cleaning fee:" not in prompt
+        assert "Service fee:" not in prompt
+
+    def test_service_fee_in_prompt_for_nightly_price(self):
+        listing = _listing(
+            price=PriceInfo(
+                amount=Decimal("120"),
+                currency="USD",
+                period="night",
+                service_fee=Decimal("30"),
+            )
+        )
+        prompt = build_prompt(listing)
+        assert "Service fee: 30 USD" in prompt

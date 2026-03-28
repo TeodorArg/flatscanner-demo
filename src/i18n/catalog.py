@@ -164,6 +164,16 @@ _CATALOG: dict[str, dict[Language, str]] = {
         Language.EN: "Per night:",
         Language.ES: "Por noche:",
     },
+    "fmt.cleaning_fee_label": {
+        Language.RU: "Уборка:",
+        Language.EN: "Cleaning fee:",
+        Language.ES: "Tarifa de limpieza:",
+    },
+    "fmt.service_fee_label": {
+        Language.RU: "Сервисный сбор:",
+        Language.EN: "Service fee:",
+        Language.ES: "Tarifa de servicio:",
+    },
     # --- Formatter system strings ---
     "fmt.truncated": {
         Language.RU: "\n\n[Сообщение обрезано]",

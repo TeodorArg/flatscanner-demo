@@ -311,6 +311,18 @@ def _normalize(url: str, raw: dict[str, Any]) -> NormalizedListing:
                 base_price_obj = price_raw.get("basePrice")
                 if isinstance(base_price_obj, dict):
                     amount = _parse_price_amount(base_price_obj.get("price"))
+            # Additional fallbacks from nested breakDown when top-level fields
+            # are absent or empty (common for dated tri_angle responses).
+            if amount is None:
+                bd_top = price_raw.get("breakDown")
+                if isinstance(bd_top, dict):
+                    total_obj = bd_top.get("total")
+                    if isinstance(total_obj, dict):
+                        amount = _parse_price_amount(total_obj.get("price"))
+                    if amount is None:
+                        bd_base_obj = bd_top.get("basePrice")
+                        if isinstance(bd_base_obj, dict):
+                            amount = _parse_price_amount(bd_base_obj.get("price"))
             if amount is not None:
                 try:
                     price = PriceInfo(
@@ -347,11 +359,30 @@ def _normalize(url: str, raw: dict[str, Any]) -> NormalizedListing:
     # Attach cleaning/service fees when present (tri_angle actor fields).
     # _parse_price_amount handles both numeric values and formatted strings
     # like '$25' so fees are not silently dropped when the actor returns strings.
+    # When top-level cleaningFee/serviceFee are absent, fall back to
+    # price.breakDown.cleaningFee.price and price.breakDown.serviceFee.price.
     if price is not None:
         cleaning_fee_amount = _parse_price_amount(raw.get("cleaningFee"))
+        if cleaning_fee_amount is None:
+            _price_obj = raw.get("price")
+            if isinstance(_price_obj, dict):
+                _bd = _price_obj.get("breakDown")
+                if isinstance(_bd, dict):
+                    _cf = _bd.get("cleaningFee")
+                    if isinstance(_cf, dict):
+                        cleaning_fee_amount = _parse_price_amount(_cf.get("price"))
         if cleaning_fee_amount is not None:
             price = price.model_copy(update={"cleaning_fee": cleaning_fee_amount})
+
         service_fee_amount = _parse_price_amount(raw.get("serviceFee"))
+        if service_fee_amount is None:
+            _price_obj = raw.get("price")
+            if isinstance(_price_obj, dict):
+                _bd = _price_obj.get("breakDown")
+                if isinstance(_bd, dict):
+                    _sf = _bd.get("serviceFee")
+                    if isinstance(_sf, dict):
+                        service_fee_amount = _parse_price_amount(_sf.get("price"))
         if service_fee_amount is not None:
             price = price.model_copy(update={"service_fee": service_fee_amount})
     # Attach stay dates parsed from the source URL query params so downstream

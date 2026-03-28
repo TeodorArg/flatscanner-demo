@@ -201,6 +201,14 @@ def _format_stay_price(listing: NormalizedListing, language: Language) -> str:
         per_night_label = get_string("fmt.nightly_rate_label", language)
         lines.append(f"{per_night_label} {p.nightly_rate} {p.currency}")
 
+    if p.cleaning_fee is not None:
+        cleaning_label = get_string("fmt.cleaning_fee_label", language)
+        lines.append(f"{cleaning_label} {p.cleaning_fee} {p.currency}")
+
+    if p.service_fee is not None:
+        service_label = get_string("fmt.service_fee_label", language)
+        lines.append(f"{service_label} {p.service_fee} {p.currency}")
+
     return "\n".join(lines)
 
 

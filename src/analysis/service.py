@@ -96,6 +96,8 @@ def build_prompt(
             lines.append(f"Price: {p.amount} {p.currency} per {p.period}")
         if p.cleaning_fee is not None:
             lines.append(f"Cleaning fee: {p.cleaning_fee} {p.currency}")
+        if p.service_fee is not None:
+            lines.append(f"Service fee: {p.service_fee} {p.currency}")
 
     if listing.bedrooms is not None:
         lines.append(f"Bedrooms: {listing.bedrooms}")
