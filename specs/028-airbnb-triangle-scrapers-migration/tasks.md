@@ -24,7 +24,7 @@
 - [x] Update Airbnb review normalization for the new reviews schema (`normalize_from_actor_items()` + `localizedReviewerLocation` support in `AirbnbReviewNormalizer`)
 - [x] Update the reviews module to use the dedicated reviews source (`AirbnbReviewsModule` accepts optional `review_source`; fallback chain: actor → listing payload → generic)
 - [x] Add/extend tests: `tests/test_airbnb_review_source.py`, additions to `test_review_corpus_normalization.py` and `test_reviews_module.py`
-- [ ] Open PR for Slice 2 and drive checks to green
+- [x] Open PR for Slice 2 and drive checks to green
 
 ### Final validation
 
