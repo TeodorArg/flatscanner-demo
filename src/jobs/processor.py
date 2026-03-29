@@ -306,6 +306,7 @@ async def process_job(
             update={
                 "display_title": listing.title,
                 "review_insights": review_insights,
+                "amenities": listing.amenities,
             }
         )
         logger.debug("Analysis complete for job %s", job.id)
