@@ -152,9 +152,13 @@ def _format_amenities(
 
     # Tight budget: fit as many bullets as possible, reserving room for an
     # overflow note so readers know items were omitted.
+    compact_overflow = f"- [+{len(bullets)} more]"
+    compact_section = header + "\n" + compact_overflow
+
     bullets_budget = budget - len(header) - 1  # -1 for the '\n' after header
     if bullets_budget <= 0:
-        return ""
+        # No room for individual bullets; fall back to compact overflow if it fits.
+        return compact_section if len(compact_section) <= budget else ""
 
     included: list[str] = []
     for i, bullet in enumerate(bullets):
@@ -170,7 +174,8 @@ def _format_amenities(
             break
 
     if not included:
-        return ""
+        # No individual bullet fit; fall back to compact overflow if it fits.
+        return compact_section if len(compact_overflow) <= bullets_budget else ""
 
     n_omitted = len(bullets) - len(included)
     result_lines = [header] + included

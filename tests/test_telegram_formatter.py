@@ -8,6 +8,7 @@ from src.i18n.types import Language
 from src.telegram.formatter import (
     _TELEGRAM_MAX_CHARS,
     _TRUNCATION_SUFFIX,
+    _format_amenities,
     format_analysis_message,
 )
 
@@ -241,3 +242,23 @@ class TestAmenitiesBlock:
         result = _result(amenities=amenities)
         msg = format_analysis_message(_listing(), result, Language.EN)
         assert "[+" in msg and "more]" in msg
+
+    def test_tight_budget_shows_compact_overflow_not_empty(self):
+        """When budget fits the header + overflow note but not any bullet, the
+        section must still appear with a compact [+N more] marker rather than
+        being silently dropped."""
+        from src.i18n.types import Language as Lang
+
+        amenities = ["WiFi", "Kitchen", "Washer"]
+        fake_result = _result(amenities=amenities)
+        # Budget is calibrated so the compact overflow marker fits but no real
+        # bullet does.  Measured values (EN):
+        #   header "<b>Amenities:</b>" = 17 chars
+        #   compact_section = header + "\n" + "- [+3 more]" = 29 chars
+        #   bullets_budget at budget=30 → 30 - 17 - 1 = 12
+        #   first trial "- WiFi\n- [+2 more]" = 18 chars > 12 → bullet rejected
+        #   compact_overflow "- [+3 more]" = 11 chars ≤ 12 → compact returned
+        section = _format_amenities(fake_result, Lang.EN, budget=30)
+        assert section != "", "section must not be empty when budget fits compact overflow"
+        assert "[+3 more]" in section
+        assert "- WiFi" not in section  # no individual bullet should appear
