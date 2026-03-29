@@ -243,6 +243,36 @@ class TestAmenitiesBlock:
         msg = format_analysis_message(_listing(), result, Language.EN)
         assert "[+" in msg and "more]" in msg
 
+    def test_near_limit_amenities_not_truncated_when_fits(self):
+        """Full amenities list must be preserved when it fits within the exact
+        -2 separator budget and would only overflow with the over-conservative
+        old -4 budget.
+
+        Layout with minimal inputs (EN, no strengths/risks, no price explanation):
+          message_without = "<b>A</b>\\n\\nB\\n\\n<b>Price: Fair</b>" = 30 chars
+          correct budget = 4096 - 30 - 2 = 4064
+          old wrong budget = 4096 - 30 - 4 = 4062
+        Amenities section for one "X"*4043 amenity:
+          "<b>Amenities:</b>" (17) + "\\n" (1) + "- " (2) + "X"*4043 = 4063 chars
+          4063 <= 4064 (correct) → full render, no overflow note
+          4063 > 4062 (old)     → compact overflow → "[+1 more]"
+        Total message = 30 + 2 + 4063 = 4095 <= 4096.
+        """
+        amenity_name = "X" * 4043
+        result = _result(
+            display_title="A",
+            summary="B",
+            strengths=[],
+            risks=[],
+            price_verdict=PriceVerdict.FAIR,
+            price_explanation="",
+            amenities=[amenity_name],
+        )
+        msg = format_analysis_message(_listing(), result, Language.EN)
+        assert len(msg) <= _TELEGRAM_MAX_CHARS
+        assert amenity_name in msg, "full amenity must appear — no overflow truncation"
+        assert "[+" not in msg, "no overflow note should appear when amenities fit exactly"
+
     def test_tight_budget_shows_compact_overflow_not_empty(self):
         """When budget fits the header + overflow note but not any bullet, the
         section must still appear with a compact [+N more] marker rather than

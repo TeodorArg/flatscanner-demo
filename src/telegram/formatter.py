@@ -112,12 +112,11 @@ def format_analysis_message(
     tail_parts.append(price_line)
 
     # Calculate how many characters are available for the amenities block.
-    # Layout: head + "\n\n" + amenities + "\n\n" + tail
-    # So amenities budget = limit - len(head) - 2 (sep) - 2 (sep) - len(tail)
-    # If amenities are omitted the head/tail separator accounts for just 2 chars,
-    # but reserving 4 gives a small safety margin and keeps the math simple.
+    # Inserting the amenities section adds the section itself plus exactly one
+    # "\n\n" separator (2 chars) beyond the already-joined head+tail message.
+    # Budget = limit - len(message_without_amenities) - 2 (one extra separator).
     message_without_amenities = "\n\n".join(head_parts + tail_parts)
-    amenities_budget = _TELEGRAM_MAX_CHARS - len(message_without_amenities) - 4
+    amenities_budget = _TELEGRAM_MAX_CHARS - len(message_without_amenities) - 2
 
     amenities_section = _format_amenities(result, language, budget=amenities_budget)
 
