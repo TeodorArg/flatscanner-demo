@@ -219,8 +219,7 @@ def _normalize_amenities(raw_amenities: Any) -> list[str]:
     ignore group headers such as ``"Kitchen and dining"`` or ``"Not included"``
     so downstream summary prompts receive concrete facts instead of category
     names. Unavailable items are skipped here because this field is a generic
-    fallback summary list; the richer availability semantics live in the
-    dedicated ``AmenitiesEvidenceModule``.
+    flat summary list rather than a full availability matrix.
     """
     if not isinstance(raw_amenities, list):
         return []

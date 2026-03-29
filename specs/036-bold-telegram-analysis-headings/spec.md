@@ -29,6 +29,6 @@ Out of scope:
 ## Acceptance Criteria
 
 - final analysis messages render section headers in bold in Telegram
-- nested subheaders inside reviews, amenities, and pricing blocks also render in bold
+- nested subheaders inside reviews and pricing blocks also render in bold
 - dynamic user-facing text remains safely escaped
 - plain menu and progress messages remain unaffected

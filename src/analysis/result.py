@@ -41,24 +41,6 @@ class ReviewInsightsBlock(BaseModel):
     window_view_summary: str = ""
 
 
-class AmenitiesInsightsBlock(BaseModel):
-    """Compact amenities insights carried with ``AnalysisResult`` for rendering.
-
-    Amenity keys are canonical and language-neutral; the formatter resolves
-    them to localized labels via the static i18n catalog.
-    """
-
-    class Section(BaseModel):
-        """One compact grouped amenities subsection."""
-
-        section_id: str
-        amenity_keys: list[str] = Field(default_factory=list)
-
-    available_keys: list[str] = Field(default_factory=list)
-    critical_missing_keys: list[str] = Field(default_factory=list)
-    sections: list[Section] = Field(default_factory=list)
-
-
 class AnalysisResult(BaseModel):
     """Structured output from the AI analysis stage.
 
@@ -96,8 +78,4 @@ class AnalysisResult(BaseModel):
     review_insights: ReviewInsightsBlock | None = Field(
         default=None,
         description="Compact review insights block; None when no review data is available.",
-    )
-    amenities_insights: AmenitiesInsightsBlock | None = Field(
-        default=None,
-        description="Compact amenities insights block; None when no amenities evidence is available.",
     )

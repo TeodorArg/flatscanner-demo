@@ -89,10 +89,6 @@ def format_analysis_message(
     if reviews_section:
         parts.append(reviews_section)
 
-    amenities_section = _format_amenities_insights(result, language)
-    if amenities_section:
-        parts.append(amenities_section)
-
     stay_price_section = _format_stay_price(listing, language)
     if stay_price_section:
         parts.append(stay_price_section)
@@ -173,71 +169,6 @@ def _format_review_insights(result: AnalysisResult, language: Language) -> str:
     if ri.window_view_summary:
         window_label = get_string("fmt.reviews_window_label", language)
         lines.append(f"{_bold(window_label)} {_escape_text(ri.window_view_summary)}")
-
-    return "\n".join(lines)
-
-
-_AMENITY_DISPLAY_PRIORITY: list[str] = [
-    "wifi",
-    "kitchen",
-    "air_conditioning",
-    "heating",
-    "washer",
-    "dryer",
-    "parking",
-    "pool",
-    "tv",
-    "balcony",
-    "refrigerator",
-    "microwave",
-    "hot_water",
-]
-
-
-def _label_amenity_key(key: str, language: Language) -> str:
-    try:
-        return _escape_text(get_string(f"amenity.{key}", language))
-    except KeyError:
-        return _escape_text(key.replace("_", " ").title())
-
-
-def _prioritize_keys(keys: list[str], *, limit: int) -> list[str]:
-    priority = {key: index for index, key in enumerate(_AMENITY_DISPLAY_PRIORITY)}
-    return sorted(keys, key=lambda key: (priority.get(key, 999), key))[:limit]
-
-
-def _format_amenities_insights(result: AnalysisResult, language: Language) -> str:
-    """Return a compact localized amenities section, or an empty string."""
-    ai = result.amenities_insights
-    if ai is None:
-        return ""
-
-    visible_available = _prioritize_keys(ai.available_keys, limit=6)
-    visible_missing = _prioritize_keys(ai.critical_missing_keys, limit=4)
-    visible_sections = [section for section in ai.sections if section.amenity_keys]
-
-    if not visible_available and not visible_missing and not visible_sections:
-        return ""
-
-    lines: list[str] = [_bold(get_string("fmt.amenities_label", language))]
-    if visible_available:
-        key_label = get_string("fmt.amenities_key_label", language)
-        labels = ", ".join(_label_amenity_key(key, language) for key in visible_available)
-        lines.append(f"{_bold(key_label)} {labels}")
-
-    for section in visible_sections:
-        try:
-            section_label = get_string(f"fmt.amenities_section.{section.section_id}", language)
-        except KeyError:
-            section_label = section.section_id.replace("_", " ").capitalize() + ":"
-        labels = ", ".join(_label_amenity_key(key, language) for key in section.amenity_keys)
-        lines.append(f"{_bold(section_label)} {labels}")
-
-    if visible_missing:
-        missing_label = get_string("fmt.amenities_missing_label", language)
-        lines.append(_bold(missing_label))
-        for key in visible_missing:
-            lines.append(f"- {_label_amenity_key(key, language)}")
 
     return "\n".join(lines)
 

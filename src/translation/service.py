@@ -243,7 +243,6 @@ def _parse_translation_response(raw: str, original: AnalysisResult) -> AnalysisR
         price_verdict=original.price_verdict,
         price_explanation=price_explanation,
         review_insights=translated_review_insights,
-        amenities_insights=original.amenities_insights,
     )
 
 
