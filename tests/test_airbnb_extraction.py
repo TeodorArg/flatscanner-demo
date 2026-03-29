@@ -117,6 +117,79 @@ def _tri_angle_rooms_payload(listing_id: str = "55443322") -> dict[str, Any]:
     }
 
 
+def _tri_angle_live_geo_payload(listing_id: str = "1434837151247448041") -> dict[str, Any]:
+    """Return the live tri_angle geo shape observed in production."""
+    return {
+        "id": listing_id,
+        "url": f"https://www.airbnb.com/rooms/{listing_id}",
+        "title": "Palermo Hollywood Apartment",
+        "description": "Quiet apartment for two guests in Palermo Hollywood.",
+        "coordinates": {
+            "latitude": -34.58286828275092,
+            "longitude": -58.443424026428296,
+        },
+        "location": "Buenos Aires",
+        "locationSubtitle": "Buenos Aires, Argentina",
+        "locationDescriptions": [
+            {
+                "title": "Buenos Aires, Argentina",
+                "content": None,
+                "mapMarkerRadiusInMeters": 152,
+            }
+        ],
+        "price": {
+            "label": "$263 for 5 nights",
+            "qualifier": "for 5 nights",
+            "discountedPrice": "$263",
+            "breakDown": {
+                "basePrice": {"description": "5 nights x $52.49", "price": "$263"},
+                "total": {"price": "$263"},
+            },
+        },
+        "currency": "USD",
+        "amenities": ["Wifi", "Kitchen", "Washer"],
+        "personCapacity": 2,
+        "rating": 4.93,
+    }
+
+
+def _tri_angle_nested_amenities_payload(listing_id: str = "1434837151247448041") -> dict[str, Any]:
+    """Return grouped amenities similar to the live tri_angle detail shape."""
+    return {
+        "id": listing_id,
+        "title": "Palermo Hollywood Apartment",
+        "amenities": [
+            {
+                "title": "Internet and office",
+                "values": [
+                    {"title": "Wifi", "available": True},
+                ],
+            },
+            {
+                "title": "Kitchen and dining",
+                "values": [
+                    {"title": "Kitchen", "available": True},
+                    {"title": "Microwave", "available": True},
+                ],
+            },
+            {
+                "title": "Parking and facilities",
+                "values": [
+                    {"title": "Free street parking", "available": True},
+                    {"title": "Pool", "available": True},
+                ],
+            },
+            {
+                "title": "Not included",
+                "values": [
+                    {"title": "Smoke alarm", "available": False},
+                    {"title": "Heating", "available": False},
+                ],
+            },
+        ],
+    }
+
+
 def _curious_coder_payload(listing_id: str = "33166539") -> dict[str, Any]:
     """Return a listing item in the `curious_coder` actor schema."""
     return {
@@ -579,6 +652,33 @@ class TestNormalize:
         assert listing.review_count == 87
         assert listing.host_name == "Carlos"
         assert listing.host_is_superhost is True
+
+    def test_tri_angle_live_coordinates_and_subtitle_are_normalized(self):
+        """Live tri_angle payload shape should still populate geo context."""
+        listing = _normalize(self._URL, _tri_angle_live_geo_payload())
+
+        assert listing.title == "Palermo Hollywood Apartment"
+        assert listing.location.latitude == pytest.approx(-34.58286828275092)
+        assert listing.location.longitude == pytest.approx(-58.443424026428296)
+        assert listing.location.address == "Buenos Aires, Argentina"
+        assert listing.location.city == "Buenos Aires"
+        assert listing.location.country == "Argentina"
+        assert listing.location.neighbourhood is None
+
+    def test_tri_angle_grouped_amenities_are_flattened(self):
+        listing = _normalize(self._URL, _tri_angle_nested_amenities_payload())
+
+        assert listing.amenities == [
+            "Wifi",
+            "Kitchen",
+            "Microwave",
+            "Free street parking",
+            "Pool",
+        ]
+        assert "Internet and office" not in listing.amenities
+        assert "Kitchen and dining" not in listing.amenities
+        assert "Not included" not in listing.amenities
+        assert "Smoke alarm" not in listing.amenities
 
     def test_tri_angle_price_object_accepted(self):
         """``price`` as an object (live tri_angle schema) is mapped to PriceInfo."""

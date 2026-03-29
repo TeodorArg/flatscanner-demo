@@ -1,0 +1,1 @@
+"""Amenities normalizers."""

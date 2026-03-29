@@ -423,6 +423,18 @@ class TestBuildPrompt:
         assert "Marie" in prompt
         assert "Superhost" in prompt
 
+    def test_prompt_explicitly_forbids_layout_inference(self):
+        prompt = build_prompt(_minimal_listing())
+        assert "Do not invent the layout or property subtype." in prompt
+        assert "studio, loft, or one-bedroom" in prompt
+
+    def test_prompt_preserves_concrete_amenities(self):
+        listing = _minimal_listing(amenities=["Wifi", "Kitchen", "Microwave", "Pool"])
+        prompt = build_prompt(listing)
+        assert "Amenities: Wifi, Kitchen, Microwave, Pool" in prompt
+        assert "Kitchen and dining" not in prompt
+        assert "Not included" not in prompt
+
     def test_description_included_when_present(self):
         prompt = build_prompt(_full_listing())
         assert "Eiffel Tower" in prompt
@@ -457,6 +469,18 @@ class TestBuildPrompt:
         )
         prompt = build_prompt(_minimal_listing(), enrichment=outcome)
         assert "Nearby context" not in prompt
+
+    def test_no_enrichment_section_when_success_payloads_are_empty(self):
+        outcome = EnrichmentOutcome(
+            successes=[
+                EnrichmentProviderResult(name="transport", data={}),
+                EnrichmentProviderResult(name="nearby_places", data={}),
+            ]
+        )
+        prompt = build_prompt(_minimal_listing(), enrichment=outcome)
+        assert "Nearby context" not in prompt
+        assert "0 public transport stops" not in prompt
+        assert "Nearby places: 0 total" not in prompt
 
     def test_transport_enrichment_appears_in_prompt(self):
         transport_result = EnrichmentProviderResult(
@@ -498,6 +522,21 @@ class TestBuildPrompt:
         prompt = build_prompt(_minimal_listing(), enrichment=outcome)
         assert "Transport" in prompt
         assert "Nearby places" in prompt
+
+    def test_empty_success_payloads_are_skipped_but_real_results_remain(self):
+        outcome = EnrichmentOutcome(
+            successes=[
+                EnrichmentProviderResult(name="transport", data={}),
+                EnrichmentProviderResult(
+                    name="nearby_places",
+                    data={"count": 5, "by_category": {"parks": 2}},
+                ),
+            ]
+        )
+        prompt = build_prompt(_minimal_listing(), enrichment=outcome)
+        assert "Nearby context" in prompt
+        assert "Transport" not in prompt
+        assert "Nearby places: 5 total within 500 m" in prompt
 
     def test_transport_without_nearest_name_omits_nearest(self):
         transport_result = EnrichmentProviderResult(

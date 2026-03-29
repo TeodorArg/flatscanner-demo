@@ -1,16 +1,18 @@
 """Telegram message formatter for listing analysis results.
 
 Accepts a NormalizedListing, an already-translated AnalysisResult, and a
-Language, and returns a Telegram-safe plain-text message.  The formatter
-is intentionally pure: it never performs translation itself.  All section
-labels come from the i18n catalog, so new output block types can be added
-without touching catalog keys for existing blocks.
+Language, and returns a Telegram-safe HTML message. The formatter is
+intentionally pure: it never performs translation itself. All section labels
+come from the i18n catalog, so new output block types can be added without
+touching catalog keys for existing blocks.
 
 Output is kept short and deterministic to stay within Telegram's 4096-
 character message limit.
 """
 
 from __future__ import annotations
+
+from html import escape
 
 from src.analysis.result import AnalysisResult, PriceVerdict
 from src.domain.listing import NormalizedListing
@@ -40,7 +42,7 @@ def format_analysis_message(
     result: AnalysisResult,
     language: Language = DEFAULT_LANGUAGE,
 ) -> str:
-    """Return a formatted plain-text message suitable for Telegram.
+    """Return a formatted HTML message suitable for Telegram.
 
     The formatter is pure: *result* must already contain translated freeform
     blocks for non-English languages.  All section labels are looked up from
@@ -70,22 +72,26 @@ def format_analysis_message(
     parts: list[str] = []
 
     header = result.display_title or listing.title
-    parts.append(header)
-    parts.append(result.summary)
+    parts.append(_bold(header))
+    parts.append(_escape_text(result.summary))
 
     if result.strengths:
         label = get_string("fmt.strengths_label", language)
-        lines = [label] + [f"- {strength}" for strength in result.strengths]
+        lines = [_bold(label)] + [f"- {_escape_text(strength)}" for strength in result.strengths]
         parts.append("\n".join(lines))
 
     if result.risks:
         label = get_string("fmt.risks_label", language)
-        lines = [label] + [f"- {risk}" for risk in result.risks]
+        lines = [_bold(label)] + [f"- {_escape_text(risk)}" for risk in result.risks]
         parts.append("\n".join(lines))
 
     reviews_section = _format_review_insights(result, language)
     if reviews_section:
         parts.append(reviews_section)
+
+    amenities_section = _format_amenities_insights(result, language)
+    if amenities_section:
+        parts.append(amenities_section)
 
     stay_price_section = _format_stay_price(listing, language)
     if stay_price_section:
@@ -94,10 +100,11 @@ def format_analysis_message(
     price_label = get_string("fmt.price_label", language)
     verdict_key = _VERDICT_KEY.get(result.price_verdict, "fmt.verdict.unknown")
     verdict_label = get_string(verdict_key, language)
+    price_heading = _bold(f"{price_label} {verdict_label}")
     if result.price_explanation:
-        price_line = f"{price_label} {verdict_label} - {result.price_explanation}"
+        price_line = f"{price_heading} - {_escape_text(result.price_explanation)}"
     else:
-        price_line = f"{price_label} {verdict_label}"
+        price_line = price_heading
     parts.append(price_line)
 
     message = "\n\n".join(parts)
@@ -132,40 +139,105 @@ def _format_review_insights(result: AnalysisResult, language: Language) -> str:
     if ri.average_rating is not None:
         meta_parts.append(f"{ri.average_rating:.1f}★")
     if meta_parts:
-        overview = header + " " + ", ".join(meta_parts)
+        overview = _bold(header + " " + ", ".join(meta_parts))
     else:
-        overview = header
+        overview = _bold(header)
     lines.append(overview)
 
     # --- AI assessment ---
     if ri.overall_assessment:
-        lines.append(ri.overall_assessment)
+        lines.append(_escape_text(ri.overall_assessment))
 
     # --- Critical red flags ---
     if ri.critical_red_flags:
         label = get_string("fmt.reviews_red_flags_label", language)
-        lines.append(label)
+        lines.append(_bold(label))
         for flag in ri.critical_red_flags:
-            lines.append(f"- {flag}")
+            lines.append(f"- {_escape_text(flag)}")
 
     # --- Recurring issues ---
     if ri.recurring_issues:
         label = get_string("fmt.reviews_recurring_label", language)
-        lines.append(label)
+        lines.append(_bold(label))
         for issue in ri.recurring_issues:
-            lines.append(f"- {issue}")
+            lines.append(f"- {_escape_text(issue)}")
 
     # --- Conflicts / disputes ---
     if ri.conflicts_or_disputes:
         label = get_string("fmt.reviews_disputes_label", language)
-        lines.append(label)
+        lines.append(_bold(label))
         for dispute in ri.conflicts_or_disputes:
-            lines.append(f"- {dispute}")
+            lines.append(f"- {_escape_text(dispute)}")
 
     # --- Window view summary ---
     if ri.window_view_summary:
         window_label = get_string("fmt.reviews_window_label", language)
-        lines.append(f"{window_label} {ri.window_view_summary}")
+        lines.append(f"{_bold(window_label)} {_escape_text(ri.window_view_summary)}")
+
+    return "\n".join(lines)
+
+
+_AMENITY_DISPLAY_PRIORITY: list[str] = [
+    "wifi",
+    "kitchen",
+    "air_conditioning",
+    "heating",
+    "washer",
+    "dryer",
+    "parking",
+    "pool",
+    "tv",
+    "balcony",
+    "refrigerator",
+    "microwave",
+    "hot_water",
+]
+
+
+def _label_amenity_key(key: str, language: Language) -> str:
+    try:
+        return _escape_text(get_string(f"amenity.{key}", language))
+    except KeyError:
+        return _escape_text(key.replace("_", " ").capitalize())
+
+
+def _prioritize_keys(keys: list[str], *, limit: int) -> list[str]:
+    priority = {key: index for index, key in enumerate(_AMENITY_DISPLAY_PRIORITY)}
+    return sorted(keys, key=lambda key: (priority.get(key, 999), key))[:limit]
+
+
+def _format_amenities_insights(result: AnalysisResult, language: Language) -> str:
+    """Return a compact localized amenities section, or an empty string."""
+    ai = result.amenities_insights
+    if ai is None:
+        return ""
+
+    visible_available = _prioritize_keys(ai.available_keys, limit=6)
+    visible_missing = _prioritize_keys(ai.critical_missing_keys, limit=4)
+    visible_sections = [section for section in ai.sections if section.amenity_keys]
+
+    if not visible_available and not visible_missing and not visible_sections:
+        return ""
+
+    lines: list[str] = [_bold(get_string("fmt.amenities_label", language))]
+    if visible_available:
+        key_label = get_string("fmt.amenities_key_label", language)
+        labels = ", ".join(_label_amenity_key(key, language) for key in visible_available)
+        lines.append(f"{_bold(key_label)} {labels}")
+
+    for section in visible_sections:
+        try:
+            section_label = get_string(f"fmt.amenities_section.{section.section_id}", language)
+        except KeyError:
+            section_label = section.section_id.replace("_", " ").capitalize() + ":"
+        labels = ", ".join(_label_amenity_key(key, language) for key in section.amenity_keys)
+        lines.append(f"{_bold(section_label)} {labels}")
+
+    if visible_missing:
+        missing_label = get_string("fmt.amenities_missing_label", language)
+        lines.append(_bold(missing_label))
+        for key in visible_missing:
+            lines.append(f"- {_label_amenity_key(key, language)}")
 
     return "\n".join(lines)
 
@@ -192,22 +264,22 @@ def _format_stay_price(listing: NormalizedListing, language: Language) -> str:
     if p.stay_nights is not None:
         nights_label = get_string("fmt.stay_nights_label", language)
         header_parts.append(f"{nights_label} {p.stay_nights}")
-    lines.append(" ".join(header_parts))
+    lines.append(_bold(" ".join(header_parts)))
 
-    total_line = f"{p.amount} {p.currency}"
+    total_line = _escape_text(f"{p.amount} {p.currency}")
     lines.append(total_line)
 
     if p.nightly_rate is not None:
         per_night_label = get_string("fmt.nightly_rate_label", language)
-        lines.append(f"{per_night_label} {p.nightly_rate} {p.currency}")
+        lines.append(f"{_bold(per_night_label)} {_escape_text(f'{p.nightly_rate} {p.currency}')}")
 
     if p.cleaning_fee is not None:
         cleaning_label = get_string("fmt.cleaning_fee_label", language)
-        lines.append(f"{cleaning_label} {p.cleaning_fee} {p.currency}")
+        lines.append(f"{_bold(cleaning_label)} {_escape_text(f'{p.cleaning_fee} {p.currency}')}")
 
     if p.service_fee is not None:
         service_label = get_string("fmt.service_fee_label", language)
-        lines.append(f"{service_label} {p.service_fee} {p.currency}")
+        lines.append(f"{_bold(service_label)} {_escape_text(f'{p.service_fee} {p.currency}')}")
 
     return "\n".join(lines)
 
@@ -219,3 +291,13 @@ def _guard_length(message: str, language: Language = DEFAULT_LANGUAGE) -> str:
     suffix = get_string("fmt.truncated", language)
     cut = _TELEGRAM_MAX_CHARS - len(suffix)
     return message[:cut] + suffix
+
+
+def _escape_text(value: str) -> str:
+    """Escape user-visible dynamic text for Telegram HTML parse mode."""
+    return escape(value, quote=False)
+
+
+def _bold(value: str) -> str:
+    """Wrap text in Telegram HTML bold tags after escaping it."""
+    return f"<b>{_escape_text(value)}</b>"

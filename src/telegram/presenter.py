@@ -19,6 +19,8 @@ from src.telegram.sender import send_message
 class TelegramAnalysisPresenter:
     """Render and deliver the final analysis result to a Telegram chat."""
 
+    _PARSE_MODE = "HTML"
+
     def __init__(
         self,
         token: str,
@@ -38,4 +40,10 @@ class TelegramAnalysisPresenter:
     ) -> None:
         """Format the analysis result and send it to the configured chat."""
         text = format_analysis_message(listing, result, language)
-        await send_message(self._token, self._chat_id, text, client=self._client)
+        await send_message(
+            self._token,
+            self._chat_id,
+            text,
+            parse_mode=self._PARSE_MODE,
+            client=self._client,
+        )

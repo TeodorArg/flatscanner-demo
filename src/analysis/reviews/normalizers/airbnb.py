@@ -27,7 +27,7 @@ Two input shapes are supported:
          "starRating": 4.8
        }
 
-2. **Flat review items** from ``tri_angle~airbnb-reviews-scraper`` — use
+2. **Flat review items** from one-item-per-review sources — use
    ``normalize_from_actor_items()``:
 
    .. code-block:: json
@@ -52,7 +52,7 @@ Alternative field names handled per review item:
 - Comment id: ``id`` or ``reviewId``
 - Reviewer name: ``reviewer.firstName``, ``reviewer.name``, ``authorName``
 - Reviewer origin: ``reviewer.location``, ``reviewer.hometown``,
-  ``localizedReviewerLocation`` (tri_angle reviews actor top-level field)
+  ``localizedReviewerLocation`` (top-level review field when present)
 - Date: ``createdAt``, ``localizedDate``, ``date``
 - Review text: ``comments``, ``text``, ``body``
 - Host response: ``response``, ``hostReply``, ``hostResponse``
@@ -112,7 +112,7 @@ def _extract_reviewer_origin(item: dict[str, Any]) -> str | None:
         )
         if origin:
             return origin
-    # tri_angle reviews actor surfaces reviewer location at the top level
+    # Some review sources surface reviewer location at the top level.
     return _str_or_none(item.get("localizedReviewerLocation"))
 
 
@@ -182,7 +182,7 @@ class AirbnbReviewNormalizer:
         # From listing payload (embedded reviews array):
         result = normalizer.normalize(raw_payload, listing)
 
-        # From tri_angle reviews actor (flat item list):
+        # From flat per-review actor items:
         result = normalizer.normalize_from_actor_items(items, listing)
 
         corpus = result.corpus
@@ -265,13 +265,13 @@ class AirbnbReviewNormalizer:
         items: list[Any],
         listing: Any,  # NormalizedListing — kept as Any to avoid circular import
     ) -> ReviewExtractionResult:
-        """Normalize a flat list of review items from the tri_angle reviews actor.
+        """Normalize a flat list of review items from per-review sources.
 
-        The ``tri_angle~airbnb-reviews-scraper`` actor returns one dict per
-        review (unlike the listing actor which embeds reviews under a
-        ``reviews`` key in the listing payload).  Aggregate metadata
-        (total review count, average rating) is sourced from the listing
-        because the reviews actor does not provide these fields.
+        Some sources return one dict per review (unlike the listing actor
+        which embeds reviews under a ``reviews`` key in the listing payload).
+        Aggregate metadata (total review count, average rating) is sourced
+        from the listing because flat per-review sources usually do not
+        provide these fields.
 
         Parameters
         ----------
@@ -324,3 +324,4 @@ class AirbnbReviewNormalizer:
             extracted_comment_count=len(comments),
             dropped_comment_count=dropped,
         )
+

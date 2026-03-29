@@ -66,6 +66,69 @@ jobs:
             exit 1
           fi
 
+      - name: Require complete feature memory for product-code changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base_ref="${{ github.event.pull_request.base.sha }}"
+            head_ref="${{ github.sha }}"
+          else
+            git fetch --no-tags origin "${{ inputs.base_ref }}"
+            git fetch --no-tags origin "${{ inputs.head_ref }}"
+            base_ref="origin/${{ inputs.base_ref }}"
+            head_ref="origin/${{ inputs.head_ref }}"
+          fi
+
+          changed_files="$(git diff --name-only "$base_ref" "$head_ref")"
+          product_changed=0
+
+          declare -A feature_dirs=()
+          declare -A feature_spec=()
+          declare -A feature_plan=()
+          declare -A feature_tasks=()
+
+          while IFS= read -r file; do
+            [ -z "$file" ] && continue
+            case "$file" in
+              src/*|tests/*|deploy/*|Dockerfile|docker-compose*.yml)
+                product_changed=1
+                ;;
+            esac
+
+            if [[ "$file" =~ ^specs/([^/]+)/spec\.md$ ]]; then
+              feature="${BASH_REMATCH[1]}"
+              feature_dirs["$feature"]=1
+              feature_spec["$feature"]=1
+            elif [[ "$file" =~ ^specs/([^/]+)/plan\.md$ ]]; then
+              feature="${BASH_REMATCH[1]}"
+              feature_dirs["$feature"]=1
+              feature_plan["$feature"]=1
+            elif [[ "$file" =~ ^specs/([^/]+)/tasks\.md$ ]]; then
+              feature="${BASH_REMATCH[1]}"
+              feature_dirs["$feature"]=1
+              feature_tasks["$feature"]=1
+            fi
+          done <<< "$changed_files"
+
+          if [ "$product_changed" -ne 1 ]; then
+            exit 0
+          fi
+
+          valid_feature=0
+          for feature in "${!feature_dirs[@]}"; do
+            if [ "${feature_spec[$feature]:-0}" -eq 1 ] && [ "${feature_plan[$feature]:-0}" -eq 1 ] && [ "${feature_tasks[$feature]:-0}" -eq 1 ]; then
+              valid_feature=1
+              break
+            fi
+          done
+
+          if [ "$valid_feature" -ne 1 ]; then
+            echo "Product code changed without a complete feature memory update."
+            echo "Touch one specs/<feature-id>/ folder with spec.md, plan.md, and tasks.md in the same PR."
+            exit 1
+          fi
+
       - name: Require baseline documentation
         shell: bash
         run: |

@@ -42,6 +42,7 @@ async def send_message(
     text: str,
     *,
     reply_markup: dict | None = None,
+    parse_mode: str | None = None,
     client: httpx.AsyncClient | None = None,
 ) -> None:
     """POST a text message to *chat_id* via the Telegram Bot API.
@@ -51,11 +52,14 @@ async def send_message(
         chat_id: Target chat identifier.
         text: Message body (plain text).
         reply_markup: Optional inline keyboard or other reply markup dict.
+        parse_mode: Optional Telegram parse mode (e.g. ``"HTML"``).
         client: Optional injected ``httpx.AsyncClient`` (for tests).
     """
     payload: dict = {"chat_id": chat_id, "text": text}
     if reply_markup is not None:
         payload["reply_markup"] = reply_markup
+    if parse_mode is not None:
+        payload["parse_mode"] = parse_mode
     await _post(_SEND_MESSAGE_URL.format(token=token), payload, client=client)
 
 
@@ -110,6 +114,7 @@ async def send_message_return_id(
     chat_id: int,
     text: str,
     *,
+    parse_mode: str | None = None,
     client: httpx.AsyncClient | None = None,
 ) -> int:
     """POST a text message and return the Telegram message_id of the sent message.
@@ -118,12 +123,15 @@ async def send_message_return_id(
         token: Telegram bot token.
         chat_id: Target chat identifier.
         text: Message body.
+        parse_mode: Optional Telegram parse mode (e.g. ``"HTML"``).
         client: Optional injected ``httpx.AsyncClient`` (for tests).
 
     Returns:
         The ``message_id`` assigned by Telegram to the sent message.
     """
     payload: dict = {"chat_id": chat_id, "text": text}
+    if parse_mode is not None:
+        payload["parse_mode"] = parse_mode
     data = await _post_json(_SEND_MESSAGE_URL.format(token=token), payload, client=client)
     return data["result"]["message_id"]
 

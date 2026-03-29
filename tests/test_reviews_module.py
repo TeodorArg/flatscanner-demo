@@ -825,12 +825,16 @@ class TestAirbnbReviewsModuleDegradation:
 def _make_review_source(items=None, error=None):
     """Build a mock AirbnbReviewSource."""
     from src.analysis.reviews.airbnb_source import AirbnbReviewSource
+    from src.analysis.reviews.normalizers.airbnb import AirbnbReviewNormalizer
 
     source = MagicMock(spec=AirbnbReviewSource)
     if error is not None:
         source.fetch = AsyncMock(side_effect=error)
     else:
-        source.fetch = AsyncMock(return_value=items or [])
+        normalizer = AirbnbReviewNormalizer()
+        async def _fetch(_listing_url, listing):
+            return normalizer.normalize_from_actor_items(items or [], listing)
+        source.fetch = AsyncMock(side_effect=_fetch)
     return source
 
 
@@ -861,7 +865,7 @@ class TestAirbnbReviewsModuleWithReviewSource:
         ctx = AnalysisContext(listing=_listing())
         result = await mod.run(ctx)
 
-        source.fetch.assert_awaited_once_with("https://www.airbnb.com/rooms/1")
+        source.fetch.assert_awaited_once_with("https://www.airbnb.com/rooms/1", ctx.listing)
         assert isinstance(result, ReviewsResult)
         assert result.module_name == "reviews"
         svc.analyse.assert_awaited_once()
@@ -876,7 +880,7 @@ class TestAirbnbReviewsModuleWithReviewSource:
 
         await mod.run(ctx)
 
-        source.fetch.assert_awaited_once_with(listing.source_url)
+        source.fetch.assert_awaited_once_with(listing.source_url, listing)
 
     @pytest.mark.asyncio
     async def test_falls_back_to_raw_payload_when_source_fails(self):

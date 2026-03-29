@@ -148,6 +148,173 @@ _CATALOG: dict[str, dict[Language, str]] = {
         Language.EN: "Window view:",
         Language.ES: "Vista desde la ventana:",
     },
+    # --- Amenities section labels ---
+    "fmt.amenities_label": {
+        Language.RU: "\u0423\u0434\u043e\u0431\u0441\u0442\u0432\u0430:",
+        Language.EN: "Amenities:",
+        Language.ES: "Servicios:",
+    },
+    "fmt.amenities_key_label": {
+        Language.RU: "\u041a\u043b\u044e\u0447\u0435\u0432\u044b\u0435 \u0443\u0434\u043e\u0431\u0441\u0442\u0432\u0430:",
+        Language.EN: "Key amenities:",
+        Language.ES: "Servicios clave:",
+    },
+    "fmt.amenities_missing_label": {
+        Language.RU: "\u041e\u0442\u0441\u0443\u0442\u0441\u0442\u0432\u0443\u0435\u0442 \u0438\u043b\u0438 \u043d\u0435 \u0443\u043a\u0430\u0437\u0430\u043d\u043e:",
+        Language.EN: "Missing or not included:",
+        Language.ES: "Faltante o no incluido:",
+    },
+    "fmt.amenities_section.home_comfort": {
+        Language.RU: "\u0411\u044b\u0442 \u0438 \u043a\u043e\u043c\u0444\u043e\u0440\u0442:",
+        Language.EN: "Home comfort:",
+        Language.ES: "Comodidad del hogar:",
+    },
+    "fmt.amenities_section.kitchen_dining": {
+        Language.RU: "\u041a\u0443\u0445\u043d\u044f \u0438 \u0441\u0442\u043e\u043b\u043e\u0432\u0430\u044f:",
+        Language.EN: "Kitchen and dining:",
+        Language.ES: "Cocina y comedor:",
+    },
+    "fmt.amenities_section.outdoor_facilities": {
+        Language.RU: "\u041d\u0430 \u0443\u043b\u0438\u0446\u0435 \u0438 \u043d\u0430 \u0442\u0435\u0440\u0440\u0438\u0442\u043e\u0440\u0438\u0438:",
+        Language.EN: "Outdoor and facilities:",
+        Language.ES: "Exterior e instalaciones:",
+    },
+    # --- Amenity labels ---
+    "amenity.wifi": {
+        Language.RU: "Wi-Fi",
+        Language.EN: "Wi-Fi",
+        Language.ES: "Wi-Fi",
+    },
+    "amenity.kitchen": {
+        Language.RU: "\u041a\u0443\u0445\u043d\u044f",
+        Language.EN: "Kitchen",
+        Language.ES: "Cocina",
+    },
+    "amenity.air_conditioning": {
+        Language.RU: "\u041a\u043e\u043d\u0434\u0438\u0446\u0438\u043e\u043d\u0435\u0440",
+        Language.EN: "Air conditioning",
+        Language.ES: "Aire acondicionado",
+    },
+    "amenity.heating": {
+        Language.RU: "\u041e\u0442\u043e\u043f\u043b\u0435\u043d\u0438\u0435",
+        Language.EN: "Heating",
+        Language.ES: "Calefacci\u00f3n",
+    },
+    "amenity.washer": {
+        Language.RU: "\u0421\u0442\u0438\u0440\u0430\u043b\u044c\u043d\u0430\u044f \u043c\u0430\u0448\u0438\u043d\u0430",
+        Language.EN: "Washer",
+        Language.ES: "Lavadora",
+    },
+    "amenity.dryer": {
+        Language.RU: "\u0421\u0443\u0448\u0438\u043b\u043a\u0430",
+        Language.EN: "Dryer",
+        Language.ES: "Secadora",
+    },
+    "amenity.parking": {
+        Language.RU: "\u041f\u0430\u0440\u043a\u043e\u0432\u043a\u0430",
+        Language.EN: "Parking",
+        Language.ES: "Estacionamiento",
+    },
+    "amenity.pool": {
+        Language.RU: "\u0411\u0430\u0441\u0441\u0435\u0439\u043d",
+        Language.EN: "Pool",
+        Language.ES: "Piscina",
+    },
+    "amenity.tv": {
+        Language.RU: "\u0422\u0412",
+        Language.EN: "TV",
+        Language.ES: "TV",
+    },
+    "amenity.balcony": {
+        Language.RU: "\u0411\u0430\u043b\u043a\u043e\u043d \u0438\u043b\u0438 \u043f\u0430\u0442\u0438\u043e",
+        Language.EN: "Balcony or patio",
+        Language.ES: "Balc\u00f3n o patio",
+    },
+    "amenity.refrigerator": {
+        Language.RU: "\u0425\u043e\u043b\u043e\u0434\u0438\u043b\u044c\u043d\u0438\u043a",
+        Language.EN: "Refrigerator",
+        Language.ES: "Refrigerador",
+    },
+    "amenity.microwave": {
+        Language.RU: "\u041c\u0438\u043a\u0440\u043e\u0432\u043e\u043b\u043d\u043e\u0432\u043a\u0430",
+        Language.EN: "Microwave",
+        Language.ES: "Microondas",
+    },
+    "amenity.hot_water": {
+        Language.RU: "\u0413\u043e\u0440\u044f\u0447\u0430\u044f \u0432\u043e\u0434\u0430",
+        Language.EN: "Hot water",
+        Language.ES: "Agua caliente",
+    },
+    "amenity.bathtub": {
+        Language.RU: "\u0412\u0430\u043d\u043d\u0430",
+        Language.EN: "Bathtub",
+        Language.ES: "Ba\u00f1era",
+    },
+    "amenity.shampoo": {
+        Language.RU: "\u0428\u0430\u043c\u043f\u0443\u043d\u044c",
+        Language.EN: "Shampoo",
+        Language.ES: "Champ\u00fa",
+    },
+    "amenity.bidet": {
+        Language.RU: "\u0411\u0438\u0434\u0435",
+        Language.EN: "Bidet",
+        Language.ES: "Bid\u00e9",
+    },
+    "amenity.hangers": {
+        Language.RU: "\u041f\u043b\u0435\u0447\u0438\u043a\u0438",
+        Language.EN: "Hangers",
+        Language.ES: "Perchas",
+    },
+    "amenity.bed_linens": {
+        Language.RU: "\u041f\u043e\u0441\u0442\u0435\u043b\u044c\u043d\u043e\u0435 \u0431\u0435\u043b\u044c\u0451",
+        Language.EN: "Bed linens",
+        Language.ES: "Ropa de cama",
+    },
+    "amenity.cooking_basics": {
+        Language.RU: "\u0412\u0441\u0451 \u043d\u0435\u043e\u0431\u0445\u043e\u0434\u0438\u043c\u043e\u0435 \u0434\u043b\u044f \u0433\u043e\u0442\u043e\u0432\u043a\u0438",
+        Language.EN: "Cooking basics",
+        Language.ES: "Elementos b\u00e1sicos para cocinar",
+    },
+    "amenity.dishes_and_silverware": {
+        Language.RU: "\u041f\u043e\u0441\u0443\u0434\u0430 \u0438 \u0441\u0442\u043e\u043b\u043e\u0432\u044b\u0435 \u043f\u0440\u0438\u0431\u043e\u0440\u044b",
+        Language.EN: "Dishes and silverware",
+        Language.ES: "Platos y cubiertos",
+    },
+    "amenity.kettle": {
+        Language.RU: "\u0427\u0430\u0439\u043d\u0438\u043a",
+        Language.EN: "Kettle",
+        Language.ES: "Hervidor",
+    },
+    "amenity.toaster": {
+        Language.RU: "\u0422\u043e\u0441\u0442\u0435\u0440",
+        Language.EN: "Toaster",
+        Language.ES: "Tostadora",
+    },
+    "amenity.outdoor_dining": {
+        Language.RU: "\u041e\u0431\u0435\u0434\u0435\u043d\u043d\u0430\u044f \u0437\u043e\u043d\u0430 \u043d\u0430 \u0443\u043b\u0438\u0446\u0435",
+        Language.EN: "Outdoor dining area",
+        Language.ES: "Zona de comedor exterior",
+    },
+    "amenity.bbq_grill": {
+        Language.RU: "\u0413\u0440\u0438\u043b\u044c \u0434\u043b\u044f \u0431\u0430\u0440\u0431\u0435\u043a\u044e",
+        Language.EN: "BBQ grill",
+        Language.ES: "Parrilla",
+    },
+    "amenity.smoke_alarm": {
+        Language.RU: "\u0414\u0430\u0442\u0447\u0438\u043a \u0434\u044b\u043c\u0430",
+        Language.EN: "Smoke alarm",
+        Language.ES: "Detector de humo",
+    },
+    "amenity.carbon_monoxide_alarm": {
+        Language.RU: "\u0414\u0430\u0442\u0447\u0438\u043a \u0443\u0433\u0430\u0440\u043d\u043e\u0433\u043e \u0433\u0430\u0437\u0430",
+        Language.EN: "Carbon monoxide alarm",
+        Language.ES: "Detector de mon\u00f3xido de carbono",
+    },
+    "amenity.essentials": {
+        Language.RU: "\u0411\u0430\u0437\u043e\u0432\u044b\u0435 \u0432\u0435\u0449\u0438",
+        Language.EN: "Essentials",
+        Language.ES: "Elementos b\u00e1sicos",
+    },
     # --- Stay-price block ---
     "fmt.stay_price_label": {
         Language.RU: "Стоимость проживания:",

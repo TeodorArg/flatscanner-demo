@@ -3,11 +3,11 @@
 ## Problem
 
 The current Airbnb actor (`curious_coder~airbnb-scraper`) was sufficient for the
-MVP, but it is no longer a strong fit for the post-MVP engine:
+MVP, but it was no longer a strong fit for the post-MVP engine:
 
-- dated Airbnb URLs do not reliably yield usable price data
-- listing, pricing, photos, and reviews are coupled in one unstable payload
-- future photo and review modules need more specialized source contracts
+- dated Airbnb URLs did not reliably yield usable price data
+- listing, pricing, photos, and reviews were coupled in one unstable payload
+- future photo and review modules needed more specialized source contracts
 
 Live validation showed that even with `scrapeDetail=True` and explicit stay dates,
 the current actor still returned `pricing = null` and `costPerNight = null` for
@@ -16,15 +16,16 @@ without fixing the root issue.
 
 ## Goal
 
-Migrate Airbnb ingestion to a pair of specialized `tri_angle` actors:
+Migrate Airbnb ingestion to a specialized `tri_angle` room-URL actor while
+introducing a dedicated review-source seam for the reviews module.
 
 1. `tri_angle~airbnb-rooms-urls-scraper`
    - listing details
    - dated price data
    - photos
    - host / amenities / rules
-2. `tri_angle~airbnb-reviews-scraper`
-   - dedicated review corpus for the reviews module
+2. a dedicated Airbnb review-source seam
+   - decouples the reviews module from any one listing actor payload
 
 ## Scope
 
@@ -42,9 +43,9 @@ Replace the current listing/detail Airbnb actor with
 
 ### Slice 2
 
-Migrate reviews ingestion to `tri_angle~airbnb-reviews-scraper` and make the
-Airbnb reviews module consume the dedicated review payload instead of assuming
-reviews come from the listing actor.
+Refactor review ingestion behind a dedicated Airbnb review-source abstraction so
+the reviews module no longer assumes reviews always come from the listing
+payload.
 
 ## Non-goals
 
@@ -60,7 +61,7 @@ reviews come from the listing actor.
   room-URL actor and existing Telegram analysis continues to work.
 - Slice 1 yields a better source contract for dated Airbnb pricing than the
   current actor path.
-- Slice 2 lands with the Airbnb reviews module backed by the dedicated
-  `tri_angle` reviews actor.
-- The repository memory is updated to reflect the new actor split and why it
-  exists.
+- Slice 2 lands with the Airbnb reviews module backed by a dedicated review
+  source abstraction rather than a hard-coded listing payload path.
+- The repository memory is updated to reflect the new listing actor split and
+  the review-source abstraction.

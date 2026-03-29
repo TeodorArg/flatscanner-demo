@@ -296,7 +296,7 @@ class TestFormatterStayPriceBlock:
 
     def test_nightly_rate_in_stay_block(self):
         msg = format_analysis_message(self._stay_listing(), _result(), Language.EN)
-        assert "Per night: 130.49 USD" in msg
+        assert "<b>Per night:</b> 130.49 USD" in msg
 
     def test_stay_block_omitted_for_nightly_price(self):
         listing = _listing(price=PriceInfo(amount=Decimal("120"), currency="USD", period="night"))
@@ -330,7 +330,7 @@ class TestFormatterStayPriceBlock:
         msg = format_analysis_message(listing, _result(), Language.EN)
         assert "Stay price:" in msg
         assert "600 USD" in msg
-        assert "Per night:" not in msg
+        assert "<b>Per night:</b>" not in msg
 
     def test_cleaning_fee_in_stay_block_en(self):
         listing = _listing(
@@ -345,7 +345,7 @@ class TestFormatterStayPriceBlock:
             )
         )
         msg = format_analysis_message(listing, _result(), Language.EN)
-        assert "Cleaning fee: 75 USD" in msg
+        assert "<b>Cleaning fee:</b> 75 USD" in msg
 
     def test_service_fee_in_stay_block_en(self):
         listing = _listing(
@@ -360,7 +360,7 @@ class TestFormatterStayPriceBlock:
             )
         )
         msg = format_analysis_message(listing, _result(), Language.EN)
-        assert "Service fee: 50 USD" in msg
+        assert "<b>Service fee:</b> 50 USD" in msg
 
     def test_cleaning_fee_label_ru(self):
         listing = _listing(
@@ -389,8 +389,8 @@ class TestFormatterStayPriceBlock:
             )
         )
         msg = format_analysis_message(listing, _result(), Language.EN)
-        assert "Cleaning fee:" not in msg
-        assert "Service fee:" not in msg
+        assert "<b>Cleaning fee:</b>" not in msg
+        assert "<b>Service fee:</b>" not in msg
 
 
 # ---------------------------------------------------------------------------

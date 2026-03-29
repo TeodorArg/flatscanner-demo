@@ -38,14 +38,20 @@ import httpx
 from src.adapters.registry import resolve_adapter
 from src.analysis.context import AnalysisContext
 from src.analysis.modules.ai_summary import AISummaryModule, AISummaryResult
+from src.analysis.modules.amenities import (
+    AirbnbAmenitiesEvidenceModule,
+    AmenitiesEvidenceResult,
+    GenericAmenitiesEvidenceModule,
+)
 from src.analysis.modules.reviews import AirbnbReviewsModule, GenericReviewsModule, ReviewsResult
 from src.analysis.openrouter_client import OpenRouterError
 from src.analysis.reviews.airbnb_source import AirbnbReviewSource
 from src.analysis.registry import ModuleRegistry
-from src.analysis.result import ReviewInsightsBlock
+from src.analysis.result import AmenitiesInsightsBlock, ReviewInsightsBlock
 from src.analysis.reviews.service import ReviewAnalysisService
 from src.analysis.runner import ModuleRunner
 from src.analysis.service import AnalysisService
+from src.domain.amenity_corpus import AmenityAvailability
 from src.domain.delivery import AnalysisResultPresenter, DeliveryChannel, ProgressSink
 from src.domain.listing import AnalysisJob
 from src.domain.raw_payload import RawPayload
@@ -99,6 +105,90 @@ def _map_reviews_result(rv: ReviewsResult | None) -> ReviewInsightsBlock | None:
         conflicts_or_disputes=_extract(rv.conflicts_or_disputes),
         positive_signals=_extract(rv.positive_signals),
         window_view_summary=rv.window_view_summary or "",
+    )
+
+
+def _map_amenities_result(av: AmenitiesEvidenceResult | None) -> AmenitiesInsightsBlock | None:
+    """Map an ``AmenitiesEvidenceResult`` into an ``AmenitiesInsightsBlock``."""
+    if av is None:
+        return None
+    if not av.available_keys and not av.critical_missing_keys:
+        return None
+
+    section_definitions: list[tuple[str, set[str]]] = [
+        ("home_comfort", {"bathroom", "bedroom", "laundry", "entertainment", "climate"}),
+        ("kitchen_dining", {"kitchen"}),
+        ("outdoor_facilities", {"outdoor", "parking", "leisure"}),
+    ]
+
+    section_priorities: dict[str, list[str]] = {
+        "home_comfort": [
+            "bathtub",
+            "hot_water",
+            "washer",
+            "bed_linens",
+            "tv",
+            "shampoo",
+            "bidet",
+            "hangers",
+            "air_conditioning",
+        ],
+        "kitchen_dining": [
+            "kitchen",
+            "refrigerator",
+            "microwave",
+            "cooking_basics",
+            "dishes_and_silverware",
+            "kettle",
+            "toaster",
+        ],
+        "outdoor_facilities": [
+            "balcony",
+            "outdoor_dining",
+            "bbq_grill",
+            "parking",
+            "pool",
+        ],
+    }
+
+    def _unique_ordered(keys: list[str], *, priority: list[str], limit: int) -> list[str]:
+        seen: set[str] = set()
+        ordered: list[str] = []
+        priority_order = {key: index for index, key in enumerate(priority)}
+        for key in sorted(keys, key=lambda k: (priority_order.get(k, 999), k)):
+            if key in seen:
+                continue
+            seen.add(key)
+            ordered.append(key)
+            if len(ordered) >= limit:
+                break
+        return ordered
+
+    sections: list[AmenitiesInsightsBlock.Section] = []
+    available_items = [
+        item
+        for item in av.corpus.items
+        if item.availability == AmenityAvailability.AVAILABLE
+    ]
+    for section_id, categories in section_definitions:
+        keys = [item.canonical_key for item in available_items if item.category in categories]
+        visible_keys = _unique_ordered(
+            keys,
+            priority=section_priorities.get(section_id, []),
+            limit=6,
+        )
+        if visible_keys:
+            sections.append(
+                AmenitiesInsightsBlock.Section(
+                    section_id=section_id,
+                    amenity_keys=visible_keys,
+                )
+            )
+
+    return AmenitiesInsightsBlock(
+        available_keys=list(av.available_keys),
+        critical_missing_keys=list(av.critical_missing_keys),
+        sections=sections,
     )
 
 
@@ -271,13 +361,15 @@ async def process_job(
         review_source = (
             AirbnbReviewSource(
                 api_token=settings.apify_api_token,
-                actor_id=settings.apify_airbnb_reviews_actor_id,
+                actor_id=settings.apify_airbnb_reviews_actor_id or None,
             )
             if settings.apify_api_token
             else None
         )
         registry = ModuleRegistry()
         registry.register(AISummaryModule(service))
+        registry.register(AirbnbAmenitiesEvidenceModule())
+        registry.register(GenericAmenitiesEvidenceModule())
         registry.register(AirbnbReviewsModule(review_service, review_source=review_source))
         registry.register(GenericReviewsModule())
         runner = ModuleRunner(registry)
@@ -301,8 +393,18 @@ async def process_job(
             (r for r in module_results if isinstance(r, ReviewsResult)), None
         )
         review_insights = _map_reviews_result(reviews_module_result)
+        amenities_module_result = next(
+            (r for r in module_results if isinstance(r, AmenitiesEvidenceResult)), None
+        )
+        amenities_insights = _map_amenities_result(amenities_module_result)
 
-        result = result.model_copy(update={"display_title": listing.title, "review_insights": review_insights})
+        result = result.model_copy(
+            update={
+                "display_title": listing.title,
+                "review_insights": review_insights,
+                "amenities_insights": amenities_insights,
+            }
+        )
         logger.debug("Analysis complete for job %s", job.id)
 
         # Stage 4: preparing final report (before translate/format/send) ----

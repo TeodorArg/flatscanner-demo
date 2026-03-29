@@ -2,7 +2,7 @@
 
 ## Migration strategy
 
-Do not switch both actors in one PR. Land the migration in two small slices.
+Do not switch both concerns in one PR. Land the migration in two small slices.
 
 ## Slice 1 - Listing / Details / Price / Photos
 
@@ -19,7 +19,7 @@ for the core Airbnb listing adapter path.
 | `src/adapters/airbnb.py` | Update actor input contract and normalization for the new raw schema |
 | `tests/test_airbnb_extraction.py` | Replace or extend fixtures for the new actor schema |
 | `tests/test_analysis.py` | Adjust prompt/path expectations if pricing fields change |
-| `docs/project/backend/backend-docs.md` | Record the actor split and new default listing actor |
+| `docs/project/backend/backend-docs.md` | Record the listing actor split and new default listing actor |
 | `specs/028-airbnb-triangle-scrapers-migration/tasks.md` | Track slice completion |
 
 ### Constraints
@@ -29,22 +29,22 @@ for the core Airbnb listing adapter path.
 - Do not implement dedicated photo analysis yet
 - Preserve raw payload capture for future photo/replay work
 
-## Slice 2 - Dedicated Reviews Source
+## Slice 2 - Reviews Source Abstraction
 
 ### Goal
 
-Move Airbnb review ingestion to `tri_angle~airbnb-reviews-scraper`.
+Move Airbnb review ingestion behind a dedicated source abstraction.
 
 ### Affected areas
 
 | Area | Change |
 |---|---|
-| `src/app/config.py` | Add dedicated Airbnb reviews actor setting |
+| `src/app/config.py` | Add dedicated Airbnb review-source configuration |
 | `src/analysis/reviews/` | Add a dedicated Airbnb review source fetch path |
 | `src/analysis/modules/reviews.py` | Use the dedicated reviews source for Airbnb |
 | `tests/test_reviews_module.py` | Cover dedicated reviews ingestion path |
-| `tests/test_review_corpus_normalization.py` | Add or update fixtures for the tri_angle reviews schema |
-| `docs/project/backend/backend-docs.md` | Record the actor pair and responsibilities |
+| `tests/test_review_corpus_normalization.py` | Add or update fixtures for any flat per-review schema |
+| `docs/project/backend/backend-docs.md` | Record the listing actor split and reviews abstraction |
 
 ## Order
 

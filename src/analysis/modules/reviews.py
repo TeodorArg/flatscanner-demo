@@ -3,12 +3,10 @@
 Provides two implementations of the reviews analysis module:
 
 ``AirbnbReviewsModule``
-    Provider-specific module for Airbnb listings.  Fetches reviews from the
-    dedicated ``tri_angle~airbnb-reviews-scraper`` actor via
-    ``AirbnbReviewSource`` when configured, normalizes them with
-    ``AirbnbReviewNormalizer.normalize_from_actor_items()``, then runs an AI
-    analysis with ``ReviewAnalysisService`` when at least one comment text is
-    present.
+    Provider-specific module for Airbnb listings.  Fetches reviews through a
+    configurable ``AirbnbReviewSource`` strategy, normalizes them into the
+    unified corpus contract, then runs an AI analysis with
+    ``ReviewAnalysisService`` when at least one comment text is present.
 
     Fallback chain (most specific first):
     1. Dedicated reviews actor (``review_source`` is set and fetch succeeds)
@@ -88,11 +86,11 @@ class AirbnbReviewsModule:
         Pre-built ``ReviewAnalysisService`` used for AI-backed analysis.
         Callers are responsible for constructing and configuring it.
     review_source:
-        Optional ``AirbnbReviewSource`` for fetching reviews from the
-        dedicated ``tri_angle~airbnb-reviews-scraper`` actor.  When provided,
-        the module fetches reviews directly rather than relying on the listing
-        raw payload.  Falls back to the listing payload when ``None`` or when
-        the fetch raises an exception.
+        Optional ``AirbnbReviewSource`` for fetching reviews through a
+        configurable source strategy. When provided, the module fetches
+        reviews directly rather than relying on the listing raw payload.
+        Falls back to the listing payload when ``None`` or when the fetch
+        raises an exception.
     """
 
     name = "reviews"
@@ -112,8 +110,8 @@ class AirbnbReviewsModule:
         """Normalize reviews and optionally run AI analysis.
 
         Fetch order:
-        1. Dedicated reviews actor (when ``review_source`` is set and listing
-           URL is available).  A failed fetch is logged and silently skipped.
+        1. Configured review source (when ``review_source`` is set and listing
+           URL is available). A failed fetch is logged and silently skipped.
         2. Listing raw payload (``ctx.raw_payload``).
         3. Generic normalizer (metadata-only fallback).
 
@@ -121,7 +119,7 @@ class AirbnbReviewsModule:
         ----------
         ctx:
             Analysis context.  ``ctx.listing.source_url`` is passed to the
-            reviews actor; ``ctx.raw_payload`` is used as fallback.
+            configured review source; ``ctx.raw_payload`` is used as fallback.
 
         Returns
         -------
@@ -131,16 +129,16 @@ class AirbnbReviewsModule:
         """
         extraction = None
 
-        # 1. Dedicated reviews actor
+        # 1. Configured review source
         if self._review_source is not None and ctx.listing.source_url:
             try:
-                items = await self._review_source.fetch(ctx.listing.source_url)
-                extraction = self._airbnb_normalizer.normalize_from_actor_items(
-                    items, ctx.listing
+                extraction = await self._review_source.fetch(
+                    ctx.listing.source_url,
+                    ctx.listing,
                 )
             except Exception:
                 logger.warning(
-                    "Airbnb reviews actor fetch failed; falling back to listing payload",
+                    "Airbnb review source fetch failed; falling back to listing payload",
                     exc_info=True,
                 )
 

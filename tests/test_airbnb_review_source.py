@@ -1,133 +1,98 @@
-"""Tests for the dedicated Airbnb reviews source (Slice 2).
-
-Covers:
-- AirbnbReviewSource.fetch(): passes correct input to ApifyClient,
-  returns items list, propagates ApifyError and timeout errors
-- Default actor ID is tri_angle~airbnb-reviews-scraper
-"""
+"""Tests for the Airbnb listing-payload review source."""
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from src.adapters.apify_client import ApifyError
 from src.analysis.reviews.airbnb_source import AirbnbReviewSource
-
+from src.domain.listing import ListingProvider, NormalizedListing
 
 _LISTING_URL = "https://www.airbnb.com/rooms/12345678"
 
-_SAMPLE_ITEMS = [
+
+def _listing() -> NormalizedListing:
+    return NormalizedListing(
+        provider=ListingProvider.AIRBNB,
+        source_url=_LISTING_URL,
+        source_id="12345678",
+        title="Test Listing",
+        review_count=14,
+        rating=4.9,
+    )
+
+
+_CURIOUS_ITEMS = [
     {
-        "id": "review-1",
-        "language": "en",
-        "text": "Great place, very clean!",
-        "localizedDate": "March 2024",
-        "createdAt": "2024-03-15",
-        "localizedReviewerLocation": "New York",
-        "reviewer": {"firstName": "Alice"},
-        "rating": 5,
-        "response": None,
-        "reviewHighlight": None,
-        "startUrl": _LISTING_URL,
-    },
-    {
-        "id": "review-2",
-        "language": "fr",
-        "text": "Très bien, je recommande.",
-        "localizedDate": "February 2024",
-        "createdAt": "2024-02-10",
-        "localizedReviewerLocation": "Paris",
-        "reviewer": {"firstName": "Pierre"},
-        "rating": 4,
-        "response": "Merci!",
-        "reviewHighlight": None,
-        "startUrl": _LISTING_URL,
-    },
+        "reviews": [
+            {
+                "id": "review-1",
+                "reviewer": {"firstName": "Alice", "location": "New York"},
+                "createdAt": "2024-03-15",
+                "rating": 5,
+                "comments": "Great place, very clean!",
+                "response": None,
+            }
+        ],
+        "reviewsCount": 14,
+        "starRating": 4.9,
+    }
 ]
 
 
 class TestAirbnbReviewSourceInit:
-    def test_default_actor_id(self):
-        """AirbnbReviewSource passes the default actor ID to ApifyClient."""
+    def test_default_actor_uses_curious_coder(self):
         with patch("src.analysis.reviews.airbnb_source.ApifyClient") as MockClient:
-            AirbnbReviewSource(api_token="tok")
+            source = AirbnbReviewSource(api_token="tok")
+            assert source.actor_id == "curious_coder~airbnb-scraper"
             MockClient.assert_called_once_with(
                 api_token="tok",
-                actor_id="tri_angle~airbnb-reviews-scraper",
+                actor_id="curious_coder~airbnb-scraper",
                 timeout=120.0,
             )
 
-    def test_custom_actor_id(self):
-        """A custom actor_id is forwarded to ApifyClient unchanged."""
+    def test_custom_actor_id_overrides_strategy_default(self):
         with patch("src.analysis.reviews.airbnb_source.ApifyClient") as MockClient:
-            AirbnbReviewSource(api_token="tok", actor_id="other~actor")
-            MockClient.assert_called_once_with(
+            source = AirbnbReviewSource(
                 api_token="tok",
-                actor_id="other~actor",
-                timeout=120.0,
+                actor_id="custom~actor",
             )
-
-    def test_custom_timeout_passed_through(self):
-        """A custom timeout is forwarded to ApifyClient unchanged."""
-        with patch("src.analysis.reviews.airbnb_source.ApifyClient") as MockClient:
-            AirbnbReviewSource(api_token="tok", timeout=60.0)
+            assert source.actor_id == "custom~actor"
             MockClient.assert_called_once_with(
                 api_token="tok",
-                actor_id="tri_angle~airbnb-reviews-scraper",
-                timeout=60.0,
+                actor_id="custom~actor",
+                timeout=120.0,
             )
 
 
 class TestAirbnbReviewSourceFetch:
     @pytest.mark.asyncio
-    async def test_fetch_returns_items(self):
+    async def test_curious_source_sends_listing_payload_input(self):
         source = AirbnbReviewSource(api_token="tok")
-        source._client.run_and_get_items = AsyncMock(return_value=_SAMPLE_ITEMS)
+        source._client.run_and_get_items = AsyncMock(return_value=_CURIOUS_ITEMS)
 
-        result = await source.fetch(_LISTING_URL)
-
-        assert result == _SAMPLE_ITEMS
-
-    @pytest.mark.asyncio
-    async def test_fetch_sends_correct_input(self):
-        source = AirbnbReviewSource(api_token="tok")
-        source._client.run_and_get_items = AsyncMock(return_value=[])
-
-        await source.fetch(_LISTING_URL)
+        extraction = await source.fetch(_LISTING_URL, _listing())
 
         source._client.run_and_get_items.assert_awaited_once_with(
-            {"startUrls": [{"url": _LISTING_URL}]}
+            {
+                "urls": [_LISTING_URL],
+                "currency": "USD",
+                "scrapeAvailability": False,
+                "scrapeDetail": False,
+                "scrapeReviews": True,
+            }
         )
+        assert extraction.corpus.total_review_count == 14
+        assert len(extraction.corpus.comments) == 1
+        assert extraction.corpus.comments[0].comment_text == "Great place, very clean!"
 
     @pytest.mark.asyncio
-    async def test_fetch_returns_empty_list_when_actor_returns_no_items(self):
+    async def test_empty_actor_output_returns_empty_extraction(self):
         source = AirbnbReviewSource(api_token="tok")
         source._client.run_and_get_items = AsyncMock(return_value=[])
 
-        result = await source.fetch(_LISTING_URL)
+        extraction = await source.fetch(_LISTING_URL, _listing())
 
-        assert result == []
-
-    @pytest.mark.asyncio
-    async def test_fetch_propagates_apify_error(self):
-        source = AirbnbReviewSource(api_token="tok")
-        source._client.run_and_get_items = AsyncMock(
-            side_effect=ApifyError("actor run failed with status 500")
-        )
-
-        with pytest.raises(ApifyError, match="actor run failed"):
-            await source.fetch(_LISTING_URL)
-
-    @pytest.mark.asyncio
-    async def test_fetch_propagates_timeout_error(self):
-        import httpx
-
-        source = AirbnbReviewSource(api_token="tok")
-        source._client.run_and_get_items = AsyncMock(
-            side_effect=httpx.TimeoutException("timed out")
-        )
-
-        with pytest.raises(httpx.TimeoutException):
-            await source.fetch(_LISTING_URL)
+        assert extraction.corpus.total_review_count == 14
+        assert extraction.corpus.comments == []

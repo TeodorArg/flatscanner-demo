@@ -20,6 +20,13 @@ This is the canonical PR-loop document for implementation, AI review, and merge 
 7. If follow-up is needed, continue on the same branch. Maintainers may trigger `Claude Fix PR` with the `claude-fix` label or `/claude-fix`.
 8. A human merges only after required checks are green and approval is present.
 
+## Hard Gate
+
+- Codex must not bypass this loop for product code in `src/`, `tests/`, or runtime setup.
+- Product-code work starts only after the active feature folder exists and the isolated worker branch/worktree is created.
+- If the implementation worker, isolated worktree flow, or PR loop is unavailable, stop and report the blocker instead of implementing locally.
+- Local unreviewed product-code edits do not count as progress toward completion.
+
 ## AI Review Contract
 
 - Reviewer selection comes only from the repo variable `AI_REVIEW_AGENT`.

@@ -32,6 +32,8 @@ _SYSTEM_PROMPT = (
     "You are a rental listing analyst. "
     "Reply ONLY with a valid JSON object, no markdown, no text outside the JSON. "
     "Write all text fields in English. "
+    "Do not infer bedroom layout or property subtype (for example: studio, loft, one-bedroom) "
+    "unless it is explicitly stated in the provided facts. "
     "Use the schema from the user message."
 )
 
@@ -64,7 +66,12 @@ def build_prompt(
         appended as a structured nearby-context section so the model
         can factor in transport access and local amenities.
     """
-    lines: list[str] = ["Analyse this rental listing.\n"]
+    lines: list[str] = [
+        "Analyse this rental listing.",
+        "Do not invent the layout or property subtype. "
+        "If the input does not explicitly say studio, loft, or one-bedroom, keep the wording generic.",
+        "",
+    ]
 
     lines.append(f"Title: {listing.title}")
 
@@ -120,9 +127,14 @@ def build_prompt(
             host_line += " (Superhost)"
         lines.append(host_line)
 
-    if enrichment and enrichment.successes:
+    nonempty_enrichment_successes = (
+        [result for result in enrichment.successes if result.data]
+        if enrichment
+        else []
+    )
+    if nonempty_enrichment_successes:
         lines.append("\nNearby context (from enrichment):")
-        for result in enrichment.successes:
+        for result in nonempty_enrichment_successes:
             data = result.data or {}
             if result.name == "transport":
                 count = data.get("count", 0)

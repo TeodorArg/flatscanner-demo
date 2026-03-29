@@ -179,6 +179,93 @@ def _parse_price_amount(val: Any) -> Decimal | None:
     return None
 
 
+def _parse_location_text(value: Any) -> tuple[str | None, str | None, str | None, str | None]:
+    """Derive coarse location fields from a subtitle-like location string.
+
+    Accepts strings such as:
+    - ``"Buenos Aires"``
+    - ``"Buenos Aires, Argentina"``
+    - ``"Palermo, Buenos Aires, Argentina"``
+
+    Returns ``(address, city, country, neighbourhood)`` with best-effort
+    parsing and ``None`` for any field that cannot be inferred safely.
+    """
+    if not isinstance(value, str):
+        return (None, None, None, None)
+    text = value.strip()
+    if not text:
+        return (None, None, None, None)
+
+    parts = [part.strip() for part in text.split(",") if part.strip()]
+    if not parts:
+        return (None, None, None, None)
+
+    if len(parts) >= 3:
+        return (text, parts[-2], parts[-1], parts[0])
+    if len(parts) == 2:
+        return (text, parts[0], parts[1], None)
+    return (text, parts[0], None, None)
+
+
+def _normalize_amenities(raw_amenities: Any) -> list[str]:
+    """Return a flat, user-meaningful amenity list from heterogeneous raw shapes.
+
+    Airbnb actors expose amenities in several schemas:
+    - flat string list: ``["Wifi", "Kitchen"]``
+    - flat dict list: ``[{"title": "Wifi", "available": True}, ...]``
+    - grouped nested list: ``[{"title": "Internet", "values": [...]}, ...]``
+
+    For grouped payloads we intentionally flatten the nested amenity titles and
+    ignore group headers such as ``"Kitchen and dining"`` or ``"Not included"``
+    so downstream summary prompts receive concrete facts instead of category
+    names. Unavailable items are skipped here because this field is a generic
+    fallback summary list; the richer availability semantics live in the
+    dedicated ``AmenitiesEvidenceModule``.
+    """
+    if not isinstance(raw_amenities, list):
+        return []
+
+    items: list[str] = []
+    seen: set[str] = set()
+
+    def _append(label: Any) -> None:
+        if not isinstance(label, str):
+            return
+        text = label.strip()
+        if not text:
+            return
+        key = text.casefold()
+        if key in seen:
+            return
+        seen.add(key)
+        items.append(text)
+
+    for entry in raw_amenities:
+        if isinstance(entry, str):
+            _append(entry)
+            continue
+        if not isinstance(entry, dict):
+            continue
+
+        group_title = str(entry.get("title") or "").strip()
+        group_is_not_included = group_title.casefold() == "not included"
+        raw_values = entry.get("values")
+        if isinstance(raw_values, list):
+            for raw_value in raw_values:
+                if not isinstance(raw_value, dict):
+                    continue
+                if raw_value.get("available") is False or group_is_not_included:
+                    continue
+                _append(raw_value.get("title"))
+            continue
+
+        if entry.get("available") is False or group_is_not_included:
+            continue
+        _append(entry.get("title"))
+
+    return items
+
+
 def _build_actor_input(url: str, actor_id: str) -> dict[str, Any]:
     """Return the actor-specific Apify input payload for *url*.
 
@@ -403,9 +490,25 @@ def _normalize(url: str, raw: dict[str, Any]) -> NormalizedListing:
             pass
 
     # --- location ------------------------------------------------------------
-    raw_location = raw.get("location")
-    if not isinstance(raw_location, dict):
-        raw_location = {}
+    raw_location_any = raw.get("location")
+    raw_location = raw_location_any if isinstance(raw_location_any, dict) else {}
+    raw_coordinates = raw.get("coordinates")
+    if not isinstance(raw_coordinates, dict):
+        raw_coordinates = {}
+    raw_location_descriptions = raw.get("locationDescriptions")
+    location_descriptions: list[dict[str, Any]] = (
+        [item for item in raw_location_descriptions if isinstance(item, dict)]
+        if isinstance(raw_location_descriptions, list)
+        else []
+    )
+    location_text = _first_present(
+        raw.get("locationSubtitle"),
+        location_descriptions[0].get("title") if location_descriptions else None,
+        raw_location_any if isinstance(raw_location_any, str) else None,
+    )
+    parsed_address, parsed_city, parsed_country, parsed_neighbourhood = _parse_location_text(
+        location_text
+    )
 
     def _float_or_none(val: Any) -> float | None:
         try:
@@ -419,33 +522,31 @@ def _normalize(url: str, raw: dict[str, Any]) -> NormalizedListing:
         latitude=_float_or_none(
             _first_present(
                 _first_non_none(raw, "lat", "latitude"),
+                raw_coordinates.get("latitude"),
                 raw_location.get("latitude"),
             )
         ),
         longitude=_float_or_none(
             _first_present(
                 _first_non_none(raw, "lng", "longitude"),
+                raw_coordinates.get("longitude"),
                 raw_location.get("longitude"),
             )
         ),
-        address=raw.get("address") or raw_location.get("address") or None,
-        city=raw.get("city") or None,
-        country=raw.get("country") or raw.get("countryCode") or None,
-        neighbourhood=raw.get("neighbourhood") or raw_location.get("description") or None,
+        address=raw.get("address") or raw_location.get("address") or parsed_address or None,
+        city=raw.get("city") or parsed_city or None,
+        country=raw.get("country") or raw.get("countryCode") or parsed_country or None,
+        neighbourhood=(
+            raw.get("neighbourhood")
+            or raw_location.get("description")
+            or parsed_neighbourhood
+            or None
+        ),
     )
 
     # --- amenities -----------------------------------------------------------
     raw_amenities = raw.get("amenities")
-    amenities: list[str] = []
-    if isinstance(raw_amenities, list):
-        if raw_amenities and isinstance(raw_amenities[0], dict):
-            amenities = [
-                str(item.get("title"))
-                for item in raw_amenities
-                if isinstance(item, dict) and item.get("available") is not False and item.get("title")
-            ]
-        else:
-            amenities = [str(a) for a in raw_amenities if a]
+    amenities = _normalize_amenities(raw_amenities)
 
     # --- host ----------------------------------------------------------------
     host = raw.get("host")

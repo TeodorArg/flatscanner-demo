@@ -26,7 +26,8 @@ This repository uses `github/spec-kit` with two memory layers:
 ## Boundaries
 
 - Codex may directly edit docs, ADRs, specs, prompts, workflows, templates, and other process files.
-- Product code in `src/`, `tests/`, and runtime setup should normally land through Claude-authored pull requests.
+- Product code in `src/`, `tests/`, and runtime setup must land through Claude-authored pull requests by default.
+- Codex must not edit product code directly in the main checkout, even for small fixes, foundation slices, or emergency follow-ups.
 - Multi-agent work must use isolated git worktrees; never run multiple coding agents in one working tree.
 
 ## Working Rules
@@ -35,6 +36,10 @@ This repository uses `github/spec-kit` with two memory layers:
 - Keep changes scoped and avoid unrelated refactors.
 - Update docs or specs before code when behavior or architecture changes.
 - Keep one branch and one PR per Claude worker task.
+- Before any product-code task, create or update the active `specs/<feature-id>/` folder first.
+- Before any product-code task, explicitly use the standard loop: feature memory -> isolated Claude worktree -> PR -> required checks -> AI review.
+- If the Claude worker, isolated worktree, or PR loop is unavailable, stop and report the blocker instead of implementing locally.
+- Local draft product-code edits in `src/`, `tests/`, or runtime setup do not count as progress and must not be presented as task completion.
 - Treat `docs/`, `specs/`, and `.specify/` as repository memory, not session memory.
 - Keep `.github/workflows/` green.
 - Automated PR review is selected only through the repo variable `AI_REVIEW_AGENT`.
@@ -55,3 +60,5 @@ An orchestrated PR loop is finished only when the current PR head SHA has:
 - only human approval or final merge remaining
 
 If any of those are false, the task is still in progress unless the user explicitly pauses it.
+
+Local-only product-code edits without an active PR loop are still in progress.

@@ -118,7 +118,7 @@ class TestProcessJobSuccess:
         sent_texts: list[str] = []
         sent_chats: list[int] = []
 
-        async def fake_send(token, chat_id, text, *, client=None):
+        async def fake_send(token, chat_id, text, *, parse_mode=None, client=None):
             sent_texts.append(text)
             sent_chats.append(chat_id)
 
@@ -198,7 +198,7 @@ class TestProcessJobSuccess:
 
         captured_tokens: list[str] = []
 
-        async def capture_send(token, chat_id, text, *, client=None):
+        async def capture_send(token, chat_id, text, *, parse_mode=None, client=None):
             captured_tokens.append(token)
 
         with patch("src.telegram.presenter.send_message", side_effect=capture_send):
@@ -401,7 +401,7 @@ class TestProcessJobSendFailure:
         mock_service = MagicMock(spec=AnalysisService)
         mock_service.analyse = AsyncMock(return_value=result)
 
-        async def failing_send(token, chat_id, text, *, client=None):
+        async def failing_send(token, chat_id, text, *, parse_mode=None, client=None):
             raise httpx.HTTPStatusError(
                 "403 Forbidden",
                 request=MagicMock(),
@@ -441,7 +441,7 @@ class TestProcessJobTranslationFallback:
 
         sent_texts: list[str] = []
 
-        async def fake_send(token, chat_id, text, *, client=None):
+        async def fake_send(token, chat_id, text, *, parse_mode=None, client=None):
             sent_texts.append(text)
 
         with patch("src.telegram.presenter.send_message", side_effect=fake_send):
@@ -479,7 +479,7 @@ class TestProcessJobLocalizedTitle:
 
         sent_texts: list[str] = []
 
-        async def fake_send(token, chat_id, text, *, client=None):
+        async def fake_send(token, chat_id, text, *, parse_mode=None, client=None):
             sent_texts.append(text)
 
         with patch("src.telegram.presenter.send_message", side_effect=fake_send):
@@ -492,7 +492,7 @@ class TestProcessJobLocalizedTitle:
             )
 
         assert sent_texts
-        assert sent_texts[0].startswith("Apartamento acogedor en Berlin")
+        assert sent_texts[0].startswith("<b>Apartamento acogedor en Berlin</b>")
 
 
 # ---------------------------------------------------------------------------
@@ -941,7 +941,7 @@ class TestProcessJobFrameworkIntegration:
 
         sent_texts: list[str] = []
 
-        async def fake_send(token, chat_id, text, *, client=None):
+        async def fake_send(token, chat_id, text, *, parse_mode=None, client=None):
             sent_texts.append(text)
 
         with patch("src.telegram.presenter.send_message", side_effect=fake_send):
@@ -1205,7 +1205,7 @@ class TestProcessJobReviewsModuleIntegration:
 
         sent_texts: list[str] = []
 
-        async def fake_send(token, chat_id, text, *, client=None):
+        async def fake_send(token, chat_id, text, *, parse_mode=None, client=None):
             sent_texts.append(text)
 
         with patch("src.telegram.presenter.send_message", side_effect=fake_send):
