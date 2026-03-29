@@ -174,9 +174,9 @@ class TestAmenitiesBlock:
         result = _result(amenities=["WiFi", "Kitchen", "Washer"])
         msg = format_analysis_message(_listing(), result, Language.EN)
         assert "<b>Amenities:</b>" in msg
-        assert "WiFi" in msg
-        assert "Kitchen" in msg
-        assert "Washer" in msg
+        assert "- WiFi" in msg
+        assert "- Kitchen" in msg
+        assert "- Washer" in msg
 
     def test_amenities_omitted_when_empty(self):
         result = _result(amenities=[])
@@ -188,12 +188,13 @@ class TestAmenitiesBlock:
         msg = format_analysis_message(_listing(), _result(), Language.EN)
         assert "<b>Amenities:</b>" not in msg
 
-    def test_amenities_capped_at_ten(self):
+    def test_amenities_all_items_rendered(self):
         amenities = [f"Feature{i}" for i in range(15)]
         result = _result(amenities=amenities)
         msg = format_analysis_message(_listing(), result, Language.EN)
         assert "Feature9" in msg
-        assert "Feature10" not in msg
+        assert "Feature10" in msg
+        assert "Feature14" in msg
 
     def test_amenities_html_escaped(self):
         result = _result(amenities=["Pool & Spa", "<Hot tub>"])

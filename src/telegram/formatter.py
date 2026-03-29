@@ -112,16 +112,16 @@ def format_analysis_message(
 
 
 def _format_amenities(result: AnalysisResult, language: Language) -> str:
-    """Return a compact amenities line, or an empty string to omit it.
+    """Return a bullet-list amenities section, or an empty string to omit it.
 
-    Shows up to 10 amenities as a comma-separated list to keep the message
-    concise.  Returns an empty string when the amenities list is empty.
+    Shows every amenity as a bullet list item.  Returns an empty string when
+    the amenities list is empty.
     """
     if not result.amenities:
         return ""
     label = get_string("fmt.amenities_label", language)
-    items = result.amenities[:10]
-    return f"{_bold(label)} {', '.join(_escape_text(a) for a in items)}"
+    lines = [_bold(label)] + [f"- {_escape_text(a)}" for a in result.amenities]
+    return "\n".join(lines)
 
 
 def _format_review_insights(result: AnalysisResult, language: Language) -> str:
