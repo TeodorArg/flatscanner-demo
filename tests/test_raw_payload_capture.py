@@ -258,7 +258,7 @@ class TestProcessorRawPayloadPersistence:
 
         sent_chats: list[int] = []
 
-        async def fake_send(token, chat_id, text, *, client=None):
+        async def fake_send(token, chat_id, text, *, parse_mode=None, client=None):
             sent_chats.append(chat_id)
 
         with patch("src.telegram.presenter.send_message", side_effect=fake_send):
