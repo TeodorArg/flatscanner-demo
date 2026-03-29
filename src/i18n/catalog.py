@@ -128,6 +128,12 @@ _CATALOG: dict[str, dict[Language, str]] = {
         Language.EN: "Amenities:",
         Language.ES: "Servicios:",
     },
+    # Overflow note when amenities are truncated.  Use str.format(n=<count>).
+    "fmt.amenities_overflow": {
+        Language.RU: "[+{n} ещё]",
+        Language.EN: "[+{n} more]",
+        Language.ES: "[+{n} más]",
+    },
     # --- Reviews section labels ---
     "fmt.reviews_label": {
         Language.RU: "Отзывы:",

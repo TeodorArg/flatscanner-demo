@@ -292,3 +292,23 @@ class TestAmenitiesBlock:
         assert section != "", "section must not be empty when budget fits compact overflow"
         assert "[+3 more]" in section
         assert "- WiFi" not in section  # no individual bullet should appear
+
+    def test_overflow_marker_localized_russian(self):
+        """Overflow marker must use the Russian catalog string, not English."""
+        amenities = [f"Amenity number {i} with a descriptive name" for i in range(200)]
+        result = _result(amenities=amenities)
+        msg = format_analysis_message(_listing(), result, Language.RU)
+        assert len(msg) <= _TELEGRAM_MAX_CHARS
+        assert "[+" in msg
+        assert "ещё]" in msg
+        assert "more]" not in msg
+
+    def test_overflow_marker_localized_spanish(self):
+        """Overflow marker must use the Spanish catalog string, not English."""
+        amenities = [f"Amenity number {i} with a descriptive name" for i in range(200)]
+        result = _result(amenities=amenities)
+        msg = format_analysis_message(_listing(), result, Language.ES)
+        assert len(msg) <= _TELEGRAM_MAX_CHARS
+        assert "[+" in msg
+        assert "más]" in msg
+        assert "more]" not in msg

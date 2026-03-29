@@ -151,7 +151,8 @@ def _format_amenities(
 
     # Tight budget: fit as many bullets as possible, reserving room for an
     # overflow note so readers know items were omitted.
-    compact_overflow = f"- [+{len(bullets)} more]"
+    overflow_tpl = get_string("fmt.amenities_overflow", language)
+    compact_overflow = "- " + overflow_tpl.format(n=len(bullets))
     compact_section = header + "\n" + compact_overflow
 
     bullets_budget = budget - len(header) - 1  # -1 for the '\n' after header
@@ -163,7 +164,7 @@ def _format_amenities(
     for i, bullet in enumerate(bullets):
         # Bullets remaining after this one if we include it
         n_remaining = len(bullets) - i - 1
-        overflow = f"- [+{n_remaining} more]" if n_remaining > 0 else ""
+        overflow = ("- " + overflow_tpl.format(n=n_remaining)) if n_remaining > 0 else ""
         trial = "\n".join(included + [bullet])
         if overflow:
             trial += "\n" + overflow
@@ -179,7 +180,7 @@ def _format_amenities(
     n_omitted = len(bullets) - len(included)
     result_lines = [header] + included
     if n_omitted > 0:
-        result_lines.append(f"- [+{n_omitted} more]")
+        result_lines.append("- " + overflow_tpl.format(n=n_omitted))
     return "\n".join(result_lines)
 
 
