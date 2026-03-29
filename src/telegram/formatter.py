@@ -198,7 +198,7 @@ def _label_amenity_key(key: str, language: Language) -> str:
     try:
         return _escape_text(get_string(f"amenity.{key}", language))
     except KeyError:
-        return _escape_text(key.replace("_", " ").capitalize())
+        return _escape_text(key.replace("_", " ").title())
 
 
 def _prioritize_keys(keys: list[str], *, limit: int) -> list[str]:

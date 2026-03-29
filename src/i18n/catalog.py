@@ -315,6 +315,162 @@ _CATALOG: dict[str, dict[Language, str]] = {
         Language.EN: "Essentials",
         Language.ES: "Elementos b\u00e1sicos",
     },
+    # --- Extended amenity labels ---
+    "amenity.dedicated_workspace": {
+        Language.RU: "Рабочее место",
+        Language.EN: "Dedicated workspace",
+        Language.ES: "Espacio de trabajo",
+    },
+    "amenity.iron": {
+        Language.RU: "Утюг",
+        Language.EN: "Iron",
+        Language.ES: "Plancha",
+    },
+    "amenity.hair_dryer": {
+        Language.RU: "Фен",
+        Language.EN: "Hair dryer",
+        Language.ES: "Secador de cabello",
+    },
+    "amenity.safe": {
+        Language.RU: "Сейф",
+        Language.EN: "Safe",
+        Language.ES: "Caja fuerte",
+    },
+    "amenity.extra_pillows_blankets": {
+        Language.RU: "Доп. подушки и одеяла",
+        Language.EN: "Extra pillows and blankets",
+        Language.ES: "Almohadas y mantas extra",
+    },
+    "amenity.room_darkening_shades": {
+        Language.RU: "Плотные шторы",
+        Language.EN: "Room-darkening shades",
+        Language.ES: "Persianas opacas",
+    },
+    "amenity.towels": {
+        Language.RU: "Полотенца",
+        Language.EN: "Towels",
+        Language.ES: "Toallas",
+    },
+    "amenity.body_soap": {
+        Language.RU: "Мыло для тела",
+        Language.EN: "Body soap",
+        Language.ES: "Jabón corporal",
+    },
+    "amenity.conditioner": {
+        Language.RU: "Кондиционер для волос",
+        Language.EN: "Conditioner",
+        Language.ES: "Acondicionador",
+    },
+    "amenity.shower_gel": {
+        Language.RU: "Гель для душа",
+        Language.EN: "Shower gel",
+        Language.ES: "Gel de ducha",
+    },
+    "amenity.cleaning_products": {
+        Language.RU: "Моющие средства",
+        Language.EN: "Cleaning products",
+        Language.ES: "Productos de limpieza",
+    },
+    "amenity.coffee_maker": {
+        Language.RU: "Кофемашина",
+        Language.EN: "Coffee maker",
+        Language.ES: "Cafetera",
+    },
+    "amenity.dining_table": {
+        Language.RU: "Обеденный стол",
+        Language.EN: "Dining table",
+        Language.ES: "Mesa de comedor",
+    },
+    "amenity.stove": {
+        Language.RU: "Плита",
+        Language.EN: "Stove",
+        Language.ES: "Cocina",
+    },
+    "amenity.oven": {
+        Language.RU: "Духовка",
+        Language.EN: "Oven",
+        Language.ES: "Horno",
+    },
+    "amenity.dishwasher": {
+        Language.RU: "Посудомоечная машина",
+        Language.EN: "Dishwasher",
+        Language.ES: "Lavavajillas",
+    },
+    "amenity.wine_glasses": {
+        Language.RU: "Бокалы для вина",
+        Language.EN: "Wine glasses",
+        Language.ES: "Copas de vino",
+    },
+    "amenity.clothes_drying_rack": {
+        Language.RU: "Сушилка для одежды",
+        Language.EN: "Clothes drying rack",
+        Language.ES: "Tendedero de ropa",
+    },
+    "amenity.ceiling_fan": {
+        Language.RU: "Потолочный вентилятор",
+        Language.EN: "Ceiling fan",
+        Language.ES: "Ventilador de techo",
+    },
+    "amenity.indoor_fireplace": {
+        Language.RU: "Камин",
+        Language.EN: "Indoor fireplace",
+        Language.ES: "Chimenea interior",
+    },
+    "amenity.hot_tub": {
+        Language.RU: "Джакузи",
+        Language.EN: "Hot tub",
+        Language.ES: "Jacuzzi",
+    },
+    "amenity.gym": {
+        Language.RU: "Тренажёрный зал",
+        Language.EN: "Gym",
+        Language.ES: "Gimnasio",
+    },
+    "amenity.sauna": {
+        Language.RU: "Сауна",
+        Language.EN: "Sauna",
+        Language.ES: "Sauna",
+    },
+    "amenity.streaming_services": {
+        Language.RU: "Стриминговые сервисы",
+        Language.EN: "Streaming services",
+        Language.ES: "Servicios de streaming",
+    },
+    "amenity.ethernet": {
+        Language.RU: "Ethernet",
+        Language.EN: "Ethernet",
+        Language.ES: "Ethernet",
+    },
+    "amenity.private_entrance": {
+        Language.RU: "Отдельный вход",
+        Language.EN: "Private entrance",
+        Language.ES: "Entrada privada",
+    },
+    "amenity.self_checkin": {
+        Language.RU: "Самостоятельное заселение",
+        Language.EN: "Self check-in",
+        Language.ES: "Registro autónomo",
+    },
+    "amenity.ev_charger": {
+        Language.RU: "Зарядка для электромобиля",
+        Language.EN: "EV charger",
+        Language.ES: "Cargador para vehículo eléctrico",
+    },
+    "amenity.outdoor_shower": {
+        Language.RU: "Душ на улице",
+        Language.EN: "Outdoor shower",
+        Language.ES: "Ducha exterior",
+    },
+    "amenity.fire_extinguisher": {
+        Language.RU: "Огнетушитель",
+        Language.EN: "Fire extinguisher",
+        Language.ES: "Extintor",
+    },
+    "amenity.first_aid_kit": {
+        Language.RU: "Аптечка",
+        Language.EN: "First aid kit",
+        Language.ES: "Botiquín de primeros auxilios",
+    },
     # --- Stay-price block ---
     "fmt.stay_price_label": {
         Language.RU: "Стоимость проживания:",
