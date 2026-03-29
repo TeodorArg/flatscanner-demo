@@ -5,7 +5,7 @@
 ## Task List
 
 - [x] Add `amenities: list[str]` field to `AnalysisResult`
-- [x] Map `listing.amenities` → `result.amenities` in job processor
+- [x] Map `listing.amenities` -> `result.amenities` in job processor
 - [x] Add `"fmt.amenities_label"` to i18n catalog (RU / EN / ES)
 - [x] Implement `_format_amenities()` in `src/telegram/formatter.py`
 - [x] Hook `_format_amenities()` into `format_analysis_message()`
@@ -15,4 +15,4 @@
 
 ## Validation
 
-- `python -m pytest tests/test_telegram_formatter.py` — 29 passed
+- `python -m pytest tests/test_031_amenities_block.py tests/test_telegram_formatter.py -q` - 44 passed
