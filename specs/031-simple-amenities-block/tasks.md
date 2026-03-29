@@ -13,6 +13,8 @@
 - [x] Create `specs/031-simple-amenities-block/` folder with spec, plan, tasks
 - [x] Commit changes on assigned branch
 
+- [x] AI Review follow-up: remove amenities from LLM translation path; update TestAmenitiesTranslation tests
+
 ## Validation
 
-- `python -m pytest tests/test_031_amenities_block.py tests/test_telegram_formatter.py -q` - 44 passed
+- `python -m pytest tests/test_031_amenities_block.py tests/test_telegram_formatter.py tests/test_translation_service.py -q` - 73 passed
