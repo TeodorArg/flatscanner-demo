@@ -189,6 +189,9 @@ def _parse_translation_response(raw: str, original: AnalysisResult) -> AnalysisR
     if not isinstance(price_explanation, str):
         price_explanation = original.price_explanation
 
+    # amenities are scraper labels rendered verbatim — never translated.
+    amenities = original.amenities
+
     # --- Review insights block (optional) ---
     translated_review_insights: ReviewInsightsBlock | None = None
     if original.review_insights is not None:
@@ -242,6 +245,7 @@ def _parse_translation_response(raw: str, original: AnalysisResult) -> AnalysisR
         # price_verdict is language-neutral — never translated.
         price_verdict=original.price_verdict,
         price_explanation=price_explanation,
+        amenities=amenities,
         review_insights=translated_review_insights,
     )
 

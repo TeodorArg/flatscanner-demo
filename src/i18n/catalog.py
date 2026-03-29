@@ -122,6 +122,12 @@ _CATALOG: dict[str, dict[Language, str]] = {
         Language.EN: "Unknown",
         Language.ES: "Desconocido",
     },
+    # --- Amenities section label ---
+    "fmt.amenities_label": {
+        Language.RU: "Удобства:",
+        Language.EN: "Amenities:",
+        Language.ES: "Servicios:",
+    },
     # --- Reviews section labels ---
     "fmt.reviews_label": {
         Language.RU: "Отзывы:",

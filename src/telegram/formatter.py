@@ -85,6 +85,10 @@ def format_analysis_message(
         lines = [_bold(label)] + [f"- {_escape_text(risk)}" for risk in result.risks]
         parts.append("\n".join(lines))
 
+    amenities_section = _format_amenities(result, language)
+    if amenities_section:
+        parts.append(amenities_section)
+
     reviews_section = _format_review_insights(result, language)
     if reviews_section:
         parts.append(reviews_section)
@@ -105,6 +109,19 @@ def format_analysis_message(
 
     message = "\n\n".join(parts)
     return _guard_length(message, language)
+
+
+def _format_amenities(result: AnalysisResult, language: Language) -> str:
+    """Return a compact amenities line, or an empty string to omit it.
+
+    Shows up to 10 amenities as a comma-separated list to keep the message
+    concise.  Returns an empty string when the amenities list is empty.
+    """
+    if not result.amenities:
+        return ""
+    label = get_string("fmt.amenities_label", language)
+    items = result.amenities[:10]
+    return f"{_bold(label)} {', '.join(_escape_text(a) for a in items)}"
 
 
 def _format_review_insights(result: AnalysisResult, language: Language) -> str:

@@ -167,3 +167,54 @@ class TestMultilingualOutput:
         msg = format_analysis_message(_listing(), _result())
         assert msg
         assert msg.startswith("<b>")
+
+
+class TestAmenitiesBlock:
+    def test_amenities_present_when_non_empty(self):
+        result = _result(amenities=["WiFi", "Kitchen", "Washer"])
+        msg = format_analysis_message(_listing(), result, Language.EN)
+        assert "<b>Amenities:</b>" in msg
+        assert "WiFi" in msg
+        assert "Kitchen" in msg
+        assert "Washer" in msg
+
+    def test_amenities_omitted_when_empty(self):
+        result = _result(amenities=[])
+        msg = format_analysis_message(_listing(), result, Language.EN)
+        assert "<b>Amenities:</b>" not in msg
+
+    def test_amenities_default_omitted(self):
+        # AnalysisResult.amenities defaults to [] so section must not appear
+        msg = format_analysis_message(_listing(), _result(), Language.EN)
+        assert "<b>Amenities:</b>" not in msg
+
+    def test_amenities_capped_at_ten(self):
+        amenities = [f"Feature{i}" for i in range(15)]
+        result = _result(amenities=amenities)
+        msg = format_analysis_message(_listing(), result, Language.EN)
+        assert "Feature9" in msg
+        assert "Feature10" not in msg
+
+    def test_amenities_html_escaped(self):
+        result = _result(amenities=["Pool & Spa", "<Hot tub>"])
+        msg = format_analysis_message(_listing(), result, Language.EN)
+        assert "Pool &amp; Spa" in msg
+        assert "&lt;Hot tub&gt;" in msg
+        assert "<Hot tub>" not in msg
+
+    def test_amenities_label_localized_russian(self):
+        result = _result(amenities=["WiFi"])
+        msg = format_analysis_message(_listing(), result, Language.RU)
+        assert "<b>Удобства:</b>" in msg
+
+    def test_amenities_label_localized_spanish(self):
+        result = _result(amenities=["WiFi"])
+        msg = format_analysis_message(_listing(), result, Language.ES)
+        assert "<b>Servicios:</b>" in msg
+
+    def test_amenities_appear_before_price_section(self):
+        result = _result(amenities=["WiFi", "Kitchen"])
+        msg = format_analysis_message(_listing(), result, Language.EN)
+        amenities_pos = msg.index("<b>Amenities:</b>")
+        price_pos = msg.index("<b>Price:")
+        assert amenities_pos < price_pos

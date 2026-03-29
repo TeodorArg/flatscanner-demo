@@ -79,3 +79,7 @@ class AnalysisResult(BaseModel):
         default=None,
         description="Compact review insights block; None when no review data is available.",
     )
+    amenities: list[str] = Field(
+        default_factory=list,
+        description="Scraped amenity labels carried from the listing for display.",
+    )
