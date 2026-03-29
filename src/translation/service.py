@@ -40,7 +40,6 @@ _TRANSLATION_SCHEMA_HINT = """\
   "strengths": ["<translated strength 1>", "<translated strength 2>"],
   "risks": ["<translated risk 1>", "<translated risk 2>"],
   "price_explanation": "<translated price explanation>",
-  "amenities": ["<translated amenity 1>", "<translated amenity 2>"],
   "review_overall_assessment": "<translated overall assessment or empty string>",
   "review_critical_red_flags": ["<translated red flag 1>"],
   "review_recurring_issues": ["<translated recurring issue 1>"],
@@ -63,7 +62,6 @@ def _build_translation_prompt(result: AnalysisResult, language: Language) -> str
         "strengths": result.strengths,
         "risks": result.risks,
         "price_explanation": result.price_explanation,
-        "amenities": result.amenities,
         "review_overall_assessment": "",
         "review_critical_red_flags": [],
         "review_recurring_issues": [],
@@ -191,11 +189,8 @@ def _parse_translation_response(raw: str, original: AnalysisResult) -> AnalysisR
     if not isinstance(price_explanation, str):
         price_explanation = original.price_explanation
 
-    amenities = _coerce_translated_list(
-        "amenities",
-        data.get("amenities", original.amenities),
-        original.amenities,
-    )
+    # amenities are scraper labels rendered verbatim — never translated.
+    amenities = original.amenities
 
     # --- Review insights block (optional) ---
     translated_review_insights: ReviewInsightsBlock | None = None

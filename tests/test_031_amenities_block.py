@@ -148,22 +148,27 @@ class TestAmenitiesFormatterSection:
 
 
 class TestAmenitiesTranslation:
-    def test_amenities_included_in_translation_prompt(self):
+    def test_amenities_not_included_in_translation_prompt(self):
+        """Amenity labels are scraper verbatim strings — must not be sent to LLM."""
         r = _result(amenities=["WiFi", "Kitchen"])
         prompt = _build_translation_prompt(r, Language.RU)
-        assert "amenities" in prompt
-        assert "WiFi" in prompt
+        # The amenities key must not appear in the source JSON sent for translation.
+        input_section = prompt.split("Output schema:")[0]
+        import json as _json
+        input_json_start = input_section.find("{")
+        source = _json.loads(input_section[input_json_start:])
+        assert "amenities" not in source
 
-    def test_parse_response_carries_translated_amenities(self):
+    def test_parse_response_preserves_original_amenities(self):
+        """Translation response is ignored for amenities; original labels are kept as-is."""
         original = _result(amenities=["WiFi", "Kitchen"])
-        translated_response = json.dumps(
+        response = json.dumps(
             {
                 "display_title": "Test",
                 "summary": "Хорошее место.",
                 "strengths": [],
                 "risks": [],
                 "price_explanation": "",
-                "amenities": ["Вайфай", "Кухня"],
                 "review_overall_assessment": "",
                 "review_critical_red_flags": [],
                 "review_recurring_issues": [],
@@ -172,29 +177,7 @@ class TestAmenitiesTranslation:
                 "review_window_view_summary": "",
             }
         )
-        result = _parse_translation_response(translated_response, original)
-        assert result.amenities == ["Вайфай", "Кухня"]
-
-    def test_parse_response_falls_back_to_original_amenities_on_malformed(self):
-        original = _result(amenities=["WiFi", "Kitchen"])
-        # amenities field is wrong type
-        bad_response = json.dumps(
-            {
-                "display_title": "Test",
-                "summary": "Хорошее место.",
-                "strengths": [],
-                "risks": [],
-                "price_explanation": "",
-                "amenities": "not-a-list",
-                "review_overall_assessment": "",
-                "review_critical_red_flags": [],
-                "review_recurring_issues": [],
-                "review_conflicts_or_disputes": [],
-                "review_positive_signals": [],
-                "review_window_view_summary": "",
-            }
-        )
-        result = _parse_translation_response(bad_response, original)
+        result = _parse_translation_response(response, original)
         assert result.amenities == ["WiFi", "Kitchen"]
 
     def test_parse_response_empty_amenities_stays_empty(self):
@@ -206,7 +189,6 @@ class TestAmenitiesTranslation:
                 "strengths": [],
                 "risks": [],
                 "price_explanation": "",
-                "amenities": [],
                 "review_overall_assessment": "",
                 "review_critical_red_flags": [],
                 "review_recurring_issues": [],
