@@ -14,7 +14,8 @@
 - [x] Commit changes on assigned branch
 
 - [x] AI Review follow-up: remove amenities from LLM translation path; update TestAmenitiesTranslation tests
+- [x] AI Review follow-up: add pipeline-level test proving listing.amenities flows through process_job into the delivered message
 
 ## Validation
 
-- `python -m pytest tests/test_031_amenities_block.py tests/test_telegram_formatter.py tests/test_translation_service.py -q` - 73 passed
+- `python -m pytest tests/test_031_amenities_block.py tests/test_telegram_formatter.py tests/test_translation_service.py -q` - 74 passed

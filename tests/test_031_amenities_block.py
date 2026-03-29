@@ -8,16 +8,20 @@ Covers:
 - Amenity strings are HTML-escaped
 - i18n labels work for all supported languages
 - Translation service passes amenities through (and falls back gracefully)
+- Pipeline-level: listing.amenities flows through process_job into the delivered message
 """
 
 from __future__ import annotations
 
 import json
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from src.analysis.result import AnalysisResult, PriceVerdict
-from src.domain.listing import ListingProvider, NormalizedListing
+from src.analysis.service import AnalysisService
+from src.domain.delivery import DeliveryChannel, TelegramDeliveryContext
+from src.domain.listing import AnalysisJob, ListingProvider, NormalizedListing
 from src.i18n.types import Language
 from src.telegram.formatter import format_analysis_message
 from src.translation.service import _build_translation_prompt, _parse_translation_response
@@ -199,3 +203,85 @@ class TestAmenitiesTranslation:
         )
         result = _parse_translation_response(response, original)
         assert result.amenities == []
+
+
+# ---------------------------------------------------------------------------
+# Pipeline-level: listing.amenities → process_job → delivered message
+# ---------------------------------------------------------------------------
+
+
+class TestAmenitiesPipeline:
+    """Verify that listing.amenities are threaded through process_job into the
+    final formatted message delivered by the presenter."""
+
+    @pytest.mark.asyncio
+    async def test_listing_amenities_appear_in_delivered_message(self):
+        """process_job must map listing.amenities into the assembled result and
+        forward them to the Telegram message."""
+        from decimal import Decimal
+
+        from src.adapters.base import AdapterResult
+        from src.app.config import Settings
+        from src.jobs.processor import process_job
+
+        amenities = ["WiFi", "Kitchen", "Pool"]
+
+        listing = NormalizedListing(
+            provider=ListingProvider.AIRBNB,
+            source_url="https://www.airbnb.com/rooms/99",
+            source_id="99",
+            title="Test Apartment",
+            amenities=amenities,
+        )
+
+        ai_result = AnalysisResult(
+            summary="Great spot.",
+            price_verdict=PriceVerdict.FAIR,
+        )
+
+        mock_adapter = MagicMock()
+        mock_adapter.fetch = AsyncMock(
+            return_value=AdapterResult(raw={"id": "99"}, listing=listing)
+        )
+
+        mock_service = MagicMock(spec=AnalysisService)
+        mock_service.analyse = AsyncMock(return_value=ai_result)
+
+        mock_ts = MagicMock()
+        mock_ts.translate = AsyncMock(side_effect=lambda result, lang: result)
+
+        settings = Settings(
+            app_env="testing",
+            telegram_bot_token="test-token",
+            openrouter_api_key="test-key",
+            apify_api_token="test-apify",
+        )
+
+        job = AnalysisJob(
+            source_url="https://www.airbnb.com/rooms/99",
+            provider=ListingProvider.AIRBNB,
+            delivery_channel=DeliveryChannel.TELEGRAM,
+            telegram_context=TelegramDeliveryContext(chat_id=42, message_id=1),
+            language=Language.EN,
+        )
+
+        delivered: list[str] = []
+
+        async def fake_send(token, chat_id, text, *, parse_mode=None, client=None):
+            delivered.append(text)
+
+        with patch("src.telegram.presenter.send_message", side_effect=fake_send):
+            await process_job(
+                job,
+                settings,
+                adapter=mock_adapter,
+                analysis_service=mock_service,
+                translation_service=mock_ts,
+            )
+
+        assert len(delivered) == 1
+        msg = delivered[0]
+        assert "WiFi" in msg
+        assert "Kitchen" in msg
+        assert "Pool" in msg
+        assert "<b>Amenities:</b>" in msg
