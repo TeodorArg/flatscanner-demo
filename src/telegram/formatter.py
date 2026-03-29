@@ -53,10 +53,15 @@ def format_analysis_message(
     - Summary paragraph
     - Strengths bullet list (omitted when empty)
     - Risks bullet list (omitted when empty)
+    - Amenities bullet list (truncated with overflow note when too long)
+    - Reviews insights (omitted when absent)
+    - Stay price details (omitted when absent)
     - Price fairness verdict and explanation
 
-    The message is truncated with a localized notice if it would exceed
-    ``_TELEGRAM_MAX_CHARS`` characters.
+    Tail sections (reviews, stay price, price verdict) are always preserved:
+    the amenities block is budgeted so it never displaces them.  The overall
+    message is truncated with a localized notice only if non-amenities content
+    already exceeds ``_TELEGRAM_MAX_CHARS``.
 
     Parameters
     ----------
@@ -69,33 +74,32 @@ def format_analysis_message(
         Language for section labels and the truncation notice.
         Defaults to ``DEFAULT_LANGUAGE`` (Russian).
     """
-    parts: list[str] = []
+    head_parts: list[str] = []
 
     header = result.display_title or listing.title
-    parts.append(_bold(header))
-    parts.append(_escape_text(result.summary))
+    head_parts.append(_bold(header))
+    head_parts.append(_escape_text(result.summary))
 
     if result.strengths:
         label = get_string("fmt.strengths_label", language)
         lines = [_bold(label)] + [f"- {_escape_text(strength)}" for strength in result.strengths]
-        parts.append("\n".join(lines))
+        head_parts.append("\n".join(lines))
 
     if result.risks:
         label = get_string("fmt.risks_label", language)
         lines = [_bold(label)] + [f"- {_escape_text(risk)}" for risk in result.risks]
-        parts.append("\n".join(lines))
+        head_parts.append("\n".join(lines))
 
-    amenities_section = _format_amenities(result, language)
-    if amenities_section:
-        parts.append(amenities_section)
+    # Tail sections are assembled first so we can budget space for amenities.
+    tail_parts: list[str] = []
 
     reviews_section = _format_review_insights(result, language)
     if reviews_section:
-        parts.append(reviews_section)
+        tail_parts.append(reviews_section)
 
     stay_price_section = _format_stay_price(listing, language)
     if stay_price_section:
-        parts.append(stay_price_section)
+        tail_parts.append(stay_price_section)
 
     price_label = get_string("fmt.price_label", language)
     verdict_key = _VERDICT_KEY.get(result.price_verdict, "fmt.verdict.unknown")
@@ -105,23 +109,79 @@ def format_analysis_message(
         price_line = f"{price_heading} - {_escape_text(result.price_explanation)}"
     else:
         price_line = price_heading
-    parts.append(price_line)
+    tail_parts.append(price_line)
 
-    message = "\n\n".join(parts)
+    # Calculate how many characters are available for the amenities block.
+    # Inserting the amenities section adds the section itself plus exactly one
+    # "\n\n" separator (2 chars) beyond the already-joined head+tail message.
+    # Budget = limit - len(message_without_amenities) - 2 (one extra separator).
+    message_without_amenities = "\n\n".join(head_parts + tail_parts)
+    amenities_budget = _TELEGRAM_MAX_CHARS - len(message_without_amenities) - 2
+
+    amenities_section = _format_amenities(result, language, budget=amenities_budget)
+
+    all_parts = head_parts
+    if amenities_section:
+        all_parts = all_parts + [amenities_section]
+    all_parts = all_parts + tail_parts
+
+    message = "\n\n".join(all_parts)
     return _guard_length(message, language)
 
 
-def _format_amenities(result: AnalysisResult, language: Language) -> str:
-    """Return a compact amenities line, or an empty string to omit it.
+def _format_amenities(
+    result: AnalysisResult, language: Language, budget: int | None = None
+) -> str:
+    """Return a bullet-list amenities section within *budget* characters.
 
-    Shows up to 10 amenities as a comma-separated list to keep the message
-    concise.  Returns an empty string when the amenities list is empty.
+    When *budget* is ``None`` (or the full section fits), every amenity is
+    rendered.  When the full section would exceed *budget*, bullets are added
+    incrementally and a ``- [+N more]`` overflow note replaces the remainder.
+    Returns an empty string when the amenities list is empty or nothing fits.
     """
     if not result.amenities:
         return ""
     label = get_string("fmt.amenities_label", language)
-    items = result.amenities[:10]
-    return f"{_bold(label)} {', '.join(_escape_text(a) for a in items)}"
+    header = _bold(label)
+    bullets = [f"- {_escape_text(a)}" for a in result.amenities]
+
+    full = header + "\n" + "\n".join(bullets)
+    if budget is None or len(full) <= budget:
+        return full
+
+    # Tight budget: fit as many bullets as possible, reserving room for an
+    # overflow note so readers know items were omitted.
+    overflow_tpl = get_string("fmt.amenities_overflow", language)
+    compact_overflow = "- " + overflow_tpl.format(n=len(bullets))
+    compact_section = header + "\n" + compact_overflow
+
+    bullets_budget = budget - len(header) - 1  # -1 for the '\n' after header
+    if bullets_budget <= 0:
+        # No room for individual bullets; fall back to compact overflow if it fits.
+        return compact_section if len(compact_section) <= budget else ""
+
+    included: list[str] = []
+    for i, bullet in enumerate(bullets):
+        # Bullets remaining after this one if we include it
+        n_remaining = len(bullets) - i - 1
+        overflow = ("- " + overflow_tpl.format(n=n_remaining)) if n_remaining > 0 else ""
+        trial = "\n".join(included + [bullet])
+        if overflow:
+            trial += "\n" + overflow
+        if len(trial) <= bullets_budget:
+            included.append(bullet)
+        else:
+            break
+
+    if not included:
+        # No individual bullet fit; fall back to compact overflow if it fits.
+        return compact_section if len(compact_overflow) <= bullets_budget else ""
+
+    n_omitted = len(bullets) - len(included)
+    result_lines = [header] + included
+    if n_omitted > 0:
+        result_lines.append("- " + overflow_tpl.format(n=n_omitted))
+    return "\n".join(result_lines)
 
 
 def _format_review_insights(result: AnalysisResult, language: Language) -> str:
