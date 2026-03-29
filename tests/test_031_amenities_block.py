@@ -4,7 +4,7 @@ Covers:
 - AnalysisResult carries amenities field
 - Telegram formatter renders amenities as a dedicated section
 - Amenities section omitted when list is empty
-- Long amenity lists are capped at 10 items
+- All amenity items are rendered (no cap)
 - Amenity strings are HTML-escaped
 - i18n labels work for all supported languages
 - Translation service passes amenities through (and falls back gracefully)
@@ -92,12 +92,13 @@ class TestAmenitiesFormatterSection:
         msg = format_analysis_message(_listing(), _result(amenities=[]), Language.EN)
         assert "Amenities:" not in msg
 
-    def test_amenities_capped_at_ten_items(self):
+    def test_amenities_all_items_rendered(self):
         many = [f"Item{i}" for i in range(20)]
         msg = format_analysis_message(_listing(), _result(amenities=many), Language.EN)
-        # Items 0-9 should appear, 10-19 should not
+        # All items must appear — no cap
         assert "Item9" in msg
-        assert "Item10" not in msg
+        assert "Item10" in msg
+        assert "Item19" in msg
 
     def test_amenities_html_escaped(self):
         msg = format_analysis_message(
@@ -137,13 +138,15 @@ class TestAmenitiesFormatterSection:
         )
         assert "<b>Servicios:</b>" in msg
 
-    def test_amenities_comma_separated(self):
+    def test_amenities_bullet_list_format(self):
         msg = format_analysis_message(
             _listing(),
             _result(amenities=["WiFi", "Kitchen", "Pool"]),
             Language.EN,
         )
-        assert "WiFi, Kitchen, Pool" in msg
+        assert "- WiFi" in msg
+        assert "- Kitchen" in msg
+        assert "- Pool" in msg
 
 
 # ---------------------------------------------------------------------------
