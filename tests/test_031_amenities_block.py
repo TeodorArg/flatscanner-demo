@@ -148,6 +148,18 @@ class TestAmenitiesFormatterSection:
         assert "- Kitchen" in msg
         assert "- Pool" in msg
 
+    def test_long_amenities_preserves_price_verdict(self):
+        """A very long amenities list must not displace the price verdict from the message."""
+        amenities = [f"Amenity item {i} with extra description text" for i in range(200)]
+        msg = format_analysis_message(
+            _listing(),
+            _result(amenities=amenities, price_verdict=PriceVerdict.OVERPRICED),
+            Language.EN,
+        )
+        from src.telegram.formatter import _TELEGRAM_MAX_CHARS
+        assert len(msg) <= _TELEGRAM_MAX_CHARS
+        assert "<b>Price: Overpriced</b>" in msg
+
 
 # ---------------------------------------------------------------------------
 # Translation stage

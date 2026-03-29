@@ -219,3 +219,25 @@ class TestAmenitiesBlock:
         amenities_pos = msg.index("<b>Amenities:</b>")
         price_pos = msg.index("<b>Price:")
         assert amenities_pos < price_pos
+
+    def test_long_amenities_does_not_truncate_price_verdict(self):
+        """Very long amenities list must not push the price verdict out of the message."""
+        # 200 long amenity strings easily exceed the 4096-char budget if uncapped
+        amenities = [f"Amenity number {i} with a descriptive name" for i in range(200)]
+        result = _result(
+            amenities=amenities,
+            price_verdict=PriceVerdict.OVERPRICED,
+            price_explanation="Much higher than comparable listings.",
+        )
+        msg = format_analysis_message(_listing(), result, Language.EN)
+        assert len(msg) <= _TELEGRAM_MAX_CHARS
+        # Price verdict must always survive regardless of amenities length
+        assert "<b>Price: Overpriced</b>" in msg
+        assert "Much higher than comparable listings." in msg
+
+    def test_long_amenities_adds_overflow_note(self):
+        """When amenities are truncated, a [+N more] marker must appear."""
+        amenities = [f"Amenity number {i} with a descriptive name" for i in range(200)]
+        result = _result(amenities=amenities)
+        msg = format_analysis_message(_listing(), result, Language.EN)
+        assert "[+" in msg and "more]" in msg

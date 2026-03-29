@@ -21,3 +21,5 @@ change (comma join → per-line bullet). The test updates mirror this exactly.
 
 - No changes to models, pipeline, i18n catalog, or other modules.
 - Spec 031 acceptance criterion 3 (10-item cap) is superseded by this spec.
+- The budget approach (head/tail split) avoids the previous bug where unbounded
+  amenities caused `_guard_length` to cut the price verdict from the tail.
