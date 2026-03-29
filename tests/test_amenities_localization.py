@@ -113,6 +113,76 @@ class TestTaxonomyExpansion:
 
 
 # ---------------------------------------------------------------------------
+# Regression: provider-compound Airbnb labels that failed before boundary match
+# ---------------------------------------------------------------------------
+
+
+class TestProviderCompoundLabels:
+    """Labels reported in PR #49 follow-up: raw Airbnb strings that the
+    exact-match dict did not cover.  They must now resolve to the correct
+    canonical key via _boundary_match."""
+
+    @pytest.mark.parametrize(
+        "label,expected_key",
+        [
+            # TV with size prefix: "32 inch HDTV"
+            ("32 inch HDTV", "tv"),
+            # AC with model description: "AC - split type ductless system"
+            ("AC - split type ductless system", "air_conditioning"),
+            # Gym with location qualifier: "Shared gym in building"
+            ("Shared gym in building", "gym"),
+            # Coffee maker with preparation variant: "Coffee maker: pour over coffee"
+            ("Coffee maker: pour over coffee", "coffee_maker"),
+            # A few more patterns that follow the same compound structure
+            ("65-inch HDTV", "tv"),
+            ("AC - window unit", "air_conditioning"),
+            ("Private gym in building", "gym"),
+        ],
+    )
+    def test_compound_label_resolves(self, label: str, expected_key: str) -> None:
+        spec = canonicalize_amenity(label)
+        assert spec.canonical_key == expected_key, (
+            f"Compound label {label!r} → expected {expected_key!r}, got {spec.canonical_key!r}"
+        )
+
+    def test_compound_tv_label_renders_localized_ru(self) -> None:
+        from src.telegram.formatter import _label_amenity_key
+        from src.analysis.amenities.taxonomy import canonicalize_amenity
+
+        raw_label = "32 inch HDTV"
+        spec = canonicalize_amenity(raw_label)
+        ru_label = _label_amenity_key(spec.canonical_key, Language.RU)
+        assert ru_label == "ТВ", f"Expected Russian 'ТВ', got {ru_label!r}"
+
+    def test_compound_ac_label_renders_localized_ru(self) -> None:
+        from src.telegram.formatter import _label_amenity_key
+        from src.analysis.amenities.taxonomy import canonicalize_amenity
+
+        raw_label = "AC - split type ductless system"
+        spec = canonicalize_amenity(raw_label)
+        ru_label = _label_amenity_key(spec.canonical_key, Language.RU)
+        assert ru_label == "Кондиционер", f"Expected Russian 'Кондиционер', got {ru_label!r}"
+
+    def test_compound_gym_label_renders_localized_ru(self) -> None:
+        from src.telegram.formatter import _label_amenity_key
+        from src.analysis.amenities.taxonomy import canonicalize_amenity
+
+        raw_label = "Shared gym in building"
+        spec = canonicalize_amenity(raw_label)
+        ru_label = _label_amenity_key(spec.canonical_key, Language.RU)
+        assert "Тренажёрный" in ru_label, f"Expected Russian gym label, got {ru_label!r}"
+
+    def test_compound_coffee_label_renders_localized_ru(self) -> None:
+        from src.telegram.formatter import _label_amenity_key
+        from src.analysis.amenities.taxonomy import canonicalize_amenity
+
+        raw_label = "Coffee maker: pour over coffee"
+        spec = canonicalize_amenity(raw_label)
+        ru_label = _label_amenity_key(spec.canonical_key, Language.RU)
+        assert ru_label == "Кофемашина", f"Expected Russian 'Кофемашина', got {ru_label!r}"
+
+
+# ---------------------------------------------------------------------------
 # i18n catalog: new amenity entries exist for all languages
 # ---------------------------------------------------------------------------
 

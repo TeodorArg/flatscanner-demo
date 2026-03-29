@@ -60,6 +60,7 @@ _LABEL_SPECS: dict[str, AmenitySpec] = {
     "free dryer in unit": AmenitySpec("dryer", "laundry"),
     "clothes drying rack": AmenitySpec("clothes_drying_rack", "laundry"),
     # --- Climate ---
+    "ac": AmenitySpec("air_conditioning", "climate"),
     "air conditioning": AmenitySpec("air_conditioning", "climate"),
     "central air conditioning": AmenitySpec("air_conditioning", "climate"),
     "portable air conditioning": AmenitySpec("air_conditioning", "climate"),
@@ -170,10 +171,40 @@ def _category_from_group(group: str | None) -> str:
     return _GROUP_CATEGORY_ALIASES.get(normalized, _slugify(group))
 
 
+# Keys sorted longest-first so more-specific matches beat shorter aliases.
+_LABEL_SPECS_BY_LENGTH: list[tuple[str, AmenitySpec]] = sorted(
+    _LABEL_SPECS.items(), key=lambda kv: len(kv[0]), reverse=True
+)
+
+
+def _boundary_match(normalized: str) -> AmenitySpec | None:
+    """Return the best spec by word-bounded substring search, longest key first.
+
+    A key matches when it appears inside *normalized* at a word boundary:
+    the character before the match must be non-alphanumeric (or start-of-string),
+    and the character after the match must be non-alphanumeric (or end-of-string).
+    This tolerates provider detail suffixes such as "Coffee maker: pour over coffee"
+    or dimension prefixes such as "32 inch HDTV".
+    """
+    for key, spec in _LABEL_SPECS_BY_LENGTH:
+        idx = normalized.find(key)
+        if idx == -1:
+            continue
+        before_ok = idx == 0 or not normalized[idx - 1].isalnum()
+        after_idx = idx + len(key)
+        after_ok = after_idx == len(normalized) or not normalized[after_idx].isalnum()
+        if before_ok and after_ok:
+            return spec
+    return None
+
+
 def canonicalize_amenity(label: str, group: str | None = None) -> AmenitySpec:
     """Return canonical amenity mapping for a provider-specific label."""
     normalized = _normalize_label(label)
     spec = _LABEL_SPECS.get(normalized)
+    if spec is not None:
+        return spec
+    spec = _boundary_match(normalized)
     if spec is not None:
         return spec
     return AmenitySpec(canonical_key=_slugify(label), category=_category_from_group(group))
