@@ -1,45 +1,55 @@
-# flatscanner
+# repo-memory-platform
 
-`flatscanner` — Telegram-сервис для анализа объявлений об аренде и одновременно
-демонстрационный репозиторий, показывающий spec-driven и AI-assisted алгоритм
-разработки.
+`repo-memory-platform` is a spec-driven, AI-assisted repository template for
+building and operating software with explicit repository memory.
 
-## Что здесь находится
+The repository is being migrated from the legacy `flatscanner` demo toward a
+vendor-neutral platform where:
 
-- продуктовый backend для анализа rental listings
-- repository memory в `docs/` и `specs/`
-- orchestration scripts для implementation agents и AI review
-- пример управляемого цикла разработки: задача -> spec -> implementation -> PR -> CI -> AI review -> merge
+- Markdown files remain the canonical source of truth
+- `docs/` holds durable repository memory
+- `specs/<feature-id>/` holds feature memory
+- pull requests, checks, and review loops remain explicit
+- retrieval tooling such as `LightRAG` is additive, not canonical
 
-## С чего начать
+## What Lives Here
 
-### Для понимания проекта
+- repository memory in `docs/`, `specs/`, and `.specify/`
+- process docs for orchestration, review, and merge readiness
+- product code and tests for concrete implementations that use this workflow
+- automation scripts for worktrees, PR flow, and AI review operations
 
-- [Русское описание процесса и структуры проекта](./README_PROCESS_RU.md)
+## Start Here
+
+### Core Process And Memory
+
+- [Russian process guide](./README_PROCESS_RU.md)
 - [English process overview](./PROCESS_OVERVIEW_EN.md)
-- [Блок-схема delivery flow и деплоя](./DELIVERY_FLOW_RU.md)
-- [Migration kit для переноса workflow в другой проект](./agent-workflow-migration-kit/README_RU.md)
-- [Durable docs layer](./docs/README.md)
-- [Product idea](./docs/project-idea.md)
-- [Backend docs](./docs/project/backend/backend-docs.md)
+- [Delivery flow](./DELIVERY_FLOW_RU.md)
+- [Repository docs layer](./docs/README.md)
+- [Project idea](./docs/project-idea.md)
+- [Repository rules](./AGENTS.md)
 
-### Для process/workflow
+### Supporting Workflow Docs
 
 - [AI PR workflow](./docs/ai-pr-workflow.md)
-- [Claude worker orchestration](./docs/claude-worker-orchestration.md)
-- [Claude implementation contract](./CLAUDE.md)
-- [Agent roles and repository rules](./AGENTS.md)
+- [Concrete local worker profile for Claude](./docs/claude-worker-orchestration.md)
+- [Concrete Claude PR checklist](./docs/claude-pr-playbook.md)
+- [Migration kit for another repository](./agent-workflow-migration-kit/README_RU.md)
 
-## Основная идея
+## Repository Shape
 
-В проекте разделены:
+- `docs/` for durable product, architecture, and process memory
+- `specs/<feature-id>/` for active feature intent, plan, and task state
+- `.specify/` for constitution and spec-kit process templates
+- `src/` for implementation code
+- `tests/` for automated validation
+- `scripts/` for local orchestration and workflow tooling
 
-- `docs/` — долговременная память продукта и архитектуры
-- `specs/<feature-id>/` — память конкретных задач и этапов
-- `src/` — продуктовый код
-- `tests/` — автоматическая проверка поведения
-- `scripts/` — orchestration и process tooling
+## Core Rule
 
-Ключевой принцип:
+Code is not treated as complete when it merely exists locally.
 
-**код не считается завершенной задачей, пока текущий PR не прошел полный loop приемки.**
+A product-code task is complete only when the active PR loop is merge-ready:
+required checks are green, blocking review findings are cleared, merge conflicts
+are gone, and only human approval or final merge remains.
