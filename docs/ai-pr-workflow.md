@@ -31,6 +31,9 @@ This is the canonical PR-loop document for implementation, AI review, and merge 
 
 - Reviewer selection comes only from the repo variable `AI_REVIEW_AGENT`.
 - Supported values are `claude` and `codex`; missing or invalid values fall back to `claude`.
+- Runner strategy comes only from the repo variable `AI_REVIEW_RUNNER`.
+- Supported runner values are `windows` and `macOS`; missing values fall back
+  to `windows`.
 - The required status check is always `AI Review`.
 - Low-severity-only findings are advisory; the effective verdict is normalized to `comment`.
 - `AI Review` fails only when the effective verdict remains `request_changes`.

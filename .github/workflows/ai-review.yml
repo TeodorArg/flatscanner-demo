@@ -33,7 +33,7 @@ jobs:
     name: AI Review
     runs-on:
       - self-hosted
-      - windows
+      - "${{ vars.AI_REVIEW_RUNNER || 'windows' }}"
       - ai-runner
 
     steps:
@@ -44,16 +44,17 @@ jobs:
           ref: ${{ inputs.ref || github.ref }}
 
       - name: Run local AI review
+        shell: pwsh
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ inputs.pr_number }}
           AI_REVIEW_AGENT: ${{ vars.AI_REVIEW_AGENT }}
           CLAUDE_CLI_PATH: ${{ vars.CLAUDE_CLI_PATH }}
-        run: powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File .\scripts\run-ai-pr-review.ps1
+        run: ./scripts/run-ai-pr-review.ps1
 
       - name: Print review diagnostics
         if: always()
-        shell: powershell
+        shell: pwsh
         run: |
           $tempRoot = if ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } else { $env:TEMP }
           $diagnosticPath = Join-Path $tempRoot 'ai-review-diagnostics.log'

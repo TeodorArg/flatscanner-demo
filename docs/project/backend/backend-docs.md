@@ -77,7 +77,9 @@ Migration is broken into phases P1-P7 in `specs/015-post-mvp-architecture-founda
 
 ## Delivery Infrastructure
 
-- Automated review runs on a Windows self-hosted runner labeled `ai-runner`.
+- Automated review runs on a self-hosted runner labeled `ai-runner`.
+- Runner strategy comes only from `AI_REVIEW_RUNNER` and supports `windows` or
+  `macOS`, with `windows` as fallback.
 - Reviewer selection comes only from `AI_REVIEW_AGENT` and supports `claude` or `codex`, with `claude` as fallback.
 - Runner setup lives in `docs/project/backend/self-hosted-runner.md`.
 - Local Claude worker launches live in `docs/claude-worker-orchestration.md`.

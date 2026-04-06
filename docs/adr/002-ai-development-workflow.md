@@ -15,7 +15,9 @@ The repository needed an explicit delivery model for spec-driven implementation,
 - Product code lands through pull requests, not direct pushes to `main`.
 - Durable docs, specs, prompts, ADRs, and workflow files may be edited directly by Codex.
 - Every PR must pass `baseline-checks`, `guard`, and `AI Review`.
-- Automated review runs on a Windows self-hosted runner labeled `ai-runner`.
+- Automated review runs on a self-hosted runner labeled `ai-runner`.
+- Runner strategy is selected through `AI_REVIEW_RUNNER`, with supported
+  values `windows` and `macOS` and fallback `windows`.
 - The active reviewer is selected only through `AI_REVIEW_AGENT`, with supported values `claude` and `codex` and fallback `claude`.
 - Low-severity-only findings stay advisory and must not fail `AI Review`.
 

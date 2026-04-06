@@ -83,7 +83,7 @@ jobs:
     if: needs.resolve-pr.outputs.should_run == 'true'
     runs-on:
       - self-hosted
-      - windows
+      - "${{ vars.AI_REVIEW_RUNNER || 'windows' }}"
       - ai-runner
 
     steps:
@@ -96,12 +96,12 @@ jobs:
           persist-credentials: false
 
       - name: Fetch base branch
-        shell: powershell
+        shell: pwsh
         run: |
           git fetch --no-tags origin ${{ needs.resolve-pr.outputs.base_ref }}
 
       - name: Run Claude PR fix
-        shell: powershell
+        shell: pwsh
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ needs.resolve-pr.outputs.pr_number }}
@@ -109,4 +109,4 @@ jobs:
           PR_BASE_REF: ${{ needs.resolve-pr.outputs.base_ref }}
           TRIGGER_LABEL: ${{ needs.resolve-pr.outputs.trigger_label }}
         run: |
-          .\scripts\run-claude-pr-fix.ps1
+          ./scripts/run-claude-pr-fix.ps1
