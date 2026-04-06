@@ -30,6 +30,17 @@
 - [Claude implementation contract](./CLAUDE.md)
 - [Agent roles and repository rules](./AGENTS.md)
 
+### Для локального Python-окружения
+
+Репозиторий использует `Python 3.13.8` и `uv` как канонический local workflow.
+
+Минимальный setup:
+
+```bash
+uv venv --python 3.13.8
+uv pip install --python .venv/bin/python -e ".[dev]"
+```
+
 ## Основная идея
 
 В проекте разделены:

@@ -1,17 +1,18 @@
-FROM python:3.12-slim
+FROM python:3.13-slim
+
+COPY --from=ghcr.io/astral-sh/uv:0.7.22 /uv /uvx /bin/
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1
+    UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy
 
 WORKDIR /app
-
-RUN python -m pip install --upgrade pip setuptools wheel
 
 COPY pyproject.toml README.md ./
 COPY src ./src
 
-RUN pip install .
+RUN uv pip install --system .
 
 EXPOSE 8000
 
