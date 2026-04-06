@@ -42,7 +42,7 @@
 
 - [x] Define Markdown chunking rules for pilot docs
 - [x] Define metadata schema for chunks
-- [ ] Implement pilot ingestion prototype
+- [x] Implement pilot ingestion prototype
 - [ ] Validate indexing on pilot corpus
 
 ## Phase 6. Retrieval MVP

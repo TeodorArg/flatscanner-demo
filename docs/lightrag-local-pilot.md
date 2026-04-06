@@ -50,6 +50,10 @@ Use a script-first pilot that:
 3. runs retrieval queries against that index
 4. injects mandatory docs according to `docs/context-policy.md`
 
+The current canonical script entrypoint is:
+
+- `scripts/lightrag_pilot.py`
+
 ### Why Script-First
 
 - The MVP acceptance criteria require a reproducible local scenario, not a
@@ -164,6 +168,12 @@ Minimal readiness checks should confirm:
 - the Python environment can import `lightrag`
 - the repository script can print the resolved pilot corpus and working
   directory before indexing
+
+Recommended environment sync for the pilot:
+
+```bash
+uv sync --extra dev --extra repo_memory
+```
 
 ## Scope Boundary
 

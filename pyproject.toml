@@ -24,6 +24,10 @@ dev = [
     "pytest-asyncio>=0.23.0",
     "aiosqlite>=0.20.0",
 ]
+repo_memory = [
+    "lightrag-hku>=1.4.10",
+    "ollama>=0.4.7",
+]
 
 [tool.setuptools.packages.find]
 where = ["."]
