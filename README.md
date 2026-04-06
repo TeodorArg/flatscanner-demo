@@ -33,9 +33,20 @@ vendor-neutral platform where:
 ### Supporting Workflow Docs
 
 - [AI PR workflow](./docs/ai-pr-workflow.md)
-- [Concrete local worker profile for Claude](./docs/claude-worker-orchestration.md)
-- [Concrete Claude PR checklist](./docs/claude-pr-playbook.md)
-- [Migration kit for another repository](./agent-workflow-migration-kit/README_RU.md)
+- [Claude worker orchestration](./docs/claude-worker-orchestration.md)
+- [Claude implementation contract](./CLAUDE.md)
+- [Agent roles and repository rules](./AGENTS.md)
+
+### Для локального Python-окружения
+
+Репозиторий использует `Python 3.13.8` и `uv` как канонический local workflow.
+
+Минимальный setup:
+
+```bash
+uv venv --python 3.13.8
+uv pip install --python .venv/bin/python -e ".[dev]"
+```
 
 ## Repository Shape
 
