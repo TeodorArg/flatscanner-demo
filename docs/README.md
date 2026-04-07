@@ -26,20 +26,34 @@ Those belong in `specs/<feature-id>/`.
 - `.specify/` = process memory and templates
 - clearly marked archives = optional historical artifacts
 
+## Context Economy
+
+The canonical workflow for budgeted context assembly lives in
+`context-economy-workflow.md`.
+
+Use it as the primary reference for:
+
+- context-budget profiles
+- MCP bootstrap usage
+- `LightRAG` retrieval triggers
+- the checkpoint checklist for deciding `LightRAG` rebuild versus
+  MCP/local-memory sync
+
 ## Recommended Reading Order
 
 1. `project-idea.md`
 2. `project/frontend/frontend-docs.md`
 3. `project/backend/backend-docs.md`
 4. `adr/*.md`
-5. `context-policy.md`
-6. `../README_PROCESS_RU.md`
-7. `../PROCESS_OVERVIEW_EN.md`
-8. `../DELIVERY_FLOW_RU.md`
-9. `ai-pr-workflow.md`
-10. `lightrag-local-pilot.md`
-11. `local-memory-sync.md`
-12. `glossary.md`
+5. `context-economy-workflow.md`
+6. `context-policy.md`
+7. `../README_PROCESS_RU.md`
+8. `../PROCESS_OVERVIEW_EN.md`
+9. `../DELIVERY_FLOW_RU.md`
+10. `ai-pr-workflow.md`
+11. `lightrag-local-pilot.md`
+12. `local-memory-sync.md`
+13. `glossary.md`
 
 Concrete vendor-specific worker docs may exist in this repository, but they are
 implementation examples rather than the generic process contract.

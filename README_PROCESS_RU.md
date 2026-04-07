@@ -177,6 +177,10 @@ Retrieval-слой может ускорять сбор контекста, но
 Каноническая policy для сборки context pack и pilot corpus зафиксирована в
 `docs/context-policy.md`.
 
+Канонический workflow для budget profiles, bootstrap order, retrieval triggers
+и checkpoint checklist по `LightRAG`/MCP/local-memory refresh зафиксирован в
+`docs/context-economy-workflow.md`.
+
 ## 7. Практический смысл подхода
 
 Подход нужен для того, чтобы:

@@ -70,6 +70,10 @@ If retrieval tooling such as `LightRAG` is added, it must:
 The canonical policy for mandatory context, retrieved context, and the pilot
 corpus lives in `docs/context-policy.md`.
 
+The canonical workflow for context budgets, bootstrap order, retrieval
+triggers, and the `LightRAG` versus MCP/local-memory checkpoint checklist lives
+in `docs/context-economy-workflow.md`.
+
 ## Recommended Reading
 
 - [Russian process guide](./README_PROCESS_RU.md)
