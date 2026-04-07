@@ -54,10 +54,10 @@
 
 ## Phase 7. Evaluation
 
-- [ ] Run 3-5 engineering retrieval questions
-- [ ] Review retrieval relevance manually
-- [ ] Compare pilot retrieval vs full manual read order
-- [ ] Record gaps and follow-up decisions
+- [x] Run 3-5 engineering retrieval questions
+- [x] Review retrieval relevance manually
+- [x] Compare pilot retrieval vs full manual read order
+- [x] Record gaps and follow-up decisions
 
 ## Phase 8. Legacy Cleanup
 
