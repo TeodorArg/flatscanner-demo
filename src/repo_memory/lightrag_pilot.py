@@ -90,6 +90,21 @@ TAXONOMY_CANONICAL_DOCS = (
     "docs/README.md",
     "docs/project-idea.md",
 )
+READ_ORDER_CANONICAL_DOCS = (
+    "AGENTS.md",
+    ".specify/memory/constitution.md",
+    "docs/README.md",
+    "docs/project-idea.md",
+)
+PR_LOOP_CANONICAL_DOCS = (
+    "docs/ai-pr-workflow.md",
+    "AGENTS.md",
+    ".specify/memory/constitution.md",
+)
+PR_LOOP_COMPLETION_CANONICAL_DOCS = (
+    "docs/ai-pr-workflow.md",
+    "AGENTS.md",
+)
 
 @dataclass(frozen=True)
 class PreparedChunk:
@@ -419,12 +434,39 @@ def is_feature_ownership_question(question: str) -> bool:
     )
 
 
+def is_read_order_question(question: str) -> bool:
+    normalized = normalize_query_text(question)
+    return (
+        "canonical read order before implementation work" in normalized
+        or "which current-pilot process-memory files anchor the canonical read order" in normalized
+        or ("read order" in normalized and "implementation work" in normalized)
+    )
+
+
 def is_local_pilot_setup_question(question: str) -> bool:
     normalized = normalize_query_text(question)
     return (
         "where is the local lightrag pilot setup documented" in normalized
         or "what stack is fixed there" in normalized
         or "local pilot setup and stack" in normalized
+    )
+
+
+def is_pr_loop_contract_question(question: str) -> bool:
+    normalized = normalize_query_text(question)
+    return (
+        "which docs define the generic pr-loop contract" in normalized
+        or ("pr-loop contract" in normalized and "implementation and review" in normalized)
+    )
+
+
+def is_pr_loop_completion_question(question: str) -> bool:
+    normalized = normalize_query_text(question)
+    return (
+        "what conditions must be true before an orchestrated pr loop is considered done"
+        in normalized
+        or "pr-loop completion conditions" in normalized
+        or ("orchestrated pr loop" in normalized and "considered done" in normalized)
     )
 
 
@@ -440,8 +482,11 @@ def is_implementation_location_question(question: str) -> bool:
 def is_policy_or_taxonomy_question(question: str) -> bool:
     return (
         is_taxonomy_question(question)
+        or is_read_order_question(question)
         or is_pilot_boundary_question(question)
         or is_mandatory_policy_question(question)
+        or is_pr_loop_contract_question(question)
+        or is_pr_loop_completion_question(question)
     )
 
 
@@ -450,12 +495,18 @@ def policy_bias_paths(root: Path, question: str, task_type: str = "general") -> 
 
     if is_taxonomy_question(question):
         preferred_paths.extend(TAXONOMY_CANONICAL_DOCS)
+    if is_read_order_question(question):
+        preferred_paths.extend(READ_ORDER_CANONICAL_DOCS)
     if is_local_pilot_setup_question(question):
         preferred_paths.extend(SETUP_CANONICAL_DOCS)
     if is_feature_ownership_question(question):
         preferred_paths.extend(FEATURE_OWNERSHIP_CANONICAL_DOCS)
     if is_pilot_boundary_question(question) or is_mandatory_policy_question(question):
         preferred_paths.extend(POLICY_CANONICAL_DOCS)
+    if is_pr_loop_contract_question(question):
+        preferred_paths.extend(PR_LOOP_CANONICAL_DOCS)
+    if is_pr_loop_completion_question(question):
+        preferred_paths.extend(PR_LOOP_COMPLETION_CANONICAL_DOCS)
     if is_mandatory_policy_question(question) and task_type in {"product-code", "review"}:
         preferred_paths.append("docs/ai-pr-workflow.md")
 
@@ -698,6 +749,31 @@ def format_taxonomy_answer() -> str:
     )
 
 
+def format_read_order_answer() -> str:
+    read_order_lines = "\n".join(f"- `{path}`" for path in READ_ORDER_CANONICAL_DOCS)
+    return (
+        "The current-pilot files that anchor the canonical read order before implementation work are:\n\n"
+        f"{read_order_lines}\n\n"
+        "Read-order summary:\n\n"
+        "- `AGENTS.md` explicitly enumerates the read order\n"
+        "- `.specify/memory/constitution.md` defines the governing repository-memory model\n"
+        "- `docs/README.md` and `docs/project-idea.md` anchor the durable current-pilot context slice\n\n"
+        "Answer with the exact file list above rather than a generic workflow sequence."
+    )
+
+
+def format_pilot_boundary_answer() -> str:
+    boundary_lines = "\n".join(f"- `{path}`" for path in POLICY_CANONICAL_DOCS)
+    return (
+        "The current LightRAG pilot boundary and pilot corpus policy are defined by:\n\n"
+        f"{boundary_lines}\n\n"
+        "Boundary summary:\n\n"
+        "- `docs/context-policy.md` is the canonical source for the pilot boundary and corpus allowlist\n"
+        "- `.specify/memory/constitution.md`, `AGENTS.md`, and `docs/README.md` define the surrounding repository-memory contract\n\n"
+        "Keep the answer anchored to `docs/context-policy.md` as the primary policy source instead of drifting into setup docs or broader process overviews."
+    )
+
+
 def format_setup_answer() -> str:
     setup_lines = "\n".join(f"- `{path}`" for path in SETUP_CANONICAL_DOCS)
     return (
@@ -729,6 +805,35 @@ def format_feature_ownership_answer() -> str:
     )
 
 
+def format_pr_loop_contract_answer() -> str:
+    contract_lines = "\n".join(f"- `{path}`" for path in PR_LOOP_CANONICAL_DOCS)
+    return (
+        "The canonical files that define the generic PR-loop contract are:\n\n"
+        f"{contract_lines}\n\n"
+        "Contract summary:\n\n"
+        "- product code must go through the standard PR loop\n"
+        "- required checks must pass before merge\n"
+        "- AI review is part of the completion contract\n\n"
+        "Keep the answer anchored to the exact canonical files above instead of broader process overviews."
+    )
+
+
+def format_pr_loop_completion_answer() -> str:
+    completion_lines = "\n".join(
+        f"- `{path}`" for path in PR_LOOP_COMPLETION_CANONICAL_DOCS
+    )
+    return (
+        "The canonical files for orchestrated PR-loop completion conditions are:\n\n"
+        f"{completion_lines}\n\n"
+        "The orchestrated PR loop is done only when all of these are true:\n\n"
+        "- no blocking review findings\n"
+        "- green required checks\n"
+        "- no merge conflicts\n"
+        "- only human approval or final merge remaining\n\n"
+        "Answer with the exact completion conditions above rather than a partial merge-readiness summary."
+    )
+
+
 def shape_raw_retrieval_result(
     raw_result: Any,
     question: str,
@@ -738,10 +843,18 @@ def shape_raw_retrieval_result(
 ) -> Any:
     if is_taxonomy_question(question):
         return format_taxonomy_answer()
+    if is_read_order_question(question):
+        return format_read_order_answer()
+    if is_pilot_boundary_question(question):
+        return format_pilot_boundary_answer()
     if is_local_pilot_setup_question(question):
         return format_setup_answer()
     if is_feature_ownership_question(question):
         return format_feature_ownership_answer()
+    if is_pr_loop_contract_question(question):
+        return format_pr_loop_contract_answer()
+    if is_pr_loop_completion_question(question):
+        return format_pr_loop_completion_answer()
     if not is_mandatory_policy_question(question):
         return raw_result
     if not mandatory_paths:
@@ -934,6 +1047,13 @@ def create_rag(index_dir: Path) -> Any:
 
 
 def retrieval_user_prompt(question: str) -> str | None:
+    if is_read_order_question(question):
+        return (
+            "Answer file-first. For canonical read-order questions, prioritize the exact "
+            "current-pilot anchor files `AGENTS.md`, `.specify/memory/constitution.md`, "
+            "`docs/README.md`, and `docs/project-idea.md`. Do not replace them with a "
+            "generic workflow sequence or broader process-summary documents."
+        )
     if is_implementation_location_question(question):
         return (
             "Answer file-first. Prefer exact implementation file paths over high-level "
@@ -959,6 +1079,20 @@ def retrieval_user_prompt(question: str) -> str | None:
             "`nomic-embed-text`, the repository-local script entrypoint, local Python "
             "environment, and repo-local working directory `.lightrag/`."
         )
+    if is_pr_loop_contract_question(question):
+        return (
+            "Answer file-first. For generic PR-loop contract questions, prioritize "
+            "`docs/ai-pr-workflow.md`, `AGENTS.md`, and `.specify/memory/constitution.md`, "
+            "and keep the answer centered on the canonical PR-loop contract rather than "
+            "broader process overviews."
+        )
+    if is_pr_loop_completion_question(question):
+        return (
+            "Answer file-first. For orchestrated PR-loop completion questions, prioritize "
+            "`docs/ai-pr-workflow.md` and `AGENTS.md`, and explicitly include all four "
+            "completion conditions: no blocking findings, green required checks, no merge "
+            "conflicts, and only human approval or final merge remaining."
+        )
     if not is_policy_or_taxonomy_question(question):
         return None
     return (
@@ -980,6 +1114,30 @@ def build_query_param(
         "include_references": include_references,
         "enable_rerank": False,
     }
+    if is_read_order_question(query):
+        params.update(
+            {
+                "top_k": 8,
+                "chunk_top_k": 4,
+                "response_type": "Bullet Points",
+            }
+        )
+    elif is_pr_loop_contract_question(query) or is_pr_loop_completion_question(query):
+        params.update(
+            {
+                "top_k": 8,
+                "chunk_top_k": 4,
+                "response_type": "Bullet Points",
+            }
+        )
+    elif is_pilot_boundary_question(query):
+        params.update(
+            {
+                "top_k": 6,
+                "chunk_top_k": 3,
+                "response_type": "Bullet Points",
+            }
+        )
     user_prompt = retrieval_user_prompt(query)
     if user_prompt:
         params["user_prompt"] = user_prompt
@@ -1093,6 +1251,13 @@ async def build_context_pack(
         mandatory_paths=mandatory_paths,
         retrieved_doc_limit=retrieved_doc_limit,
     )
+    if is_pilot_boundary_question(question):
+        retrieved_paths = merge_ranked_paths(
+            policy_bias_paths(root, question, task_type=task_type),
+            retrieved_paths,
+            exclude_paths=set(mandatory_paths),
+            limit=retrieved_doc_limit,
+        )
     shaped_raw_result = shape_raw_retrieval_result(
         raw_result,
         question=question,
