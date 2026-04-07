@@ -1,42 +1,58 @@
-# Project Idea: flatscanner
+# Project Idea: repo-memory platform
 
 ## Problem
 
-People evaluating rentals often need to combine fragmented listing details, map context, safety signals, transport access, and price reasonableness by hand. The repository needs a clear product and technical baseline so AI agents can make consistent implementation decisions without rebuilding context in every session.
+AI-assisted development becomes brittle when important context lives only in
+chat history, private notes, or human memory.
+
+As repositories grow, agents and humans need a stable way to answer questions
+such as:
+
+- what is the current product or process contract
+- which feature memory is active
+- which architectural decisions already constrain the change
+- which documents are always mandatory before implementation
 
 ## Solution
 
-Build a universal rental listing analysis service. A user sends a listing URL to Telegram, the backend collects listing data from the source platform, enriches it with external public signals, and generates an AI summary with a quality score and a price fairness assessment.
+Build a reusable repo-memory platform where:
 
-Maintain a lightweight durable documentation layer for the product and architecture, then drive each concrete change through feature specs under `specs/`.
+- Markdown files remain the canonical source of truth
+- `docs/` stores durable repository memory
+- `specs/<feature-id>/` stores feature memory
+- `.specify/` stores governing process rules and templates
+- pull requests and checks remain the unit of completion
+- retrieval tooling such as `LightRAG` can index repository memory without
+  replacing it
 
 ## Core Value
 
-- Faster, more informed rental decisions for end users
-- One comparable analysis flow across multiple listing platforms
-- Clear explanation of risks, tradeoffs, and price fairness
-- Faster onboarding for AI agents and humans
-- Less drift between sessions and pull requests
-- Clear separation between durable context and active feature work
+- faster onboarding for humans and agents
+- lower context loss between sessions
+- clearer architectural and process continuity
+- safer multi-agent collaboration through explicit repository artifacts
+- smaller, more relevant context packs for planning and review
 
 ## High-Level Flow
 
-1. User sends a listing URL in Telegram
-2. The backend detects the source platform and selects the matching adapter
-3. Listing data is collected from the platform through Apify or another source-specific connector
-4. The system enriches the listing with external location and context data
-5. AI models summarize findings, score the listing, and estimate price fairness
-6. Telegram returns a structured result with key strengths, risks, and recommendations
-7. Durable project context stays in `docs/`, and each implementation slice is tracked in `specs/`
+1. A human requester or orchestrator identifies a task
+2. Repository memory is read from canonical files
+3. The active feature is formalized in `spec.md`, `plan.md`, and `tasks.md`
+4. Implementation happens in an isolated branch/worktree
+5. Checks and AI review validate the pull request
+6. Durable decisions are written back into repository memory
+7. Optional retrieval tooling accelerates future context assembly
 
-## Target Audience
+## Target Users
 
-- End users who want a fast, reliable evaluation of a rental listing
-- Developers and AI agents collaborating on the `flatscanner` codebase
+- developers setting up a reusable AI-assisted delivery repository
+- orchestrators and planners who need reliable repository context
+- implementation and review agents that need scoped context packs
 
 ## Product Direction
 
-- The service should support multiple listing aggregators over time, even if early implementation starts with Airbnb
-- Telegram is the primary user interface for the first release
-- The backend should keep platform-specific ingestion separate from shared analysis and scoring logic
-- AI output should be explainable, not just a black-box score
+- keep repository truth in files and in a Light-RAG database
+- separate durable memory from feature memory
+- preserve explicit review and merge gates
+- add retrieval as a derivative helper layer only after the file model is clear
+- keep the platform vendor-neutral at the role and process level

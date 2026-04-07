@@ -2,42 +2,53 @@
 
 ## Purpose
 
-`flatscanner` is developed with a spec-driven, AI-assisted workflow.
+This repository uses a spec-driven, AI-assisted workflow with explicit
+repository memory.
 
 ## Core Principles
 
 1. Specs before code.
 2. Pull requests are the unit of review and merge.
-3. CI checks must pass before merge.
-4. Agents must preserve project context through repository files, not hidden session state.
-5. Durable context and feature execution artifacts should be separated.
+3. Required checks must pass before merge.
+4. Repository files preserve context; hidden session state does not define
+   project truth.
+5. Durable memory, feature memory, and process memory must stay distinct.
+6. Retrieval may assist context assembly, but canonical truth remains in files.
 
 ## Source Of Truth
 
-Repository truth is split across two layers:
+Repository truth is split across these layers:
 
-- `docs/`: durable product, architecture, glossary, and ADR context shared across features
-- `specs/<feature-id>/`: active feature intent, plan, validation, and execution checklist
+- `docs/` for durable product, architecture, and workflow context
+- `specs/<feature-id>/` for feature intent, plan, and execution state
+- `.specify/` for governing process rules and templates
 
-The process contract and templates live in `.specify/`.
+Historical artifacts may exist, but they must be clearly separated from active
+canonical memory.
 
 Each feature folder should contain:
 
 - `spec.md`: product intent, scope, requirements, acceptance criteria
 - `plan.md`: technical approach, touched areas, risks, validation
-- `tasks.md`: execution checklist
+- `tasks.md`: execution checklist and state
 
-## Agent Roles
+## Role Model
 
-- ChatGPT: product framing, architecture discussion, tradeoff analysis
-- Codex: planning, review, test guidance, PR analysis
-- Claude Code: implementation, multi-file changes, refactors aligned with spec
+- Human requester: sets goals and approves direction
+- Orchestrator: reads memory, frames scope, and drives the delivery loop
+- Implementation agent: makes scoped changes in isolated work
+- Review agent: evaluates pull requests and raises findings
+- CI/checks: provide required machine validation
+- Human approver: decides final merge
+
+Concrete tools or vendors may implement these roles, but the repository
+constitution does not bind them to one provider.
 
 ## Quality Gates
 
-No change should be merged unless:
+No change should be treated as complete unless:
 
 - the relevant docs and spec are up to date
 - tests are present when behavior changes
-- GitHub Actions checks pass
+- required checks pass
 - pull request review is completed
