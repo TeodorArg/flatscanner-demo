@@ -20,6 +20,15 @@ What is already known:
 - policy/taxonomy answers can be improved with targeted shaping
 - there is still no broad benchmark for multiple question classes and modes
 
+Post-`046` alignment constraint:
+
+- the benchmark must explicitly separate current-pilot rows from
+  corpus-expansion rows
+- `Track A` measures the current small process-memory pilot plus mandatory-doc
+  policy
+- `Track B` preserves broader questions that are useful, but outside the
+  current pilot target set
+
 ## Benchmark Design
 
 ### Phase 1. Freeze benchmark classes
@@ -39,6 +48,7 @@ Initial class set:
 For each question, record:
 
 - question text
+- track
 - class
 - task type
 - run modes
@@ -51,6 +61,8 @@ Dataset design rule:
 - keep the dataset small enough to run manually
 - keep it broad enough to expose mode-sensitive failure patterns
 - retain the frozen `044` questions as one benchmark subset, not the whole set
+- narrow or split mixed rows instead of scoring them against two different
+  corpus contracts at once
 
 ### Phase 3. Freeze scoring rubric
 
@@ -132,7 +144,13 @@ Decision rules:
 
 ## Frozen Benchmark Dataset
 
-The initial `045` benchmark dataset is fixed at 10 questions.
+The canonical `045` benchmark dataset is now a split-track set:
+
+- `Track A`: current-pilot benchmark rows
+- `Track B`: corpus-expansion benchmark rows
+
+Because `BQ3` is split into two track-specific rows, the refined dataset now
+contains 11 canonical rows.
 
 Design rules for this frozen set:
 
@@ -147,6 +165,7 @@ Design rules for this frozen set:
 
 ### BQ1. Repository memory taxonomy files
 
+- Track: `Track A`
 - Class: `taxonomy-read-order`
 - Question: `Which files define the repository memory taxonomy`
 - Task type: `general`
@@ -165,8 +184,9 @@ Design rules for this frozen set:
 
 ### BQ2. Canonical read order before implementation work
 
+- Track: `Track A`
 - Class: `taxonomy-read-order`
-- Question: `What is the canonical read order before implementation work`
+- Question: `Which current-pilot process-memory files anchor the canonical read order before implementation work`
 - Task type: `product-code`
 - Run modes: `hybrid`, `global`
 - Expected canonical files:
@@ -174,32 +194,54 @@ Design rules for this frozen set:
   - `.specify/memory/constitution.md`
   - `docs/README.md`
   - `docs/project-idea.md`
-  - `docs/project/frontend/frontend-docs.md`
-  - `docs/project/backend/backend-docs.md`
 - Expected key facts:
   - the read order is explicitly enumerated in `AGENTS.md`
-  - relevant implementation files come only after the canonical memory layers
+  - this row is intentionally limited to the current-pilot process-memory
+    portion of that read order
+  - frontend/backend docs remain conditional mandatory additions for matching
+    task types rather than indexed targets for this Track A row
 
-### BQ3. Pilot boundary and corpus definition
+### BQ3A. Pilot boundary and corpus definition
 
+- Track: `Track A`
 - Class: `policy-boundary`
-- Question: `Where the local LightRAG pilot boundary and pilot corpus are defined`
+- Question: `Which files define the current LightRAG pilot boundary and pilot corpus policy`
 - Task type: `general`
 - Run modes: `mix`, `global`
 - Expected canonical files:
   - `docs/context-policy.md`
-  - `docs/lightrag-local-pilot.md`
   - `docs/README.md`
+  - `.specify/memory/constitution.md`
   - `AGENTS.md`
 - Expected key facts:
-  - the pilot corpus is intentionally small
+  - the pilot corpus is intentionally small and process-oriented
   - `docs/context-policy.md` defines the included and excluded corpus
-  - `docs/lightrag-local-pilot.md` fixes the local stack and pilot interface
+  - retrieved docs are additive and subordinate to mandatory docs
 - Notes:
-  - this extends the frozen `044` boundary regression with pilot-setup context
+  - this preserves the boundary/corpus-policy half of the frozen `044`
+    boundary regression
+
+### BQ3B. Local pilot setup and stack definition
+
+- Track: `Track B`
+- Class: `policy-boundary`
+- Question: `Where is the local LightRAG pilot setup documented and what stack is fixed there`
+- Task type: `general`
+- Run modes: `mix`, `global`
+- Expected canonical files:
+  - `docs/lightrag-local-pilot.md`
+  - `docs/context-policy.md`
+- Expected key facts:
+  - `docs/lightrag-local-pilot.md` fixes the local stack and script-first
+    interface
+  - `docs/context-policy.md` remains the canonical corpus-policy companion
+- Notes:
+  - this row is kept as a Track B expansion candidate because
+    `docs/lightrag-local-pilot.md` is outside the current indexed pilot corpus
 
 ### BQ4. Mandatory versus retrieve-on-demand artifacts
 
+- Track: `Track A`
 - Class: `policy-boundary`
 - Question: `Which artifacts are mandatory versus retrieve-on-demand for product-code work`
 - Task type: `product-code`
@@ -219,6 +261,7 @@ Design rules for this frozen set:
 
 ### BQ5. Local memory mirror versus canonical memory
 
+- Track: `Track B`
 - Class: `policy-boundary`
 - Question: `Which documents define local-memory mirror policy versus canonical repository memory`
 - Task type: `general`
@@ -234,6 +277,7 @@ Design rules for this frozen set:
 
 ### BQ6. Generic PR-loop contract
 
+- Track: `Track A`
 - Class: `workflow-pr-loop`
 - Question: `Which docs define the generic PR-loop contract for implementation and review`
 - Task type: `review`
@@ -248,6 +292,7 @@ Design rules for this frozen set:
 
 ### BQ7. PR-loop completion conditions
 
+- Track: `Track A`
 - Class: `workflow-pr-loop`
 - Question: `What conditions must be true before an orchestrated PR loop is considered done`
 - Task type: `review`
@@ -263,6 +308,7 @@ Design rules for this frozen set:
 
 ### BQ8. Retrieval MVP and precision follow-up ownership
 
+- Track: `Track B`
 - Class: `feature-memory-navigation`
 - Question: `Which feature defined the retrieval MVP, which feature closed Q3 Q4 Q5 precision regressions, and which feature owns the broader benchmark`
 - Task type: `general`
@@ -280,6 +326,7 @@ Design rules for this frozen set:
 
 ### BQ9. Local pilot setup and stack
 
+- Track: `Track B`
 - Class: `architecture-system-location`
 - Question: `Where is the local LightRAG pilot setup documented and what stack is fixed there`
 - Task type: `general`
@@ -295,6 +342,7 @@ Design rules for this frozen set:
 
 ### BQ10. Current pilot implementation location
 
+- Track: `Track B`
 - Class: `architecture-system-location`
 - Question: `Which code and tests implement the current LightRAG pilot behavior`
 - Task type: `product-code`
@@ -310,6 +358,25 @@ Design rules for this frozen set:
   - implementation location is subordinate to the canonical docs/spec contract
 
 ## Frozen Execution Matrix Summary
+
+### Track A. Current-Pilot Benchmark
+
+- `BQ1`
+- `BQ2`
+- `BQ3A`
+- `BQ4`
+- `BQ6`
+- `BQ7`
+
+### Track B. Expansion Benchmark
+
+- `BQ3B`
+- `BQ5`
+- `BQ8`
+- `BQ9`
+- `BQ10`
+
+### Class/Mode Coverage
 
 - `taxonomy-read-order`: `mix`, `hybrid`, `global`
 - `policy-boundary`: `mix`, `hybrid`, `global`, `local`

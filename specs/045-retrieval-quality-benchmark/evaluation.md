@@ -21,15 +21,35 @@ results remain pending.
 - Date created: `2026-04-07`
 - Baseline status: `COMPLETED`
 - Baseline run date: `2026-04-07`
+- Post-`046` refinement status: `TRACK SPLIT APPLIED`
 - Based on:
   - `specs/042-repo-memory-platform-lightrag/evaluation.md`
   - `specs/044-lightrag-retrieval-precision/evaluation.md`
+  - `specs/046-pilot-corpus-benchmark-alignment/evaluation.md`
 - Run note:
   - benchmark queries completed successfully against the current existing
     `.lightrag/index`
   - an attempted `build` refresh failed on duplicate-document validation for
     the pilot corpus, so this benchmark reflects query behavior on the existing
     index rather than a clean rebuilt index
+
+## Post-046 Refinement Note
+
+The original `2026-04-07` broader baseline was executed before the benchmark
+was split into `Track A` and `Track B`.
+
+Current canonical interpretation:
+
+- `Track A` rows measure the current small process-memory pilot plus
+  mandatory-doc policy
+- `Track B` rows remain useful, but they are corpus-expansion candidates rather
+  than fair ranking-only expectations for the current pilot baseline
+- `BQ2` is now narrowed to the current-pilot read-order scope
+- `BQ3` is now split into `BQ3A` boundary/corpus policy and `BQ3B`
+  setup/stack expectations
+
+This file preserves the observed `2026-04-07` run results, but interprets them
+through the refined split-track contract.
 
 ## Run Protocol
 
@@ -83,6 +103,7 @@ Score each dimension on a `0-2` scale.
 
 ## BQ1. Repository memory taxonomy files
 
+- Track: `Track A`
 - Class: `taxonomy-read-order`
 - Task type: `general`
 - Modes: `mix`, `hybrid`
@@ -114,7 +135,12 @@ Score each dimension on a `0-2` scale.
 
 ## BQ2. Canonical read order before implementation work
 
+- Track: `Track A`
 - Class: `taxonomy-read-order`
+- Canonical refined question:
+  - `Which current-pilot process-memory files anchor the canonical read order before implementation work`
+- Historical baseline question:
+  - `What is the canonical read order before implementation work`
 - Task type: `product-code`
 - Modes: `hybrid`, `global`
 - Question: `What is the canonical read order before implementation work`
@@ -123,10 +149,10 @@ Score each dimension on a `0-2` scale.
   - `.specify/memory/constitution.md`
   - `docs/README.md`
   - `docs/project-idea.md`
-  - `docs/project/frontend/frontend-docs.md`
-  - `docs/project/backend/backend-docs.md`
 - Expected key facts:
   - the read order is explicitly enumerated in `AGENTS.md`
+  - the refined Track A row only expects the current-pilot process-memory
+    portion of that read order
 
 ### Result
 
@@ -134,8 +160,10 @@ Score each dimension on a `0-2` scale.
 - Notes:
   - both `hybrid` and `global` answered with a plausible workflow sequence
   - neither mode actually surfaced the expected read-order files from
-    `AGENTS.md`; retrieval drifted into broad process docs and omitted the
-    frontend/backend docs expected by the frozen benchmark
+    `AGENTS.md`; retrieval drifted into broad process docs
+  - after the track split, this row should no longer be read as a failure to
+    retrieve frontend/backend docs, because those are outside the narrowed
+    Track A target for `BQ2`
 
 ### Scores
 
@@ -144,20 +172,23 @@ Score each dimension on a `0-2` scale.
 - `reference_fidelity`: `0`
 - `context_pack_usefulness`: `1`
 
-## BQ3. Pilot boundary and corpus definition
+## BQ3A. Pilot boundary and corpus definition
 
+- Track: `Track A`
 - Class: `policy-boundary`
 - Task type: `general`
 - Modes: `mix`, `global`
-- Question: `Where the local LightRAG pilot boundary and pilot corpus are defined`
+- Canonical refined question:
+  - `Which files define the current LightRAG pilot boundary and pilot corpus policy`
+- Historical baseline question:
+  - `Where the local LightRAG pilot boundary and pilot corpus are defined`
 - Expected canonical files:
   - `docs/context-policy.md`
-  - `docs/lightrag-local-pilot.md`
   - `docs/README.md`
+  - `.specify/memory/constitution.md`
   - `AGENTS.md`
 - Expected key facts:
   - `docs/context-policy.md` defines the pilot corpus boundary
-  - `docs/lightrag-local-pilot.md` defines stack and pilot interface
 
 ### Result
 
@@ -166,8 +197,8 @@ Score each dimension on a `0-2` scale.
   - `mix` correctly centered the answer on `docs/context-policy.md`
   - `global` named `docs/context-policy.md` but still claimed the boundary was
     not explicitly defined and invented a possible workflow file
-  - neither mode surfaced `docs/lightrag-local-pilot.md`, so the stack/setup
-    half of the question remains under-supported
+  - after the track split, the missing setup-doc half is no longer part of this
+    Track A row and is interpreted separately as `BQ3B`
 
 ### Scores
 
@@ -176,8 +207,41 @@ Score each dimension on a `0-2` scale.
 - `reference_fidelity`: `1`
 - `context_pack_usefulness`: `1`
 
+## BQ3B. Local pilot setup and stack definition
+
+- Track: `Track B`
+- Class: `policy-boundary`
+- Task type: `general`
+- Modes: `mix`, `global`
+- Canonical refined question:
+  - `Where is the local LightRAG pilot setup documented and what stack is fixed there`
+- Derived from the historical broader `BQ3` run on `2026-04-07`
+- Expected canonical files:
+  - `docs/lightrag-local-pilot.md`
+  - `docs/context-policy.md`
+- Expected key facts:
+  - `docs/lightrag-local-pilot.md` defines stack and pilot interface
+  - this row is outside the current indexed pilot target set
+
+### Result
+
+- Verdict: `PARTIAL`
+- Notes:
+  - the historical broader `BQ3` run under-supported the setup-doc half
+  - neither `mix` nor `global` surfaced `docs/lightrag-local-pilot.md`
+  - under the split-track benchmark, this is treated as a `Track B`
+    corpus-expansion signal rather than a pure current-pilot ranking defect
+
+### Scores
+
+- `answer_correctness`: `1`
+- `canonical_file_precision`: `0`
+- `reference_fidelity`: `0`
+- `context_pack_usefulness`: `1`
+
 ## BQ4. Mandatory versus retrieve-on-demand artifacts
 
+- Track: `Track A`
 - Class: `policy-boundary`
 - Task type: `product-code`
 - Modes: `hybrid`, `mix`
@@ -211,6 +275,7 @@ Score each dimension on a `0-2` scale.
 
 ## BQ5. Local memory mirror versus canonical memory
 
+- Track: `Track B`
 - Class: `policy-boundary`
 - Task type: `general`
 - Modes: `mix`, `local`
@@ -243,6 +308,7 @@ Score each dimension on a `0-2` scale.
 
 ## BQ6. Generic PR-loop contract
 
+- Track: `Track A`
 - Class: `workflow-pr-loop`
 - Task type: `review`
 - Modes: `hybrid`, `global`
@@ -275,6 +341,7 @@ Score each dimension on a `0-2` scale.
 
 ## BQ7. PR-loop completion conditions
 
+- Track: `Track A`
 - Class: `workflow-pr-loop`
 - Task type: `review`
 - Modes: `hybrid`, `mix`
@@ -306,6 +373,7 @@ Score each dimension on a `0-2` scale.
 
 ## BQ8. Retrieval MVP and precision follow-up ownership
 
+- Track: `Track B`
 - Class: `feature-memory-navigation`
 - Task type: `general`
 - Modes: `mix`, `global`
@@ -341,6 +409,7 @@ Score each dimension on a `0-2` scale.
 
 ## BQ9. Local pilot setup and stack
 
+- Track: `Track B`
 - Class: `architecture-system-location`
 - Task type: `general`
 - Modes: `mix`, `local`
@@ -371,6 +440,7 @@ Score each dimension on a `0-2` scale.
 
 ## BQ10. Current pilot implementation location
 
+- Track: `Track B`
 - Class: `architecture-system-location`
 - Task type: `product-code`
 - Modes: `hybrid`, `local`
@@ -402,13 +472,23 @@ Score each dimension on a `0-2` scale.
 
 ## Summary Template
 
+### By Track
+
+- `Track A`: `PARTIAL`
+  - `BQ1` and `BQ4` are strong current-pilot rows
+  - `BQ2`, `BQ3A`, `BQ6`, and `BQ7` remain usable but still show retrieval or
+    reference drift within the current corpus-plus-mandatory-doc contract
+- `Track B`: `FAIL`
+  - `BQ3B`, `BQ5`, `BQ8`, `BQ9`, and `BQ10` mostly expose corpus-target gaps
+    rather than a clean ranking-only baseline for the current pilot
+
 ### By Question Class
 
 - `taxonomy-read-order`: `PARTIAL`
   - BQ1 passes cleanly, but BQ2 still drifts from canonical read-order files
 - `policy-boundary`: `PARTIAL`
-  - BQ4 is strong and BQ3 is usable, but BQ5 fails on local-memory mirror
-    policy
+  - BQ3A and BQ4 are current-pilot-aligned, while BQ3B and BQ5 are Track B
+    expansion candidates
 - `workflow-pr-loop`: `PARTIAL`
   - answers are often semantically usable, but references prefer broad process
     docs over `docs/ai-pr-workflow.md`
@@ -438,6 +518,8 @@ Score each dimension on a `0-2` scale.
 
 - retrieval is much stronger on policy questions when `docs/context-policy.md`
   is already a favored canonical target
+- mixed benchmark rows were overstating current-pilot failures before the
+  `Track A` / `Track B` split clarified the corpus contract
 - feature-memory navigation across `specs/042`, `specs/044`, and `specs/045`
   fails almost completely because the current pilot corpus does not contain
   active feature-memory files
@@ -451,11 +533,11 @@ Score each dimension on a `0-2` scale.
 
 ### Ranked Follow-Up Gaps
 
-1. Corpus-boundary mismatch for benchmark classes that expect
+1. `Track B` corpus-boundary mismatch for benchmark rows that expect
    `docs/lightrag-local-pilot.md`, `docs/local-memory-sync.md`, active feature
    specs, or implementation files. The current pilot corpus is too narrow for
-   these questions.
-2. Retrieval still over-prefers broad process docs (`README_PROCESS_RU.md`,
+   these questions by design.
+2. `Track A` retrieval still over-prefers broad process docs (`README_PROCESS_RU.md`,
    `PROCESS_OVERVIEW_EN.md`, `DELIVERY_FLOW_RU.md`) when the question asks for a
    more specific canonical contract.
 3. `local` mode underperforms enough on this corpus that it should not be
@@ -464,9 +546,11 @@ Score each dimension on a `0-2` scale.
 ### Recommended Next Feature
 
 - `046-pilot-corpus-benchmark-alignment`
-  - first decide whether the benchmark should narrow to current-corpus-only
-    questions or the pilot corpus should expand to include the canonical files
-    now required by `045`
-  - rerank-provider work is not yet justified as the immediate next step,
-    because the dominant failures look corpus-boundary-driven rather than
-    ranking-only
+  - completed the benchmark-to-corpus alignment decision and selected the
+    split-track strategy
+- Immediate docs-only follow-up:
+  - refine `045` so `Track A` and `Track B` are explicit in the benchmark
+    contract
+- Later implementation path:
+  - open a separate corpus/indexing feature if the repository chooses to
+    support the broader Track B rows
