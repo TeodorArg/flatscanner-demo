@@ -16,6 +16,14 @@ evaluation framework, baseline coverage и scoring rubric, чтобы дальш
 принимать решения по ranking, rerank и другим retrieval improvements на данных,
 а не по ощущению.
 
+After the `046` alignment decision, the canonical `045` benchmark contract is
+split into two explicit tracks:
+
+- `Track A`: current-pilot rows that the small process-memory corpus plus
+  mandatory-doc policy are supposed to support now
+- `Track B`: broader expansion-candidate rows that remain useful, but should
+  not be interpreted as pure ranking-only failures on the current pilot
+
 ## Problem
 
 После `044` pilot уже лучше отвечает на конкретный frozen set вопросов, но у
@@ -127,10 +135,19 @@ Feature memory must define explicit question classes such as:
 Benchmark must define a frozen question set with:
 
 - question text
+- track assignment
 - task type
 - recommended query mode coverage
 - expected canonical files
 - expected answer shape or key facts
+
+Mixed rows must not remain ambiguous. The canonical `045` dataset therefore
+must:
+
+- keep every row labeled as either `Track A` or `Track B`
+- narrow `BQ2` to the current-pilot read-order scope
+- split `BQ3` into a `Track A` boundary/corpus-policy row and a `Track B`
+  setup/stack row
 
 ### FR3. Multi-dimensional scoring rubric defined
 
@@ -157,6 +174,7 @@ Context7-backed relevance for this requirement:
 Feature memory must define how baseline results are recorded, including:
 
 - per-question verdicts
+- per-track interpretation
 - per-dimension scores
 - summary by question class
 - summary by query mode
@@ -172,12 +190,13 @@ Benchmark results must map cleanly to possible next specs, including:
 
 ## Technical Requirements
 
-### TR1. Must build on `042` and `044`
+### TR1. Must build on `042`, `044`, and `046`
 
 The benchmark must explicitly reference:
 
 - `specs/042-repo-memory-platform-lightrag/evaluation.md`
 - `specs/044-lightrag-retrieval-precision/evaluation.md`
+- `specs/046-pilot-corpus-benchmark-alignment/evaluation.md`
 
 ### TR2. Reference capture must stay explicit
 
@@ -217,6 +236,12 @@ rather than a flat list of observations.
 The feature leaves a clear decision path for whether the next investment should
 be rerank, ranking, extraction, answer shaping, or some other retrieval change.
 
+### AC5. Track split is explicit
+
+The benchmark contract clearly distinguishes `Track A` current-pilot rows from
+`Track B` expansion candidates, so corpus-boundary gaps are not misread as
+current-pilot ranking defects.
+
 ## Validation
 
 Минимальная validation для этой фичи:
@@ -225,7 +250,8 @@ be rerank, ranking, extraction, answer shaping, or some other retrieval change.
 2. Freeze the scoring rubric and execution matrix.
 3. Run the broader benchmark baseline.
 4. Record per-question and per-dimension results.
-5. Produce a prioritized follow-up list tied to actual observed failures.
+5. Record `Track A` versus `Track B` interpretation explicitly.
+6. Produce a prioritized follow-up list tied to actual observed failures.
 
 ## References
 
@@ -233,3 +259,4 @@ be rerank, ranking, extraction, answer shaping, or some other retrieval change.
 - `specs/044-lightrag-retrieval-precision/spec.md`
 - `specs/044-lightrag-retrieval-precision/plan.md`
 - `specs/044-lightrag-retrieval-precision/evaluation.md`
+- `specs/046-pilot-corpus-benchmark-alignment/evaluation.md`

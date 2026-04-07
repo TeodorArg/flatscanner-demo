@@ -40,12 +40,20 @@
 - [x] Rank next retrieval-quality gaps by impact
 - [x] Recommend the next feature slice based on benchmark evidence
 
+## Phase 6. Post-046 Docs Refinement
+
+- [x] Reclassify the benchmark into explicit `Track A` and `Track B` rows
+- [x] Narrow `BQ2` to the current-pilot read-order scope
+- [x] Split `BQ3` into `BQ3A` current-pilot boundary coverage and `BQ3B` setup/stack expansion coverage
+- [x] Update `spec.md`, `plan.md`, and `evaluation.md` so track interpretation is explicit
+
 ## Completion Criteria
 
 - [x] The benchmark is broader than the `044` precision slice
 - [x] The rubric is reusable by another agent without hidden judgment
 - [x] Baseline results are recorded in canonical feature memory
 - [x] The feature ends with a ranked follow-up recommendation rather than only observations
+- [x] The benchmark contract explicitly distinguishes `Track A` current-pilot rows from `Track B` expansion candidates
 
 ## Execution Note
 
