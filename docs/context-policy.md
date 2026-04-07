@@ -3,6 +3,10 @@
 This document defines how repository context is assembled for planning,
 implementation, review, and future retrieval tooling.
 
+For the higher-level budget workflow and refresh triggers that connect canonical
+files, MCP memory, local mirror, and `LightRAG`, see
+`docs/context-economy-workflow.md`.
+
 ## Purpose
 
 The repository must not rely on retrieval alone to decide which governing
@@ -167,6 +171,30 @@ Benchmark justification for this expansion:
 
 The point of the pilot is still to avoid repo-wide indexing. Corpus growth must
 stay explicit, benchmark-justified, and minimal.
+
+## 4A. Rebuild Trigger Rule
+
+The pilot index should be rebuilt or refreshed only when indexed truth or
+indexing assumptions change.
+
+Typical rebuild or refresh triggers:
+
+- the corpus allowlist in this document changes
+- an indexed file listed above changes materially
+- chunking or metadata rules change
+- the embedding model changes
+- indexed pilot implementation files under the explicit `src/` or `tests/`
+  allowlist change materially
+
+Non-triggers:
+
+- updates to non-indexed files
+- MCP-only changes
+- local `in_memory/memory.jsonl` changes
+- doc wording changes outside the indexed corpus
+
+The broader workflow decision table for these triggers lives in
+`docs/context-economy-workflow.md`.
 
 ## 5. Metadata Expectations For Retrieval
 

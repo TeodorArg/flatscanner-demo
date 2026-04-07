@@ -3,6 +3,10 @@
 This document fixes the local stack and the executable interface for the first
 repository-memory `LightRAG` pilot.
 
+For the canonical decision table that says when `LightRAG` should be rebuilt
+versus when only MCP/local-memory sync is needed, see
+`docs/context-economy-workflow.md`.
+
 ## Purpose
 
 The first pilot must be locally reproducible, small in scope, and aligned with
@@ -46,6 +50,17 @@ No alternate provider matrix is part of the MVP.
 - If the embedding model changes, the pilot index must be rebuilt.
 - Retrieval results from different embedding models must not be compared as one
   continuous baseline.
+
+## Rebuild Boundary
+
+Rebuild or refresh validation is also required when:
+
+- the explicit pilot corpus allowlist changes
+- an indexed canonical file changes materially
+- chunking or metadata policy changes
+- indexed pilot implementation files change materially
+
+Rebuild is not required just because MCP memory or local `memory.jsonl` changed.
 
 ## Pilot Interface Decision
 

@@ -3,6 +3,10 @@
 This document defines the role of local `in_memory/memory.jsonl` and how it
 relates to MCP memory and canonical repository files.
 
+For the higher-level workflow that decides when MCP/local-memory sync happens
+relative to `LightRAG` refresh decisions and budgeted context assembly, see
+`docs/context-economy-workflow.md`.
+
 ## Purpose
 
 The repository already has canonical memory layers in files:
@@ -119,6 +123,7 @@ Typical triggers for evaluation:
 - a phase is marked complete in `specs/<feature-id>/tasks.md`
 - a new durable rule is fixed in `docs/`, `spec.md`, or `plan.md`
 - a canonical process or architecture decision is clarified
+- a durable benchmark or validation outcome should be preserved across sessions
 
 Non-triggers:
 
@@ -207,3 +212,6 @@ For this repository:
 - local parity is selective and repo-scoped, not exhaustive
 - durable checkpoint completion should prompt an explicit memory-sync decision,
   but not every file edit should create a memory update
+- `LightRAG` rebuild decisions are separate from MCP/local-memory sync decisions;
+  both are evaluated after canonical file updates, but they respond to
+  different triggers
