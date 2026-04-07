@@ -247,6 +247,76 @@ Use this sequence after a meaningful checkpoint:
 5. if yes, update MCP memory
 6. refresh local `in_memory/memory.jsonl` only if local parity remains useful
 
+## Checkpoint Helper
+
+The repository-local helper for this decision is:
+
+- `scripts/checkpoint_decision.py`
+
+This helper is read-only in v1.
+
+It does not:
+
+- rebuild `LightRAG`
+- write MCP memory
+- rewrite `in_memory/memory.jsonl`
+
+It only classifies the checkpoint and explains the reasoning.
+
+### When To Use It
+
+Use it after canonical doc/spec/task updates when you want a fast,
+repeatable classification of:
+
+- whether indexed `LightRAG` truth changed
+- whether durable repo-scoped facts changed
+- whether local parity is worth keeping
+
+It is most useful for daily checkpoints where the file set is already known or
+easy to discover from the current working tree.
+
+### How It Works
+
+The helper combines:
+
+- changed file paths supplied explicitly or discovered from `git diff`
+- the current indexed allowlist from `docs/context-policy.md`
+- durable-fact rules from this workflow and related canonical docs
+- local mirror inspection of `in_memory/memory.jsonl` for parity hints
+
+It then returns exactly one outcome:
+
+- `neither`
+- `lightrag_only`
+- `mcp_local_only`
+- `both`
+
+### Default Interpretation
+
+- `neither`: the change is outside the indexed corpus and does not create a new durable repo fact
+- `lightrag_only`: indexed truth changed, but no durable repo-scoped fact should be synced
+- `mcp_local_only`: durable repo-scoped fact changed, but indexed truth did not
+- `both`: indexed truth changed and durable repo-scoped fact changed
+
+### Example Commands
+
+Use explicit paths for deterministic checks:
+
+```bash
+python scripts/checkpoint_decision.py decide \
+  --path docs/context-policy.md
+```
+
+Use the current working-tree diff:
+
+```bash
+python scripts/checkpoint_decision.py decide --git-diff
+```
+
+If the checkpoint is wording-only or otherwise ambiguous, the helper may still
+need explicit operator judgment. In that case, use the narrow override flags
+instead of treating the path-based heuristic as canonical truth.
+
 ## Checkpoint Checklist
 
 Run this checklist after any durable doc/spec/task checkpoint.

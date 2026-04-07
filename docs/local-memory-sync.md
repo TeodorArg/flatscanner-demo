@@ -108,6 +108,11 @@ After each completed phase checkpoint or durable decision checkpoint, the
 orchestrator should explicitly evaluate whether new repo-scoped durable facts
 were added to canonical files.
 
+For a read-only pre-sync classification step that also distinguishes
+`LightRAG` rebuild triggers from MCP/local-memory triggers, use
+`scripts/checkpoint_decision.py` as described in
+`docs/context-economy-workflow.md`.
+
 If yes:
 
 1. add the durable fact to MCP memory when it is likely to help future

@@ -22,12 +22,20 @@ model.
 2. Work from an active `specs/<feature-id>/` folder.
 3. The implementation agent works on a feature branch, either manually or
    through local worker orchestration.
-4. The PR updates `tasks.md`, tests, and any required durable docs.
-5. GitHub runs required checks and `AI Review`.
-6. The selected reviewer posts or updates one sticky comment marked
+4. After canonical doc/spec/task updates, run
+   `python scripts/checkpoint_decision.py decide --git-diff` before finalizing
+   commit or PR state.
+5. Apply the checkpoint outcome:
+   - run `LightRAG` refresh/rebuild validation when the outcome is
+     `lightrag_only` or `both`
+   - update MCP memory when the outcome is `mcp_local_only` or `both`
+   - refresh local `in_memory/memory.jsonl` only when local parity is useful
+6. The PR updates `tasks.md`, tests, and any required durable docs.
+7. GitHub runs required checks and `AI Review`.
+8. The selected reviewer posts or updates one sticky comment marked
    `<!-- ai-review -->`.
-7. If follow-up is needed, continue on the same branch.
-8. A human merges only after required checks are green and approval is present.
+9. If follow-up is needed, continue on the same branch.
+10. A human merges only after required checks are green and approval is present.
 
 ## Hard Gate
 

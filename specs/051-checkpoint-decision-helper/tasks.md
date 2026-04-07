@@ -16,25 +16,37 @@
 
 ## Phase 2. Open Implementation Loop
 
-- [ ] Open an isolated implementation worktree/branch/PR for `051`
-- [ ] Implement the read-only helper command
-- [ ] Keep the helper write-free in v1
+- [x] Open an isolated implementation worktree/branch/PR for `051`
+- [x] Implement the read-only helper command
+- [x] Keep the helper write-free in v1
 
 ## Phase 3. Validation
 
-- [ ] Add automated tests for the scenario matrix
-- [ ] Validate `neither`
-- [ ] Validate `lightrag_only`
-- [ ] Validate `mcp_local_only`
-- [ ] Validate `both`
+- [x] Add automated tests for the scenario matrix
+- [x] Validate `neither`
+- [x] Validate `lightrag_only`
+- [x] Validate `mcp_local_only`
+- [x] Validate `both`
+- [x] Run `python scripts/checkpoint_decision.py decide --git-diff`
+- [x] Record the current branch checkpoint outcome before commit/PR finalization
+- [x] Explicitly defer checkpoint apply work to `052-checkpoint-apply-pipeline`
+- [x] Confirm that `LightRAG`/MCP/local-memory apply actions remain out of scope for this read-only helper feature
 
 ## Completion Criteria
 
-- [ ] The helper returns one stable decision per scenario
-- [ ] The helper explains why the decision was chosen
-- [ ] The helper performs no rebuild or sync writes in v1
+- [x] The helper returns one stable decision per scenario
+- [x] The helper explains why the decision was chosen
+- [x] The helper performs no rebuild or sync writes in v1
 - [ ] The implementation lands only through the standard isolated worktree/PR loop
 
 ## Execution Note
 
-- [ ] Product-code and runtime changes for this helper must not be implemented in the main checkout
+- [x] Product-code and runtime changes for this helper must not be implemented in the main checkout
+
+Current branch checkpoint outcome before commit/PR finalization:
+
+- `both`
+
+For this feature, the outcome is recorded but not applied. Downstream
+`LightRAG`, MCP memory, and local mirror apply work is intentionally deferred
+to `052-checkpoint-apply-pipeline`.
