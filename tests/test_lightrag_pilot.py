@@ -13,6 +13,7 @@ from src.repo_memory.lightrag_pilot import (
     doc_class_for_path,
     extract_reference_paths,
     format_feature_ownership_answer,
+    format_pilot_boundary_answer,
     format_setup_answer,
     format_taxonomy_answer,
     format_policy_answer,
@@ -293,6 +294,16 @@ def test_format_setup_answer_lists_canonical_docs_and_stack():
     assert "generic README" in result
 
 
+def test_format_pilot_boundary_answer_lists_context_policy_first():
+    result = format_pilot_boundary_answer()
+
+    assert result.startswith("The current LightRAG pilot boundary and pilot corpus policy are defined by:")
+    assert "- `docs/context-policy.md`" in result
+    assert "- `.specify/memory/constitution.md`" in result
+    assert "- `AGENTS.md`" in result
+    assert "primary policy source" in result
+
+
 def test_format_feature_ownership_answer_lists_expected_files():
     result = format_feature_ownership_answer()
 
@@ -396,6 +407,10 @@ async def test_build_context_pack_biases_q4_toward_context_policy():
 
     assert pack.mode == "mix"
     assert [document.path for document in pack.retrieved_documents] == ["docs/context-policy.md"]
+    assert isinstance(pack.raw_retrieval_result, str)
+    assert pack.raw_retrieval_result.startswith(
+        "The current LightRAG pilot boundary and pilot corpus policy are defined by:"
+    )
 
 
 @pytest.mark.asyncio
@@ -462,6 +477,21 @@ def test_shape_raw_retrieval_result_rewrites_setup_question_to_file_first_answer
     assert result.startswith("The local LightRAG pilot setup is defined by:")
     assert "`docs/lightrag-local-pilot.md`" in result
     assert "`docs/context-policy.md`" in result
+
+
+def test_shape_raw_retrieval_result_rewrites_pilot_boundary_question_to_file_first_answer():
+    result = shape_raw_retrieval_result(
+        "The boundary is probably described across several docs.",
+        question="Which files define the current LightRAG pilot boundary and pilot corpus policy",
+        task_type="general",
+        mandatory_paths=sorted(MANDATORY_DOCS),
+        retrieved_paths=["README_PROCESS_RU.md", "docs/lightrag-local-pilot.md"],
+    )
+
+    assert isinstance(result, str)
+    assert result.startswith("The current LightRAG pilot boundary and pilot corpus policy are defined by:")
+    assert "`docs/context-policy.md`" in result
+    assert "setup docs or broader process overviews" in result
 
 
 def test_shape_raw_retrieval_result_rewrites_feature_ownership_to_file_first_answer():
