@@ -11,9 +11,12 @@ from src.repo_memory.lightrag_pilot import (
     corpus_paths,
     doc_class_for_path,
     extract_reference_paths,
+    format_taxonomy_answer,
+    format_policy_answer,
     mandatory_doc_paths,
     policy_bias_paths,
     retrieval_user_prompt,
+    shape_raw_retrieval_result,
 )
 
 
@@ -133,6 +136,63 @@ def test_policy_bias_paths_prioritize_context_policy_for_policy_questions():
     )[:2] == ["docs/context-policy.md", ".specify/memory/constitution.md"]
 
 
+def test_shape_raw_retrieval_result_rewrites_q5_to_file_first_answer():
+    result = shape_raw_retrieval_result(
+        "Mandatory docs are different from retrieve-on-demand docs.",
+        question="which artifacts are mandatory versus retrieve-on-demand for product-code work",
+        task_type="product-code",
+        mandatory_paths=[
+            ".specify/memory/constitution.md",
+            "AGENTS.md",
+            "docs/README.md",
+            "docs/ai-pr-workflow.md",
+        ],
+        retrieved_paths=["docs/context-policy.md"],
+    )
+
+    assert isinstance(result, str)
+    assert result.startswith("Mandatory files for `product-code` work are:")
+    assert "`docs/context-policy.md`" in result
+    assert "higher-level category summaries" in result
+
+
+def test_format_policy_answer_lists_mandatory_and_retrieved_files():
+    result = format_policy_answer(
+        task_type="product-code",
+        mandatory_paths=["AGENTS.md", "docs/ai-pr-workflow.md"],
+        retrieved_paths=["docs/context-policy.md"],
+    )
+
+    assert "- `AGENTS.md`" in result
+    assert "- `docs/ai-pr-workflow.md`" in result
+    assert "- `docs/context-policy.md`" in result
+
+
+def test_format_taxonomy_answer_lists_frozen_canonical_files():
+    result = format_taxonomy_answer()
+
+    assert result.startswith("The canonical files that define the repository memory taxonomy are:")
+    assert "- `.specify/memory/constitution.md`" in result
+    assert "- `AGENTS.md`" in result
+    assert "- `docs/README.md`" in result
+    assert "- `docs/project-idea.md`" in result
+
+
+def test_shape_raw_retrieval_result_rewrites_q3_to_taxonomy_file_list():
+    result = shape_raw_retrieval_result(
+        "The taxonomy is described in some docs.",
+        question="which files define the repository memory taxonomy",
+        task_type="general",
+        mandatory_paths=sorted(MANDATORY_DOCS),
+        retrieved_paths=["docs/project-idea.md"],
+    )
+
+    assert isinstance(result, str)
+    assert result.startswith("The canonical files that define the repository memory taxonomy are:")
+    assert "`docs/project-idea.md`" in result
+    assert "invented file names" in result
+
+
 @pytest.mark.asyncio
 async def test_build_context_pack_injects_mandatory_docs_when_retrieval_has_no_references():
     root = Path(__file__).resolve().parents[1]
@@ -234,3 +294,29 @@ async def test_build_context_pack_biases_q5_toward_context_policy():
     assert "docs/ai-pr-workflow.md" in mandatory_paths
     assert "specs/044-lightrag-retrieval-precision/spec.md" in mandatory_paths
     assert [document.path for document in pack.retrieved_documents] == ["docs/context-policy.md"]
+    assert isinstance(pack.raw_retrieval_result, str)
+    assert pack.raw_retrieval_result.startswith("Mandatory files for `product-code` work are:")
+    assert "`docs/context-policy.md`" in pack.raw_retrieval_result
+
+
+@pytest.mark.asyncio
+async def test_build_context_pack_shapes_q3_to_frozen_taxonomy_file_list():
+    root = Path(__file__).resolve().parents[1]
+
+    async def fake_runner(_root: Path, _question: str, mode: str, include_references: bool) -> str:
+        assert mode == "mix"
+        assert include_references is True
+        return "The taxonomy seems to be described in docs/memory.md."
+
+    pack = await build_context_pack(
+        root,
+        "which files define the repository memory taxonomy",
+        mode="mix",
+        task_type="general",
+        query_runner=fake_runner,
+    )
+
+    assert isinstance(pack.raw_retrieval_result, str)
+    assert pack.raw_retrieval_result.startswith("The canonical files that define the repository memory taxonomy are:")
+    assert "`docs/project-idea.md`" in pack.raw_retrieval_result
+    assert "docs/memory.md" not in pack.raw_retrieval_result

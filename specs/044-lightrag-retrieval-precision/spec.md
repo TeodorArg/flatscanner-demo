@@ -198,15 +198,18 @@ Warning-only rerank state больше не остается неявным base
 
 Current implementation coverage added in this feature:
 
-- automated regression coverage for Q4/Q5-style policy-bias behavior in
+- automated regression coverage for Q3/Q4/Q5-style policy-bias behavior in
   `tests/test_lightrag_pilot.py`
 - automated coverage for explicit no-rerank query-param construction
 - automated coverage for structured canonical path extraction and normalization
+- automated coverage for deterministic taxonomy-answer shaping against the
+  frozen canonical file set
 
-Manual follow-up still required:
+Manual follow-up completed in this feature:
 
-- rerun the before/after evaluation set in `hybrid` and `mix`
-- record comparison results versus the `042` baseline
+- reran the before/after evaluation set in `hybrid` and `mix`
+- recorded comparison results versus the `042` baseline in
+  `specs/044-lightrag-retrieval-precision/evaluation.md`
 
 ## References
 
