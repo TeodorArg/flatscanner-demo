@@ -58,6 +58,37 @@ Selection rule:
 - prefer explicit allowlist entries over broad directory-wide inclusion when
   possible
 
+Frozen allowlist for implementation:
+
+- `docs/context-policy.md`
+- `docs/lightrag-local-pilot.md`
+- `docs/local-memory-sync.md`
+- `specs/042-repo-memory-platform-lightrag/spec.md`
+- `specs/042-repo-memory-platform-lightrag/plan.md`
+- `specs/042-repo-memory-platform-lightrag/evaluation.md`
+- `specs/044-lightrag-retrieval-precision/spec.md`
+- `specs/044-lightrag-retrieval-precision/evaluation.md`
+- `specs/045-retrieval-quality-benchmark/spec.md`
+- `src/repo_memory/lightrag_pilot.py`
+- `tests/test_lightrag_pilot.py`
+
+Row mapping for this allowlist:
+
+- `BQ3B`: `docs/lightrag-local-pilot.md`, `docs/context-policy.md`
+- `BQ5`: `docs/local-memory-sync.md`, `docs/context-policy.md`
+- `BQ8`: selected `specs/042`, `specs/044`, `specs/045` files
+- `BQ9`: `docs/lightrag-local-pilot.md`, `docs/context-policy.md`
+- `BQ10`: `src/repo_memory/lightrag_pilot.py`, `tests/test_lightrag_pilot.py`,
+  `docs/lightrag-local-pilot.md`, `specs/042-repo-memory-platform-lightrag/plan.md`
+
+Explicit exclusions kept outside the pilot:
+
+- all other `src/` and `tests/` files
+- all other `specs/*` files
+- `docs/ai-pr-workflow.md`
+- backend/frontend stack docs
+- ADRs and vendor-specific examples
+
 ### Phase 2. Canonical policy sync
 
 Update the durable docs that define corpus expectations.

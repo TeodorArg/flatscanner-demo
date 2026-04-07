@@ -11,6 +11,15 @@ the repository context policy.
 This phase does not introduce a production service. It defines the minimum
 local setup needed to validate indexing and retrieval on the pilot corpus.
 
+Current corpus note:
+
+- the pilot corpus is no longer process-only
+- the active baseline uses the explicit allowlist defined in
+  `docs/context-policy.md`
+- that allowlist now includes a minimal `Track B` expansion for local setup,
+  local-memory mirror policy, selected feature-memory ownership files, and the
+  current pilot implementation module/tests
+
 ## Locked Local Stack
 
 The Phase 4 pilot stack is fixed to:
@@ -54,6 +63,10 @@ Use a script-first pilot that:
 The current canonical script entrypoint is:
 
 - `scripts/lightrag_pilot.py`
+
+The script implementation must resolve the same explicit allowlist that is
+documented in `docs/context-policy.md`; runtime behavior must not silently
+expand beyond that policy.
 
 ### Why Script-First
 
@@ -174,6 +187,8 @@ Minimal readiness checks should confirm:
 - the Python environment can import `lightrag`
 - the repository script can print the resolved pilot corpus and working
   directory before indexing
+- the resolved corpus matches the explicit allowlist documented in
+  `docs/context-policy.md`
 
 Recommended environment sync for the pilot:
 

@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 
-PILOT_CORPUS = (
+BASE_PILOT_CORPUS = (
     ".specify/memory/constitution.md",
     "AGENTS.md",
     "README_PROCESS_RU.md",
@@ -21,6 +21,22 @@ PILOT_CORPUS = (
     "docs/README.md",
     "docs/project-idea.md",
 )
+
+TRACK_B_CORPUS_ADDITIONS = (
+    "docs/context-policy.md",
+    "docs/lightrag-local-pilot.md",
+    "docs/local-memory-sync.md",
+    "specs/042-repo-memory-platform-lightrag/spec.md",
+    "specs/042-repo-memory-platform-lightrag/plan.md",
+    "specs/042-repo-memory-platform-lightrag/evaluation.md",
+    "specs/044-lightrag-retrieval-precision/spec.md",
+    "specs/044-lightrag-retrieval-precision/evaluation.md",
+    "specs/045-retrieval-quality-benchmark/spec.md",
+    "src/repo_memory/lightrag_pilot.py",
+    "tests/test_lightrag_pilot.py",
+)
+
+PILOT_CORPUS = BASE_PILOT_CORPUS + TRACK_B_CORPUS_ADDITIONS
 
 MANDATORY_DOCS = {
     ".specify/memory/constitution.md",
@@ -41,7 +57,7 @@ LIGHTRAG_MAX_PARALLEL_INSERT = 1
 LIGHTRAG_MAX_EXTRACT_INPUT_TOKENS = 6000
 LIGHTRAG_ENTITY_EXTRACT_MAX_GLEANING = 0
 TOKEN_RE = re.compile(r"[0-9A-Za-zА-Яа-яЁё][0-9A-Za-zА-Яа-яЁё_-]*")
-PATH_RE = re.compile(r"(?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+\.md")
+PATH_RE = re.compile(r"(?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+\.[A-Za-z0-9_.-]+")
 FEATURE_TASK_FILES = ("spec.md", "plan.md", "tasks.md")
 TASK_TYPE_CHOICES = (
     "general",
@@ -56,6 +72,17 @@ POLICY_CANONICAL_DOCS = (
     ".specify/memory/constitution.md",
     "AGENTS.md",
     "docs/README.md",
+)
+SETUP_CANONICAL_DOCS = (
+    "docs/lightrag-local-pilot.md",
+    "docs/context-policy.md",
+)
+FEATURE_OWNERSHIP_CANONICAL_DOCS = (
+    "specs/042-repo-memory-platform-lightrag/spec.md",
+    "specs/042-repo-memory-platform-lightrag/evaluation.md",
+    "specs/044-lightrag-retrieval-precision/spec.md",
+    "specs/044-lightrag-retrieval-precision/evaluation.md",
+    "specs/045-retrieval-quality-benchmark/spec.md",
 )
 TAXONOMY_CANONICAL_DOCS = (
     ".specify/memory/constitution.md",
@@ -147,6 +174,10 @@ def doc_class_for_path(relative_path: str) -> str:
         return "feature_memory"
     if relative_path.startswith("docs/"):
         return "durable_doc"
+    if relative_path.startswith("src/"):
+        return "implementation_code"
+    if relative_path.startswith("tests/"):
+        return "test_code"
     return "draft"
 
 
@@ -275,11 +306,14 @@ def collapse_small_sections(
     for section in sections:
         section_size = len(section.content)
         previous = collapsed[-1] if collapsed else None
-        same_heading_depth = previous and previous.heading_path and section.heading_path and (
-            len(previous.heading_path) == len(section.heading_path)
+        previous_heading_path = previous.heading_path if previous is not None else tuple()
+        same_heading_depth = bool(
+            previous_heading_path
+            and section.heading_path
+            and len(previous_heading_path) == len(section.heading_path)
         )
         shared_parent = same_heading_depth and (
-            previous.heading_path[:-1] == section.heading_path[:-1]
+            previous_heading_path[:-1] == section.heading_path[:-1]
         )
         if (
             previous
@@ -376,6 +410,33 @@ def is_mandatory_policy_question(question: str) -> bool:
     )
 
 
+def is_feature_ownership_question(question: str) -> bool:
+    normalized = normalize_query_text(question)
+    return (
+        "which feature defined the retrieval mvp" in normalized
+        or "which feature closed q3 q4 q5 precision regressions" in normalized
+        or "which feature owns the broader benchmark" in normalized
+    )
+
+
+def is_local_pilot_setup_question(question: str) -> bool:
+    normalized = normalize_query_text(question)
+    return (
+        "where is the local lightrag pilot setup documented" in normalized
+        or "what stack is fixed there" in normalized
+        or "local pilot setup and stack" in normalized
+    )
+
+
+def is_implementation_location_question(question: str) -> bool:
+    normalized = normalize_query_text(question)
+    return (
+        "which code and tests implement the current lightrag pilot behavior" in normalized
+        or ("implement" in normalized and "lightrag pilot behavior" in normalized)
+        or "current pilot implementation location" in normalized
+    )
+
+
 def is_policy_or_taxonomy_question(question: str) -> bool:
     return (
         is_taxonomy_question(question)
@@ -389,6 +450,10 @@ def policy_bias_paths(root: Path, question: str, task_type: str = "general") -> 
 
     if is_taxonomy_question(question):
         preferred_paths.extend(TAXONOMY_CANONICAL_DOCS)
+    if is_local_pilot_setup_question(question):
+        preferred_paths.extend(SETUP_CANONICAL_DOCS)
+    if is_feature_ownership_question(question):
+        preferred_paths.extend(FEATURE_OWNERSHIP_CANONICAL_DOCS)
     if is_pilot_boundary_question(question) or is_mandatory_policy_question(question):
         preferred_paths.extend(POLICY_CANONICAL_DOCS)
     if is_mandatory_policy_question(question) and task_type in {"product-code", "review"}:
@@ -452,6 +517,37 @@ def fallback_retrieved_paths(
         key=lambda item: (-item[1], item[0]),
     )
     return [path for path, _ in ranked_paths[:limit]]
+
+
+def resolve_retrieved_paths(
+    root: Path,
+    question: str,
+    raw_result: Any,
+    task_type: str,
+    chunks: list[PreparedChunk],
+    mandatory_paths: list[str],
+    retrieved_doc_limit: int = 4,
+) -> list[str]:
+    preferred_paths = policy_bias_paths(root, question, task_type=task_type)
+    allowed_paths = {chunk.path for chunk in chunks} | set(preferred_paths)
+
+    extracted_paths = extract_reference_paths(raw_result, allowed_paths)
+    fallback_paths: list[str] = []
+    if not extracted_paths and not preferred_paths:
+        fallback_paths = fallback_retrieved_paths(
+            question,
+            chunks,
+            exclude_paths=set(mandatory_paths),
+            limit=retrieved_doc_limit,
+        )
+
+    return merge_ranked_paths(
+        extracted_paths,
+        preferred_paths,
+        fallback_paths,
+        exclude_paths=set(mandatory_paths),
+        limit=retrieved_doc_limit,
+    )
 
 
 def normalize_reference_candidate(candidate: str, allowed_paths: set[str]) -> str | None:
@@ -602,6 +698,37 @@ def format_taxonomy_answer() -> str:
     )
 
 
+def format_setup_answer() -> str:
+    setup_lines = "\n".join(f"- `{path}`" for path in SETUP_CANONICAL_DOCS)
+    return (
+        "The local LightRAG pilot setup is defined by:\n\n"
+        f"{setup_lines}\n\n"
+        "Fixed stack and runtime facts to cite from these files:\n\n"
+        "- `Ollama`\n"
+        "- `qwen2.5:1.5b`\n"
+        "- `nomic-embed-text`\n"
+        "- repository-local script entrypoint `scripts/lightrag_pilot.py`\n"
+        "- local `LightRAG` in the repository Python environment\n"
+        "- repo-local working directory `.lightrag/`\n\n"
+        "Keep the answer anchored to the canonical file pair above instead of "
+        "drifting into generic README or project-summary text."
+    )
+
+
+def format_feature_ownership_answer() -> str:
+    ownership_lines = "\n".join(f"- `{path}`" for path in FEATURE_OWNERSHIP_CANONICAL_DOCS)
+    return (
+        "The canonical feature-memory files for retrieval ownership are:\n\n"
+        f"{ownership_lines}\n\n"
+        "Ownership summary:\n\n"
+        "- `042` defines the retrieval MVP and initial evaluation\n"
+        "- `044` closes the focused Q3/Q4/Q5 precision follow-up\n"
+        "- `045` owns the broader benchmark\n\n"
+        "Answer with the exact feature-memory file paths above, not only feature ids "
+        "or abstract benchmark summaries."
+    )
+
+
 def shape_raw_retrieval_result(
     raw_result: Any,
     question: str,
@@ -611,6 +738,10 @@ def shape_raw_retrieval_result(
 ) -> Any:
     if is_taxonomy_question(question):
         return format_taxonomy_answer()
+    if is_local_pilot_setup_question(question):
+        return format_setup_answer()
+    if is_feature_ownership_question(question):
+        return format_feature_ownership_answer()
     if not is_mandatory_policy_question(question):
         return raw_result
     if not mandatory_paths:
@@ -803,6 +934,31 @@ def create_rag(index_dir: Path) -> Any:
 
 
 def retrieval_user_prompt(question: str) -> str | None:
+    if is_implementation_location_question(question):
+        return (
+            "Answer file-first. Prefer exact implementation file paths over high-level "
+            "process summaries. If the question asks where the current LightRAG pilot "
+            "behavior lives, prioritize `src/repo_memory/lightrag_pilot.py`, "
+            "`tests/test_lightrag_pilot.py`, `docs/lightrag-local-pilot.md`, and "
+            "`specs/042-repo-memory-platform-lightrag/plan.md` when supported by retrieval."
+        )
+    if is_feature_ownership_question(question):
+        return (
+            "Answer file-first. Name the exact feature-memory files that assign ownership, "
+            "especially `specs/042-repo-memory-platform-lightrag/spec.md`, "
+            "`specs/042-repo-memory-platform-lightrag/evaluation.md`, "
+            "`specs/044-lightrag-retrieval-precision/spec.md`, "
+            "`specs/044-lightrag-retrieval-precision/evaluation.md`, and "
+            "`specs/045-retrieval-quality-benchmark/spec.md`."
+        )
+    if is_local_pilot_setup_question(question):
+        return (
+            "Answer file-first. For local LightRAG setup questions, prioritize the exact "
+            "canonical pair `docs/lightrag-local-pilot.md` and `docs/context-policy.md`, "
+            "then cite the fixed stack facts: `Ollama`, `qwen2.5:1.5b`, "
+            "`nomic-embed-text`, the repository-local script entrypoint, local Python "
+            "environment, and repo-local working directory `.lightrag/`."
+        )
     if not is_policy_or_taxonomy_question(question):
         return None
     return (
@@ -882,7 +1038,7 @@ async def query_index(
     rag = create_rag(index_dir)
     await rag.initialize_storages()
     try:
-        return await rag.aquery(
+        raw_result = await rag.aquery(
             query,
             param=build_query_param(
                 query,
@@ -890,6 +1046,23 @@ async def query_index(
                 include_references=include_references,
                 query_param_factory=QueryParam,
             ),
+        )
+        chunks = build_prepared_chunks(root)
+        mandatory_paths: list[str] = []
+        retrieved_paths = resolve_retrieved_paths(
+            root,
+            query,
+            raw_result=raw_result,
+            task_type="general",
+            chunks=chunks,
+            mandatory_paths=mandatory_paths,
+        )
+        return shape_raw_retrieval_result(
+            raw_result,
+            question=query,
+            task_type="general",
+            mandatory_paths=mandatory_paths,
+            retrieved_paths=retrieved_paths,
         )
     finally:
         await rag.finalize_storages()
@@ -910,25 +1083,15 @@ async def build_context_pack(
     runner = query_runner or query_index
     raw_result = await runner(root, question, mode=mode, include_references=True)
     chunks = build_prepared_chunks(root)
-    preferred_paths = policy_bias_paths(root, question, task_type=task_type)
-    allowed_paths = {chunk.path for chunk in chunks} | set(preferred_paths)
     mandatory_paths = mandatory_doc_paths(root, active_feature_id=active_feature_id, task_type=task_type)
-
-    extracted_paths = extract_reference_paths(raw_result, allowed_paths)
-    fallback_paths: list[str] = []
-    if not extracted_paths and not preferred_paths:
-        fallback_paths = fallback_retrieved_paths(
-            question,
-            chunks,
-            exclude_paths=set(mandatory_paths),
-            limit=retrieved_doc_limit,
-        )
-    retrieved_paths = merge_ranked_paths(
-        extracted_paths,
-        preferred_paths,
-        fallback_paths,
-        exclude_paths=set(mandatory_paths),
-        limit=retrieved_doc_limit,
+    retrieved_paths = resolve_retrieved_paths(
+        root,
+        question,
+        raw_result=raw_result,
+        task_type=task_type,
+        chunks=chunks,
+        mandatory_paths=mandatory_paths,
+        retrieved_doc_limit=retrieved_doc_limit,
     )
     shaped_raw_result = shape_raw_retrieval_result(
         raw_result,

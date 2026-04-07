@@ -78,6 +78,30 @@ Target `Track B` coverage for this feature:
 The exact final inclusion set must stay minimal and justified by benchmark
 coverage, not by a broad "index more docs" impulse.
 
+Frozen minimal allowlist for this feature:
+
+- `docs/context-policy.md`
+- `docs/lightrag-local-pilot.md`
+- `docs/local-memory-sync.md`
+- `specs/042-repo-memory-platform-lightrag/spec.md`
+- `specs/042-repo-memory-platform-lightrag/plan.md`
+- `specs/042-repo-memory-platform-lightrag/evaluation.md`
+- `specs/044-lightrag-retrieval-precision/spec.md`
+- `specs/044-lightrag-retrieval-precision/evaluation.md`
+- `specs/045-retrieval-quality-benchmark/spec.md`
+- `src/repo_memory/lightrag_pilot.py`
+- `tests/test_lightrag_pilot.py`
+
+Explicit nearby exclusions that remain out of corpus:
+
+- all other `src/` files
+- all other `tests/` files
+- all unrelated `specs/*` files
+- `docs/ai-pr-workflow.md`
+- `docs/project/backend/backend-docs.md`
+- `docs/project/frontend/frontend-docs.md`
+- `docs/adr/*.md`
+
 ## Out Of Scope
 
 Вне scope:

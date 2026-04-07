@@ -102,9 +102,16 @@ If a retrieved document conflicts with a mandatory doc, the mandatory doc wins.
 
 ## 4. Pilot Corpus Policy
 
-The initial `LightRAG` pilot must index only a small process-memory corpus.
+The current `LightRAG` pilot baseline uses a small explicit allowlist.
+
+It still prioritizes process-memory retrieval, but it now carries the minimal
+`Track B` expansion required to benchmark local pilot setup, local-memory
+mirror policy, selected feature ownership history, and current implementation
+location.
 
 ### Included In Pilot Corpus
+
+Core process-memory set:
 
 - `.specify/memory/constitution.md`
 - `AGENTS.md`
@@ -114,21 +121,44 @@ The initial `LightRAG` pilot must index only a small process-memory corpus.
 - `docs/README.md`
 - `docs/project-idea.md`
 
+Minimal `Track B` expansion set:
+
+- `docs/context-policy.md`
+- `docs/lightrag-local-pilot.md`
+- `docs/local-memory-sync.md`
+- `specs/042-repo-memory-platform-lightrag/spec.md`
+- `specs/042-repo-memory-platform-lightrag/plan.md`
+- `specs/042-repo-memory-platform-lightrag/evaluation.md`
+- `specs/044-lightrag-retrieval-precision/spec.md`
+- `specs/044-lightrag-retrieval-precision/evaluation.md`
+- `specs/045-retrieval-quality-benchmark/spec.md`
+- `src/repo_memory/lightrag_pilot.py`
+- `tests/test_lightrag_pilot.py`
+
+Benchmark justification for this expansion:
+
+- `BQ3B` and `BQ9`: `docs/lightrag-local-pilot.md` plus `docs/context-policy.md`
+- `BQ5`: `docs/local-memory-sync.md` plus `docs/context-policy.md`
+- `BQ8`: selected `specs/042`, `specs/044`, and `specs/045` files
+- `BQ10`: current pilot implementation module and tests, with supporting canon
+  from `docs/lightrag-local-pilot.md` and `specs/042-repo-memory-platform-lightrag/plan.md`
+
 ### Explicitly Excluded From Pilot Corpus
 
-- `src/`
-- `tests/`
+- all other `src/` files outside the explicit allowlist above
+- all other `tests/` files outside the explicit allowlist above
 - runtime setup files
 - `docs/project/backend/backend-docs.md`
 - `docs/project/frontend/frontend-docs.md`
 - `docs/adr/*.md`
+- `docs/ai-pr-workflow.md`
 - vendor-specific example docs such as Claude-specific playbooks
 - root-level drafts such as `LIGHTRAG_MIGRATION_PLAN_RU.md`
 - legacy domain-specific `flatscanner` specs or docs
+- unrelated active or historical feature folders outside the explicit allowlist
 
-The point of the pilot is to validate process-memory retrieval first, not to
-index the whole repository while still keeping the product-framing layer in the
-initial retrieval set.
+The point of the pilot is still to avoid repo-wide indexing. Corpus growth must
+stay explicit, benchmark-justified, and minimal.
 
 ## 5. Metadata Expectations For Retrieval
 
@@ -154,6 +184,6 @@ Language is metadata, not a reason to drop a chunk from the pilot corpus.
 
 - Mandatory context is explicit and file-based.
 - Retrieved context is additive and subordinate to mandatory docs.
-- The pilot corpus is intentionally small and process-only.
+- The pilot corpus is intentionally small, explicit, and benchmark-scoped.
 - Legacy `flatscanner` artifacts are excluded from the pilot until later cleanup
   phases.
