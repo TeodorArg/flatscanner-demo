@@ -40,17 +40,33 @@
 ## Phase 6. Regression Validation
 
 - [x] Add regression tests for Q3/Q4/Q5-style questions
-- [ ] Re-run evaluation set in `hybrid`
-- [ ] Re-run evaluation set in `mix`
-- [ ] Record before/after comparison versus `042`
+- [x] Re-run evaluation set in `hybrid`
+- [x] Re-run evaluation set in `mix`
+- [x] Record before/after comparison versus `042`
 
 ## Completion Criteria
 
-- [ ] Policy/taxonomy queries return canonical files more consistently
-- [ ] `retrieved_documents` better matches raw answer
-- [ ] Q4 and Q5 no longer show the same visible drift as `042`
-- [ ] Rerank behavior is explicit and no longer left in warning-only baseline
+- [x] Policy/taxonomy queries return canonical files more consistently
+- [x] `retrieved_documents` better matches raw answer
+- [x] Q4 and Q5 no longer show the same visible drift as `042`
+- [x] Rerank behavior is explicit and no longer left in warning-only baseline
 
 ## Execution Note
 
 - [x] Create an isolated `044` implementation worktree/branch/PR loop before editing `src/` or `tests/`
+
+## Focused Follow-Up
+
+### Follow-Up 1. Q5 Policy-Answer Shaping
+
+- [x] Tighten raw-answer shaping for Q5 so canonical files are named before category summaries
+- [x] Re-run Q5 in `hybrid`
+- [x] Re-run Q5 in `mix`
+- [x] Record whether Q5 can be marked closed against the `042` baseline
+
+### Follow-Up 2. Q3 Taxonomy-File Precision
+
+- [x] Tighten taxonomy answer shaping to prevent invented or non-canonical file names
+- [x] Re-run Q3 in `hybrid`
+- [x] Re-run Q3 in `mix`
+- [x] Record whether Q3 can be marked closed against the `042` baseline

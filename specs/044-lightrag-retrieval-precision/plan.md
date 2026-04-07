@@ -234,3 +234,34 @@ precision slice.
 - расширить evaluation set после стабилизации Q3/Q4/Q5
 - решить, нужен ли richer reference payload вместо current extracted file list
 - вернуться к corpus expansion только после precision stabilization
+
+## Focused Follow-Up Inside `044`
+
+The next follow-up work stays inside this feature because `044` is still open
+on acceptance criteria.
+
+### Follow-Up 1. Q5 policy-answer shaping
+
+Status:
+
+- implemented and validated on 2026-04-07
+
+Outcome:
+
+- Q5 raw answers now list canonical files first in both `hybrid` and `mix`
+
+### Follow-Up 2. Q3 taxonomy-file precision
+
+Status:
+
+- implemented and validated on 2026-04-07
+
+Outcome:
+
+- Q3 answers use the frozen canonical taxonomy files
+- no invented or non-canonical file names appear in raw answers
+
+Feature-close assessment:
+
+- `044` acceptance criteria are now satisfied for the frozen Q3/Q4/Q5
+  regression set

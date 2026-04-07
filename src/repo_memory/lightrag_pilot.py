@@ -575,6 +575,55 @@ def merge_ranked_paths(
     return merged
 
 
+def format_policy_answer(
+    task_type: str,
+    mandatory_paths: list[str],
+    retrieved_paths: list[str],
+) -> str:
+    mandatory_lines = "\n".join(f"- `{path}`" for path in mandatory_paths)
+    retrieved_lines = "\n".join(f"- `{path}`" for path in retrieved_paths) or "- none"
+    return (
+        f"Mandatory files for `{task_type}` work are:\n\n"
+        f"{mandatory_lines}\n\n"
+        "Retrieve-on-demand policy is defined by:\n\n"
+        f"{retrieved_lines}\n\n"
+        "Answer these rules from the canonical files above before falling back to "
+        "higher-level category summaries."
+    )
+
+
+def format_taxonomy_answer() -> str:
+    taxonomy_lines = "\n".join(f"- `{path}`" for path in TAXONOMY_CANONICAL_DOCS)
+    return (
+        "The canonical files that define the repository memory taxonomy are:\n\n"
+        f"{taxonomy_lines}\n\n"
+        "Use these repository files as the taxonomy source instead of inferred "
+        "directory summaries or invented file names."
+    )
+
+
+def shape_raw_retrieval_result(
+    raw_result: Any,
+    question: str,
+    task_type: str,
+    mandatory_paths: list[str],
+    retrieved_paths: list[str],
+) -> Any:
+    if is_taxonomy_question(question):
+        return format_taxonomy_answer()
+    if not is_mandatory_policy_question(question):
+        return raw_result
+    if not mandatory_paths:
+        return raw_result
+    if not isinstance(raw_result, str):
+        return raw_result
+    return format_policy_answer(
+        task_type=task_type,
+        mandatory_paths=mandatory_paths,
+        retrieved_paths=retrieved_paths,
+    )
+
+
 def load_context_document(root: Path, relative_path: str, source: str, reason: str) -> ContextDocument:
     content = read_repo_text(root, relative_path)
     return ContextDocument(
@@ -881,6 +930,13 @@ async def build_context_pack(
         exclude_paths=set(mandatory_paths),
         limit=retrieved_doc_limit,
     )
+    shaped_raw_result = shape_raw_retrieval_result(
+        raw_result,
+        question=question,
+        task_type=task_type,
+        mandatory_paths=mandatory_paths,
+        retrieved_paths=retrieved_paths,
+    )
 
     mandatory_documents = [
         load_context_document(
@@ -915,7 +971,7 @@ async def build_context_pack(
         mandatory_documents=mandatory_documents,
         retrieved_documents=retrieved_documents,
         final_documents=final_documents,
-        raw_retrieval_result=raw_result,
+        raw_retrieval_result=shaped_raw_result,
     )
 
 
