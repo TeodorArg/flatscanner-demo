@@ -48,6 +48,9 @@ depend on a single vendor.
 - Start every task from current `main`.
 - Keep changes scoped and avoid unrelated refactors.
 - Update docs or specs before code when behavior or architecture changes.
+- Before finalizing commit or PR state after canonical doc/spec/task updates, run
+  `python scripts/checkpoint_decision.py decide --git-diff` and follow the
+  resulting `LightRAG` versus MCP/local-memory decision path.
 - After durable doc/spec/task checkpoints, explicitly evaluate whether MCP
   memory and local `in_memory/memory.jsonl` should be updated; sync memory only
   for repo-scoped durable facts already recorded in canonical files.
