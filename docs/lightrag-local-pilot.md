@@ -80,6 +80,10 @@ pilot corpus rules and mandatory-context policy.
 - `qwen3:4b` pulled into `Ollama`
 - `nomic-embed-text` pulled into `Ollama`
 
+On macOS, the expected way to start the local `Ollama` service for this pilot
+is to launch the `Ollama.app` desktop application before running pilot
+commands from the terminal.
+
 ### Local Runtime Topology
 
 The pilot uses:
@@ -160,6 +164,7 @@ Before the first real pilot indexing run, confirm all of these are true:
 
 Minimal readiness checks should confirm:
 
+- `ollama --version` returns the local CLI version without crashing
 - `ollama list` shows the required models
 - the Python environment can import `lightrag`
 - the repository script can print the resolved pilot corpus and working
