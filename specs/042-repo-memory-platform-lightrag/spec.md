@@ -157,7 +157,7 @@ Pilot ingestion для Markdown должен следовать фиксиров
 Pilot должен использовать локальный model stack:
 
 - `Ollama`
-- `qwen3:4b` как LLM
+- `qwen2.5:1.5b` как текущий pilot extraction LLM
 - `nomic-embed-text` как embedding model
 
 ### FR6. Retrieval queries
@@ -294,7 +294,7 @@ Chunking rules для pilot-а должны быть deterministic и repository
 
 ### AC4. Local provider works
 
-Pilot работает на локальном стеке `Ollama + qwen3:4b + nomic-embed-text`.
+Pilot работает на локальном стеке `Ollama + qwen2.5:1.5b + nomic-embed-text`.
 
 ### AC5. Pilot retrieval works
 
@@ -359,7 +359,7 @@ Legacy `flatscanner`-артефакты сначала исключаются и
 
 ## Decisions Fixed In Phase 4
 
-- local stack is `Ollama + qwen3:4b + nomic-embed-text`
+- local stack is `Ollama + qwen2.5:1.5b + nomic-embed-text`
 - canonical pilot interface is a repository-local script
 - local API is deferred until the script-first pilot proves useful
 - local `in_memory/memory.jsonl` is a derivative mirror of MCP memory, not a

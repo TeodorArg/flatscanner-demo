@@ -30,7 +30,7 @@
 
 ## Phase 4. Local LightRAG Stack
 
-- [x] Lock local stack to `Ollama + qwen3:4b + nomic-embed-text`
+- [x] Lock local stack to `Ollama + qwen2.5:1.5b + nomic-embed-text`
 - [x] Decide pilot interface: CLI, script, or local API
 - [x] Add local setup notes for the pilot stack
 - [x] Define local memory mirror policy for `in_memory/memory.jsonl` and MCP
@@ -43,7 +43,7 @@
 - [x] Define Markdown chunking rules for pilot docs
 - [x] Define metadata schema for chunks
 - [x] Implement pilot ingestion prototype
-- [ ] Validate indexing on pilot corpus
+- [x] Validate indexing on pilot corpus
 
 ## Phase 6. Retrieval MVP
 
@@ -71,7 +71,7 @@
 
 - [x] Top-level docs describe the new product coherently
 - [x] Process docs are vendor-neutral
-- [ ] LightRAG pilot runs locally on the chosen stack
-- [ ] Pilot retrieval returns relevant process-memory context
+- [x] LightRAG pilot runs locally on the chosen stack
+- [x] Pilot retrieval returns relevant process-memory context
 - [ ] Mandatory docs are preserved by policy
 - [ ] Legacy `flatscanner` artifacts are removed only after pilot success

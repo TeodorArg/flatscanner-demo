@@ -29,12 +29,17 @@ MANDATORY_DOCS = {
 }
 
 HEADING_RE = re.compile(r"^(#{1,6})\s+(.*\S)\s*$")
-MAX_CHUNK_CHARS = 2400
-MIN_SECTION_CHARS = 350
+MAX_CHUNK_CHARS = 1400
+MIN_SECTION_CHARS = 250
 OLLAMA_HOST = "http://localhost:11434"
-OLLAMA_LLM_MODEL = "qwen3:4b"
+OLLAMA_LLM_MODEL = "qwen2.5:1.5b"
 OLLAMA_EMBED_MODEL = "nomic-embed-text"
-
+OLLAMA_LLM_TIMEOUT_SECONDS = 900
+OLLAMA_LLM_MAX_ASYNC = 1
+OLLAMA_LLM_NUM_PREDICT = 256
+LIGHTRAG_MAX_PARALLEL_INSERT = 1
+LIGHTRAG_MAX_EXTRACT_INPUT_TOKENS = 6000
+LIGHTRAG_ENTITY_EXTRACT_MAX_GLEANING = 0
 
 @dataclass(frozen=True)
 class PreparedChunk:
@@ -289,20 +294,7 @@ def chunk_markdown(relative_path: str, content: str) -> list[PreparedChunk]:
 
 
 def serialize_chunk_for_rag(chunk: PreparedChunk) -> str:
-    heading_path = " > ".join(chunk.heading_path) if chunk.heading_path else "(document preface)"
-    metadata_lines = [
-        f"Path: {chunk.path}",
-        f"Doc Class: {chunk.doc_class}",
-        f"Title: {chunk.title}",
-        f"Heading Path: {heading_path}",
-        f"Language: {chunk.language}",
-        f"Feature ID: {chunk.feature_id or 'null'}",
-        f"Chunk ID: {chunk.chunk_id}",
-        f"Chunk Order: {chunk.chunk_order}",
-        f"Mandatory Candidate: {str(chunk.mandatory_candidate).lower()}",
-        "",
-    ]
-    return "\n".join(metadata_lines) + chunk.content
+    return chunk.content
 
 
 def build_prepared_chunks(root: Path | None = None) -> list[PreparedChunk]:
@@ -371,12 +363,14 @@ def _load_lightrag_runtime() -> tuple[Any, Any, Any, Any, Any, Any]:
     try:
         from lightrag import LightRAG, QueryParam
         from lightrag.llm.ollama import ollama_embed, ollama_model_complete
+        from lightrag.prompt import PROMPTS
         from lightrag.utils import EmbeddingFunc, Tokenizer
     except ImportError as exc:
         raise RuntimeError(
             "LightRAG pilot dependencies are missing. Install them with "
             "`uv sync --extra repo_memory --extra dev`."
         ) from exc
+    _tighten_entity_extraction_prompts(PROMPTS)
     return (
         LightRAG,
         QueryParam,
@@ -384,6 +378,43 @@ def _load_lightrag_runtime() -> tuple[Any, Any, Any, Any, Any, Any]:
         Tokenizer,
         ollama_embed,
         ollama_model_complete,
+    )
+
+
+def _tighten_entity_extraction_prompts(prompts: dict[str, Any]) -> None:
+    strict_suffix = """
+
+---Pilot Guardrails---
+9.  **Repository Metadata Ignore List:**
+    *   Ignore repository metadata sections, path-like strings, heading paths, chunk identifiers, template placeholders, and schema examples.
+    *   Never output any of the following as entities or relationships: `Path`, `Doc Class`, `Title`, `Heading Path`, `Language`, `Feature ID`, `Chunk ID`, `Chunk Order`, `Mandatory Candidate`.
+10. **Strict Output Discipline:**
+    *   Output plain extraction rows only. Do not output code fences, bullets, numbering, XML tags, headings, commentary, or explanations.
+    *   Do not invent extra fields. Entity rows must contain exactly 4 fields and relation rows must contain exactly 5 fields.
+    *   If there are no valid entities or relationships in the document body, output only `{completion_delimiter}`.
+"""
+    user_suffix = """
+5.  **Ignore Metadata Noise:** Ignore repository metadata sections, path-like strings, chunk identifiers, heading paths, and template placeholders.
+6.  **No Extra Formatting:** Do not output XML tags, code fences, bullets, numbering, or explanatory prose.
+7.  **Schema Discipline:** Entity rows must contain exactly 4 fields and relation rows must contain exactly 5 fields.
+"""
+    continue_suffix = """
+7.  **Ignore Metadata Noise:** Ignore repository metadata sections, path-like strings, chunk identifiers, heading paths, and template placeholders.
+8.  **No Extra Formatting:** Do not output XML tags, code fences, bullets, numbering, or explanatory prose.
+9.  **Schema Discipline:** Entity rows must contain exactly 4 fields and relation rows must contain exactly 5 fields.
+"""
+    prompts["entity_extraction_system_prompt"] += strict_suffix
+    prompts["entity_extraction_user_prompt"] = prompts["entity_extraction_user_prompt"].replace(
+        "4.  **Output Language:** Ensure the output language is {language}. Proper nouns (e.g., personal names, place names, organization names) must be kept in their original language and not translated.\n",
+        "4.  **Output Language:** Ensure the output language is {language}. Proper nouns (e.g., personal names, place names, organization names) must be kept in their original language and not translated.\n"
+        + user_suffix,
+    )
+    prompts["entity_continue_extraction_user_prompt"] = prompts[
+        "entity_continue_extraction_user_prompt"
+    ].replace(
+        "6.  **Completion Signal:** Output `{completion_delimiter}` as the final line after all relevant missing or corrected entities and relationships have been extracted and presented.\n",
+        "6.  **Completion Signal:** Output `{completion_delimiter}` as the final line after all relevant missing or corrected entities and relationships have been extracted and presented.\n"
+        + continue_suffix,
     )
 
 
@@ -405,12 +436,23 @@ def create_rag(index_dir: Path) -> Any:
     )
     return LightRAG(
         working_dir=str(index_dir),
+        max_parallel_insert=LIGHTRAG_MAX_PARALLEL_INSERT,
+        max_extract_input_tokens=LIGHTRAG_MAX_EXTRACT_INPUT_TOKENS,
+        entity_extract_max_gleaning=LIGHTRAG_ENTITY_EXTRACT_MAX_GLEANING,
+        chunk_token_size=700,
+        chunk_overlap_token_size=50,
         llm_model_func=ollama_model_complete,
         llm_model_name=OLLAMA_LLM_MODEL,
+        llm_model_max_async=OLLAMA_LLM_MAX_ASYNC,
+        default_llm_timeout=OLLAMA_LLM_TIMEOUT_SECONDS,
         llm_model_kwargs={
             "host": OLLAMA_HOST,
-            "options": {"num_ctx": 8192},
-            "timeout": 300,
+            "options": {
+                "num_ctx": 8192,
+                "num_predict": OLLAMA_LLM_NUM_PREDICT,
+                "temperature": 0,
+            },
+            "timeout": OLLAMA_LLM_TIMEOUT_SECONDS,
         },
         tokenizer=tokenizer,
         embedding_func=embedding_func,
@@ -465,7 +507,7 @@ async def query_index(
     if not index_dir.exists():
         raise RuntimeError("Pilot index directory does not exist. Run `build` first.")
 
-    _, QueryParam, _, _, _ = _load_lightrag_runtime()
+    _, QueryParam, _, _, _, _ = _load_lightrag_runtime()
     rag = create_rag(index_dir)
     await rag.initialize_storages()
     try:
