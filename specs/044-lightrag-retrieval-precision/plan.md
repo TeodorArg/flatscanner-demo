@@ -235,6 +235,15 @@ precision slice.
 - решить, нужен ли richer reference payload вместо current extracted file list
 - вернуться к corpus expansion только после precision stabilization
 
+Sequenced follow-up specs after `044`:
+
+- `045-retrieval-quality-benchmark` for broader evaluation-set expansion,
+  question-class coverage, benchmark rubric, and broader baseline measurement
+- `046-lightrag-rerank-provider` only if the `045` benchmark shows rerank is a
+  justified next investment
+- `047-retrieval-ranking-improvements` only after `045` establishes which
+  broader retrieval/ranking gaps are actually the most expensive
+
 ## Focused Follow-Up Inside `044`
 
 The next follow-up work stays inside this feature because `044` is still open

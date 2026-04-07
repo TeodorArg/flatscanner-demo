@@ -1,0 +1,509 @@
+[
+  {
+    "id": "BQ1",
+    "question": "Which files define the repository memory taxonomy",
+    "mode": "mix",
+    "task_type": "general",
+    "mandatory_paths": [
+      ".specify/memory/constitution.md",
+      "AGENTS.md",
+      "docs/README.md"
+    ],
+    "retrieved_paths": [
+      "docs/project-idea.md"
+    ],
+    "final_paths": [
+      ".specify/memory/constitution.md",
+      "AGENTS.md",
+      "docs/README.md",
+      "docs/project-idea.md"
+    ],
+    "raw_answer": "The canonical files that define the repository memory taxonomy are:\n\n- `.specify/memory/constitution.md`\n- `AGENTS.md`\n- `docs/README.md`\n- `docs/project-idea.md`\n\nUse these repository files as the taxonomy source instead of inferred directory summaries or invented file names."
+  },
+  {
+    "id": "BQ1",
+    "question": "Which files define the repository memory taxonomy",
+    "mode": "hybrid",
+    "task_type": "general",
+    "mandatory_paths": [
+      ".specify/memory/constitution.md",
+      "AGENTS.md",
+      "docs/README.md"
+    ],
+    "retrieved_paths": [
+      "README_PROCESS_RU.md",
+      "PROCESS_OVERVIEW_EN.md",
+      "docs/project-idea.md"
+    ],
+    "final_paths": [
+      ".specify/memory/constitution.md",
+      "AGENTS.md",
+      "docs/README.md",
+      "README_PROCESS_RU.md",
+      "PROCESS_OVERVIEW_EN.md",
+      "docs/project-idea.md"
+    ],
+    "raw_answer": "The canonical files that define the repository memory taxonomy are:\n\n- `.specify/memory/constitution.md`\n- `AGENTS.md`\n- `docs/README.md`\n- `docs/project-idea.md`\n\nUse these repository files as the taxonomy source instead of inferred directory summaries or invented file names."
+  },
+  {
+    "id": "BQ2",
+    "question": "What is the canonical read order before implementation work",
+    "mode": "hybrid",
+    "task_type": "product-code",
+    "mandatory_paths": [
+      ".specify/memory/constitution.md",
+      "AGENTS.md",
+      "docs/README.md",
+      "docs/ai-pr-workflow.md"
+    ],
+    "retrieved_paths": [
+      "DELIVERY_FLOW_RU.md",
+      "README_PROCESS_RU.md",
+      "PROCESS_OVERVIEW_EN.md",
+      "docs/project-idea.md"
+    ],
+    "final_paths": [
+      ".specify/memory/constitution.md",
+      "AGENTS.md",
+      "docs/README.md",
+      "docs/ai-pr-workflow.md",
+      "DELIVERY_FLOW_RU.md",
+      "README_PROCESS_RU.md",
+      "PROCESS_OVERVIEW_EN.md",
+      "docs/project-idea.md"
+    ],
+    "raw_answer": "The canonical read order for implementing product code tasks involves several steps that ensure clarity and maintainability of the project's documentation. Here’s a detailed breakdown:\n\n1. **Start from Current `main`**: Begin with the current state of the main branch, ensuring you are working on the latest version of your project.\n\n2. **Read Repository Memory**: Next, read the repository memory to understand what needs to be changed or updated. This includes reading `.specify/memory/constitution.md`, `docs/`, and relevant ADR files.\n\n3. **Formulate Implementation Scope**: After understanding the current state, formulate the scope of changes needed for your product code task. This involves creating or updating the active `specs/<feature-id>/` folder first to ensure that all necessary specifications are up-to-date.\n\n4. **Create Isolated Branch/Worktree**: Create an isolated branch/worktree specifically for this implementation task. This ensures that any changes made during this process do not affect other parts of your project without proper isolation.\n\n5. **Select Implementation Agent**: Choose the appropriate implementation agent to make scoped changes in the isolated worktree. The selected implementation agent will handle the specific slice of code and tests required for this feature.\n\n6. **Update Code, Tests, and Task State**: After"
+  },
+  {
+    "id": "BQ2",
+    "question": "What is the canonical read order before implementation work",
+    "mode": "global",
+    "task_type": "product-code",
+    "mandatory_paths": [
+      ".specify/memory/constitution.md",
+      "AGENTS.md",
+      "docs/README.md",
+      "docs/ai-pr-workflow.md"
+    ],
+    "retrieved_paths": [
+      "DELIVERY_FLOW_RU.md",
+      "README_PROCESS_RU.md",
+      "PROCESS_OVERVIEW_EN.md",
+      "docs/project-idea.md"
+    ],
+    "final_paths": [
+      ".specify/memory/constitution.md",
+      "AGENTS.md",
+      "docs/README.md",
+      "docs/ai-pr-workflow.md",
+      "DELIVERY_FLOW_RU.md",
+      "README_PROCESS_RU.md",
+      "PROCESS_OVERVIEW_EN.md",
+      "docs/project-idea.md"
+    ],
+    "raw_answer": "Before implementing product code, the following steps are typically followed:\n\n1. **Human Requester or Orchestrator Identifies a Task**: The human requester or orchestrator identifies a specific task that needs to be implemented.\n\n2. **Read Repository Memory from Canonical Files**: The repository memory is read from canonical files to understand the current state and context of the project.\n\n3. **Formalize Tasks in `spec.md`, `plan.md`, and `tasks.md`**: The active feature is formalized into these documents, which serve as a blueprint for the implementation process.\n\n4. **Create or Update `specs/<feature-id>/` Folder**: An isolated branch/worktree is created or updated to ensure that changes are scoped and isolated from other work.\n\n5. **Select Implementation Agent**: The appropriate implementation agent is chosen based on the task requirements, such as an implementation agent for a specific slice of code.\n\n6. **Implement in Isolated Branch/Worktree**: The selected implementation agent makes scoped changes within the isolated branch or worktree to implement the agreed-upon slice.\n\n7. **Update Code, Tests, and Task State**: Changes are made to the actual product code, tests, and task state as part of the implementation process.\n\n8. **Open or Update PR**:"
+  },
+  {
+    "id": "BQ3",
+    "question": "Where the local LightRAG pilot boundary and pilot corpus are defined",
+    "mode": "mix",
+    "task_type": "general",
+    "mandatory_paths": [
+      ".specify/memory/constitution.md",
+      "AGENTS.md",
+      "docs/README.md"
+    ],
+    "retrieved_paths": [
+      "docs/context-policy.md"
+    ],
+    "final_paths": [
+      ".specify/memory/constitution.md",
+      "AGENTS.md",
+      "docs/README.md",
+      "docs/context-policy.md"
+    ],
+    "raw_answer": "The local LightRAG pilot boundary and pilot corpus are defined in the `docs/context-policy.md` document. This policy outlines how retrieval tooling such as LightRAG should be added to the repository without replacing canonical files, respecting mandatory process documents, reducing context load while not hiding governing rules, and keeping the repository truth in files and a Light-RAG database. The pilot corpus is also mentioned within this document, indicating that it contains specific data for testing purposes or development scenarios.\n\nThe core principles of the policy include:\n1. **Specs Before Code**: Ensure specifications are reviewed before code changes.\n2. **Pull Requests as Units of Review and Merge**: Pull requests serve as units for review and merge processes.\n3. **Required Checks Must Pass Before Merge**: All required checks must be green before merging can proceed.\n4. **Repository Files Preserve Context; Hidden Session State Does Not Define Project Truth**: Repository files should preserve context, not hidden session state that defines project truth.\n5. **Durable Memory, Feature Memory, and Process Memory Must Stay Distinct**: These types of memory should remain separate to avoid confusion.\n6. **Retrieval May Assist Context Assembly, But Canonical Truth Remains in Files**: Retrieval can assist in context assembly but does not replace the"
+  },
+  {
+    "id": "BQ3",
+    "question": "Where the local LightRAG pilot boundary and pilot corpus are defined",
+    "mode": "global",
+    "task_type": "general",
+    "mandatory_paths": [
+      ".specify/memory/constitution.md",
+      "AGENTS.md",
+      "docs/README.md"
+    ],
+    "retrieved_paths": [
+      "docs/context-policy.md"
+    ],
+    "final_paths": [
+      ".specify/memory/constitution.md",
+      "AGENTS.md",
+      "docs/README.md",
+      "docs/context-policy.md"
+    ],
+    "raw_answer": "The local LightRAG (Light Repository Access Gateway) pilot boundary and pilot corpus are not explicitly defined in the provided context. The context does not contain any information about how these boundaries or corpora are set up, nor do they provide details on where such definitions might be found.\n\nTo answer this question accurately, you would need to refer directly to the relevant documentation or repository files that define the specific policies and procedures for setting up a LightRAG pilot boundary and corpus. This could include:\n\n- The `docs/context-policy.md` file which outlines general guidelines and policies.\n- Specific configuration files within the project's `.github/workflows/` directory, such as `.github/workflows/light-rag-pilot.yml`, which might contain detailed instructions for setting up a LightRAG pilot boundary.\n\nWithout access to these specific repository files or documentation, it is not possible to provide accurate information about where and how the local LightRAG pilot boundary and corpus are defined."
+  },
+  {
+    "id": "BQ4",
+    "question": "Which artifacts are mandatory versus retrieve-on-demand for product-code work",
+    "mode": "hybrid",
+    "task_type": "product-code",
+    "mandatory_paths": [
+      ".specify/memory/constitution.md",
+      "AGENTS.md",
+      "docs/README.md",
+      "docs/ai-pr-workflow.md"
+    ],
+    "retrieved_paths": [
+      "docs/context-policy.md"
+    ],
+    "final_paths": [
+      ".specify/memory/constitution.md",
+      "AGENTS.md",
+      "docs/README.md",
+      "docs/ai-pr-workflow.md",
+      "docs/context-policy.md"
+    ],
+    "raw_answer": "Mandatory files for `product-code` work are:\n\n- `.specify/memory/constitution.md`\n- `AGENTS.md`\n- `docs/README.md`\n- `docs/ai-pr-workflow.md`\n\nRetrieve-on-demand policy is defined by:\n\n- `docs/context-policy.md`\n\nAnswer these rules from the canonical files above before falling back to higher-level category summaries."
+  },
+  {
+    "id": "BQ4",
+    "question": "Which artifacts are mandatory versus retrieve-on-demand for product-code work",
+    "mode": "mix",
+    "task_type": "product-code",
+    "mandatory_paths": [
+      ".specify/memory/constitution.md",
+      "AGENTS.md",
+      "docs/README.md",
+      "docs/ai-pr-workflow.md"
+    ],
+    "retrieved_paths": [
+      "docs/context-policy.md"
+    ],
+    "final_paths": [
+      ".specify/memory/constitution.md",
+      "AGENTS.md",
+      "docs/README.md",
+      "docs/ai-pr-workflow.md",
+      "docs/context-policy.md"
+    ],
+    "raw_answer": "Mandatory files for `product-code` work are:\n\n- `.specify/memory/constitution.md`\n- `AGENTS.md`\n- `docs/README.md`\n- `docs/ai-pr-workflow.md`\n\nRetrieve-on-demand policy is defined by:\n\n- `docs/context-policy.md`\n\nAnswer these rules from the canonical files above before falling back to higher-level category summaries."
+  },
+  {
+    "id": "BQ5",
+    "question": "Which documents define local-memory mirror policy versus canonical repository memory",
+    "mode": "mix",
+    "task_type": "general",
+    "mandatory_paths": [
+      ".specify/memory/constitution.md",
+      "AGENTS.md",
+      "docs/README.md"
+    ],
+    "retrieved_paths": [
+      "docs/project-idea.md",
+      "README_PROCESS_RU.md"
+    ],
+    "final_paths": [
+      ".specify/memory/constitution.md",
+      "AGENTS.md",
+      "docs/README.md",
+      "docs/project-idea.md",
+      "README_PROCESS_RU.md"
+    ],
+    "raw_answer": "The documents that define the local-memory mirror policy versus the canonical repository memory are:\n\n1. **docs/project-idea.md** - This document outlines the project idea and provides a high-level overview of the concept.\n2. **README_PROCESS_RU.md** - The Russian process guide, which includes detailed instructions on how to manage and use the system.\n3. **README.md** - A general documentation file that covers various aspects of the repository management.\n\nThese documents provide guidance on maintaining local memory as a derivative mirror of canonical repository memory, ensuring consistency with the main project context while allowing for localized changes or updates without disrupting the broader system's integrity."
+  },
+  {
+    "id": "BQ5",
+    "question": "Which documents define local-memory mirror policy versus canonical repository memory",
+    "mode": "local",
+    "task_type": "general",
+    "mandatory_paths": [
+      ".specify/memory/constitution.md",
+      "AGENTS.md",
+      "docs/README.md"
+    ],
+    "retrieved_paths": [
+      "docs/project-idea.md",
+      "README_PROCESS_RU.md",
+      "DELIVERY_FLOW_RU.md"
+    ],
+    "final_paths": [
+      ".specify/memory/constitution.md",
+      "AGENTS.md",
+      "docs/README.md",
+      "docs/project-idea.md",
+      "README_PROCESS_RU.md",
+      "DELIVERY_FLOW_RU.md"
+    ],
+    "raw_answer": "The documents that define the local-memory mirror policy versus canonical repository memory are:\n\n1. **docs/project-idea.md** - This document outlines the project idea and concept of a repo-memory platform.\n2. **README_PROCESS_RU.md** - The Russian process guide provides details on how to manage tasks related to the implementation agent's work.\n3. **DELIVERY_FLOW_RU.md** - This is the high-level flow document that describes the delivery loop, including steps for reading repository memory and creating feature folders in `specs/`.\n4. **README.md** - The main documentation file provides an overview of the project, including guidelines on how to manage tasks related to the implementation agent.\n5. **AGENTS.md** - This document outlines the roles involved in the delivery process, such as human requester, orchestrator, and review agents.\n\nThese documents collectively provide a comprehensive understanding of the policies and practices regarding local-memory mirror versus canonical repository memory within the project context."
+  },
+  {
+    "id": "BQ6",
+    "question": "Which docs define the generic PR-loop contract for implementation and review",
+    "mode": "hybrid",
+    "task_type": "review",
+    "mandatory_paths": [
+      ".specify/memory/constitution.md",
+      "AGENTS.md",
+      "docs/README.md",
+      "docs/ai-pr-workflow.md"
+    ],
+    "retrieved_paths": [
+      "README_PROCESS_RU.md",
+      "DELIVERY_FLOW_RU.md",
+      "docs/project-idea.md"
+    ],
+    "final_paths": [
+      ".specify/memory/constitution.md",
+      "AGENTS.md",
+      "docs/README.md",
+      "docs/ai-pr-workflow.md",
+      "README_PROCESS_RU.md",
+      "DELIVERY_FLOW_RU.md",
+      "docs/project-idea.md"
+    ],
+    "raw_answer": "The generic PR loop contract for implementation and review is defined in the following documents:\n\n1. **README_PROCESS_RU.md** - This document provides a high-level overview of the process, including the steps involved in implementing changes and reviewing pull requests.\n\n2. **DELIVERY_FLOW_RU.md** - This file outlines the specific workflow for delivering changes to the main branch, which includes the PR loop contract.\n\n3. **docs/project-idea.md** - While this document is more general about project ideas and directions, it indirectly supports the implementation process by providing context on what projects are being worked on.\n\n4. **AGENTS.md** - This file defines the roles of different entities involved in the delivery process, including the orchestrator, implementation agent, review agent, and human approver.\n\n5. **.specify/memory/constitution.md** - This document contains information about the current product or process contract, which is crucial for understanding what changes are being made and why they are necessary.\n\nThese documents collectively provide a comprehensive framework for implementing and reviewing pull requests in software development projects."
+  },
+  {
+    "id": "BQ6",
+    "question": "Which docs define the generic PR-loop contract for implementation and review",
+    "mode": "global",
+    "task_type": "review",
+    "mandatory_paths": [
+      ".specify/memory/constitution.md",
+      "AGENTS.md",
+      "docs/README.md",
+      "docs/ai-pr-workflow.md"
+    ],
+    "retrieved_paths": [
+      "README_PROCESS_RU.md",
+      "docs/project-idea.md",
+      "PROCESS_OVERVIEW_EN.md"
+    ],
+    "final_paths": [
+      ".specify/memory/constitution.md",
+      "AGENTS.md",
+      "docs/README.md",
+      "docs/ai-pr-workflow.md",
+      "README_PROCESS_RU.md",
+      "docs/project-idea.md",
+      "PROCESS_OVERVIEW_EN.md"
+    ],
+    "raw_answer": "The generic PR-loop contract for implementation and review is defined in the following documents:\n\n1. **README_PROCESS_RU.md** - This document provides a high-level overview of the process, including the steps involved in implementing changes and reviewing them.\n\n2. **AGENTS.md** - This file outlines the roles and responsibilities of different agents involved in the delivery loop, such as the Human requester, Orchestrator, Implementation agent, Review agent, and GitHub Actions / checks.\n\n3. **docs/project-idea.md** - This document likely contains initial ideas or goals for the project, which can be formalized into a feature folder within `specs/`.\n\n4. **.specify/memory/constitution.md** - This file defines the contract that needs to be followed when implementing changes and reviewing them.\n\n5. **PROCESS_OVERVIEW_EN.md** - This document provides an overview of the process, including the steps involved in implementation and review.\n\nThese documents collectively define the generic PR-loop contract for implementation and review by providing guidelines on how to formalize tasks, prepare isolated worktrees, implement changes, run checks, and ensure that all necessary documentation is up-to-date."
+  },
+  {
+    "id": "BQ7",
+    "question": "What conditions must be true before an orchestrated PR loop is considered done",
+    "mode": "hybrid",
+    "task_type": "review",
+    "mandatory_paths": [
+      ".specify/memory/constitution.md",
+      "AGENTS.md",
+      "docs/README.md",
+      "docs/ai-pr-workflow.md"
+    ],
+    "retrieved_paths": [
+      "PROCESS_OVERVIEW_EN.md",
+      "README_PROCESS_RU.md",
+      "docs/project-idea.md",
+      "DELIVERY_FLOW_RU.md"
+    ],
+    "final_paths": [
+      ".specify/memory/constitution.md",
+      "AGENTS.md",
+      "docs/README.md",
+      "docs/ai-pr-workflow.md",
+      "PROCESS_OVERVIEW_EN.md",
+      "README_PROCESS_RU.md",
+      "docs/project-idea.md",
+      "DELIVERY_FLOW_RU.md"
+    ],
+    "raw_answer": "Before an orchestrated PR loop (also known as the \"Delivery Loop\") is considered complete, several key conditions must be met:\n\n1. **Required Checks Green**: All required checks on the pull request (PR) must pass.\n2. **Blocking Findings Absent**: There should be no blocking findings or issues that prevent further action.\n3. **No Merge Conflicts**: The merge conflicts between branches should be resolved, ensuring a clean and stable merge process.\n\nThese conditions ensure that all necessary steps have been completed and the PR is ready for final review and merging into the main branch. Once these criteria are met, the PR can be considered complete and merged as needed."
+  },
+  {
+    "id": "BQ7",
+    "question": "What conditions must be true before an orchestrated PR loop is considered done",
+    "mode": "mix",
+    "task_type": "review",
+    "mandatory_paths": [
+      ".specify/memory/constitution.md",
+      "AGENTS.md",
+      "docs/README.md",
+      "docs/ai-pr-workflow.md"
+    ],
+    "retrieved_paths": [
+      "PROCESS_OVERVIEW_EN.md",
+      "README_PROCESS_RU.md",
+      "docs/project-idea.md",
+      "DELIVERY_FLOW_RU.md"
+    ],
+    "final_paths": [
+      ".specify/memory/constitution.md",
+      "AGENTS.md",
+      "docs/README.md",
+      "docs/ai-pr-workflow.md",
+      "PROCESS_OVERVIEW_EN.md",
+      "README_PROCESS_RU.md",
+      "docs/project-idea.md",
+      "DELIVERY_FLOW_RU.md"
+    ],
+    "raw_answer": "Before an orchestrated PR loop is considered done, several key conditions must be met:\n\n1. **No Blocking Review Findings**: The pull request (PR) should not have any blocking review findings.\n2. **Green Required Checks**: All required checks on the PR must pass.\n3. **No Merge Conflicts**: There should be no merge conflicts present in the repository.\n4. **Only Human Approval or Final Merge Remaining**: The only remaining steps are human approval or final merge.\n\nThese conditions ensure that all necessary checks and reviews have been completed, and there are no issues preventing further progress on the PR. Once these criteria are satisfied, the task is considered complete, and the loop can be considered finished."
+  },
+  {
+    "id": "BQ8",
+    "question": "Which feature defined the retrieval MVP, which feature closed Q3 Q4 Q5 precision regressions, and which feature owns the broader benchmark",
+    "mode": "mix",
+    "task_type": "general",
+    "mandatory_paths": [
+      ".specify/memory/constitution.md",
+      "AGENTS.md",
+      "docs/README.md"
+    ],
+    "retrieved_paths": [
+      "docs/project-idea.md",
+      "PROCESS_OVERVIEW_EN.md",
+      "README_PROCESS_RU.md",
+      "DELIVERY_FLOW_RU.md"
+    ],
+    "final_paths": [
+      ".specify/memory/constitution.md",
+      "AGENTS.md",
+      "docs/README.md",
+      "docs/project-idea.md",
+      "PROCESS_OVERVIEW_EN.md",
+      "README_PROCESS_RU.md",
+      "DELIVERY_FLOW_RU.md"
+    ],
+    "raw_answer": "Based on the information provided in the context:\n\n1. The feature that defined the retrieval MVP (Minimum Viable Product) is related to adding retrieval from repository memory as a derivative layer without replacing canonical files. This was part of the process guide for keeping repository truth separate from feature memory.\n\n2. The feature that closed Q3, Q4, and Q5 precision regressions likely refers to the implementation agent's role in managing follow-up fixes by working on the same branch where the original PR was submitted. This suggests it is related to maintaining context across sessions and ensuring code quality through continuous updates.\n\n3. The feature that owns the broader benchmark could be inferred from the context of \"repository memory\" being a key concept, which implies this feature likely has significant implications for project management and documentation practices in terms of keeping track of changes and aligning with requirements over time. This suggests it is related to maintaining repository truth across different versions or iterations of the project.\n\nThese features are part of broader processes aimed at ensuring that development does not become limited by certain conditions, as mentioned in the context under \"Core Principles\" section. The retrieval layer was added to enhance context assembly without replacing canonical files, while the implementation agent's role is crucial for maintaining scope and traceability across different tasks."
+  },
+  {
+    "id": "BQ8",
+    "question": "Which feature defined the retrieval MVP, which feature closed Q3 Q4 Q5 precision regressions, and which feature owns the broader benchmark",
+    "mode": "global",
+    "task_type": "general",
+    "mandatory_paths": [
+      ".specify/memory/constitution.md",
+      "AGENTS.md",
+      "docs/README.md"
+    ],
+    "retrieved_paths": [
+      "docs/project-idea.md",
+      "PROCESS_OVERVIEW_EN.md",
+      "README_PROCESS_RU.md",
+      "DELIVERY_FLOW_RU.md"
+    ],
+    "final_paths": [
+      ".specify/memory/constitution.md",
+      "AGENTS.md",
+      "docs/README.md",
+      "docs/project-idea.md",
+      "PROCESS_OVERVIEW_EN.md",
+      "README_PROCESS_RU.md",
+      "DELIVERY_FLOW_RU.md"
+    ],
+    "raw_answer": "Based on the information provided in the context:\n\n1. The feature that defined the retrieval MVP (Minimum Viable Product) is related to the implementation of a specific feature memory mechanism within the system. This feature likely includes the creation of an artifact representing durable memory separate from feature memory, which would be integrated with the existing data about feature memory.\n\n2. The feature that closed Q3 Q4 Q5 precision regressions refers to a change in behavior or architecture that addressed issues related to performance metrics (precision) during specific quarters (Q3, Q4, and Q5). This likely involved improvements or fixes to ensure better accuracy in certain calculations or measurements.\n\n3. The feature that owns the broader benchmark is not explicitly defined by the context provided. However, it can be inferred that this feature would encompass a significant improvement or change that has had an impact on overall performance metrics across multiple quarters (Q1 through Q5). This could involve changes to the implementation of features, improvements in testing processes, or other broad-scale adjustments that have been recognized as having a substantial effect on system performance."
+  },
+  {
+    "id": "BQ9",
+    "question": "Where is the local LightRAG pilot setup documented and what stack is fixed there",
+    "mode": "mix",
+    "task_type": "general",
+    "mandatory_paths": [
+      ".specify/memory/constitution.md",
+      "AGENTS.md",
+      "docs/README.md"
+    ],
+    "retrieved_paths": [
+      "PROCESS_OVERVIEW_EN.md",
+      "docs/project-idea.md",
+      "README_PROCESS_RU.md"
+    ],
+    "final_paths": [
+      ".specify/memory/constitution.md",
+      "AGENTS.md",
+      "docs/README.md",
+      "PROCESS_OVERVIEW_EN.md",
+      "docs/project-idea.md",
+      "README_PROCESS_RU.md"
+    ],
+    "raw_answer": "The local LightRAG pilot setup is documented in the `lightrag-local-pilot.md` file. This document provides details on how to set up a LightRAG pilot, which includes configuring retrieval tooling without replacing canonical files while respecting mandatory process documents and reducing context load.\n\nRegarding what stack is fixed there, the specific technology or software components that are being tested or implemented in this setup are not detailed within the provided information. The focus appears to be on the configuration of the LightRAG pilot rather than a particular implementation of a specific technology stack."
+  },
+  {
+    "id": "BQ9",
+    "question": "Where is the local LightRAG pilot setup documented and what stack is fixed there",
+    "mode": "local",
+    "task_type": "general",
+    "mandatory_paths": [
+      ".specify/memory/constitution.md",
+      "AGENTS.md",
+      "docs/README.md"
+    ],
+    "retrieved_paths": [],
+    "final_paths": [
+      ".specify/memory/constitution.md",
+      "AGENTS.md",
+      "docs/README.md"
+    ],
+    "raw_answer": "The local LightRAG pilot setup is documented in the `docs/README.md` file. This document provides an overview of the project's overall process and structure, including details on how to set up a LightRAG pilot within the repository.\n\nRegarding the specific stack that is fixed or tested with this setup, it would typically involve integrating LightRAG into the development workflow for testing purposes. The documentation likely includes instructions on how to configure and use LightRAG in conjunction with other tools and processes within the project. However, without direct access to the `docs/README.md` file, I cannot provide specific details about which stack is fixed or tested there.\n\nFor more detailed information, you would need to refer directly to that particular document."
+  },
+  {
+    "id": "BQ10",
+    "question": "Which code and tests implement the current LightRAG pilot behavior",
+    "mode": "hybrid",
+    "task_type": "product-code",
+    "mandatory_paths": [
+      ".specify/memory/constitution.md",
+      "AGENTS.md",
+      "docs/README.md",
+      "docs/ai-pr-workflow.md"
+    ],
+    "retrieved_paths": [
+      "PROCESS_OVERVIEW_EN.md",
+      "docs/project-idea.md",
+      "DELIVERY_FLOW_RU.md",
+      "README_PROCESS_RU.md"
+    ],
+    "final_paths": [
+      ".specify/memory/constitution.md",
+      "AGENTS.md",
+      "docs/README.md",
+      "docs/ai-pr-workflow.md",
+      "PROCESS_OVERVIEW_EN.md",
+      "docs/project-idea.md",
+      "DELIVERY_FLOW_RU.md",
+      "README_PROCESS_RU.md"
+    ],
+    "raw_answer": "The implementation of the current LightRAG pilot behavior is managed through the `tasks.md` file. This file serves as a documentation for tasks related to the implementation agent's work, including how to manage scoped changes in an isolated branch or worktree.\n\nTo summarize:\n- The implementation agent makes scoped changes in an isolated worktree.\n- It updates the code and tests accordingly.\n- The implementation agent publishes or updates the pull request (PR) that includes these changes."
+  },
+  {
+    "id": "BQ10",
+    "question": "Which code and tests implement the current LightRAG pilot behavior",
+    "mode": "local",
+    "task_type": "product-code",
+    "mandatory_paths": [
+      ".specify/memory/constitution.md",
+      "AGENTS.md",
+      "docs/README.md",
+      "docs/ai-pr-workflow.md"
+    ],
+    "retrieved_paths": [
+      "PROCESS_OVERVIEW_EN.md",
+      "docs/project-idea.md",
+      "DELIVERY_FLOW_RU.md",
+      "README_PROCESS_RU.md"
+    ],
+    "final_paths": [
+      ".specify/memory/constitution.md",
+      "AGENTS.md",
+      "docs/README.md",
+      "docs/ai-pr-workflow.md",
+      "PROCESS_OVERVIEW_EN.md",
+      "docs/project-idea.md",
+      "DELIVERY_FLOW_RU.md",
+      "README_PROCESS_RU.md"
+    ],
+    "raw_answer": "The current LightRAG pilot behavior is implemented through the use of `LightRAG` retrieval tooling. This method ensures that repository knowledge remains in files without replacing canonical files, respects mandatory process documents, reduces context load while not hiding governing rules, and adds a derivative helper layer for retrieval as needed.\n\nTo implement this behavior:\n\n1. **Index Repository Knowledge**: LightRAG should index the repository's knowledge without replacing canonical files.\n2. **Respect Mandatory Process Documents**: It must respect mandatory process documents to maintain compliance with established guidelines.\n3. **Reduce Context Load Without Hiding Governing Rules**: The method should reduce context load while ensuring that governing rules are not hidden or obscured.\n\nThe specific implementation details can be found in the `docs/context-policy.md` file, which outlines the recommended reading for understanding how LightRAG is used within the repository to preserve and retrieve relevant information without disrupting the canonical files."
+  }
+]
