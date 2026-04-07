@@ -48,6 +48,13 @@ Initial target candidates:
    by `BQ8`
 4. selected implementation files for `BQ10`:
    - `src/repo_memory/lightrag_pilot.py`
+   - `src/repo_memory/pilot_config.py`
+   - `src/repo_memory/pilot_types.py`
+   - `src/repo_memory/markdown_chunks.py`
+   - `src/repo_memory/query_policy.py`
+   - `src/repo_memory/reference_resolution.py`
+   - `src/repo_memory/lightrag_runtime.py`
+   - `src/repo_memory/context_pack.py`
    - `tests/test_lightrag_pilot.py`
    - possibly `specs/042-repo-memory-platform-lightrag/plan.md` if still needed
      as supporting canonical context
@@ -70,6 +77,13 @@ Frozen allowlist for implementation:
 - `specs/044-lightrag-retrieval-precision/evaluation.md`
 - `specs/045-retrieval-quality-benchmark/spec.md`
 - `src/repo_memory/lightrag_pilot.py`
+- `src/repo_memory/pilot_config.py`
+- `src/repo_memory/pilot_types.py`
+- `src/repo_memory/markdown_chunks.py`
+- `src/repo_memory/query_policy.py`
+- `src/repo_memory/reference_resolution.py`
+- `src/repo_memory/lightrag_runtime.py`
+- `src/repo_memory/context_pack.py`
 - `tests/test_lightrag_pilot.py`
 
 Row mapping for this allowlist:
@@ -78,8 +92,9 @@ Row mapping for this allowlist:
 - `BQ5`: `docs/local-memory-sync.md`, `docs/context-policy.md`
 - `BQ8`: selected `specs/042`, `specs/044`, `specs/045` files
 - `BQ9`: `docs/lightrag-local-pilot.md`, `docs/context-policy.md`
-- `BQ10`: `src/repo_memory/lightrag_pilot.py`, `tests/test_lightrag_pilot.py`,
-  `docs/lightrag-local-pilot.md`, `specs/042-repo-memory-platform-lightrag/plan.md`
+- `BQ10`: thin facade plus helper implementation modules under `src/repo_memory/`,
+  `tests/test_lightrag_pilot.py`, `docs/lightrag-local-pilot.md`,
+  `specs/042-repo-memory-platform-lightrag/plan.md`
 
 Explicit exclusions kept outside the pilot:
 

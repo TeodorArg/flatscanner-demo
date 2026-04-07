@@ -29,6 +29,13 @@ The repo pilot code now resolves this explicit expanded corpus:
 - `specs/044-lightrag-retrieval-precision/evaluation.md`
 - `specs/045-retrieval-quality-benchmark/spec.md`
 - `src/repo_memory/lightrag_pilot.py`
+- `src/repo_memory/pilot_config.py`
+- `src/repo_memory/pilot_types.py`
+- `src/repo_memory/markdown_chunks.py`
+- `src/repo_memory/query_policy.py`
+- `src/repo_memory/reference_resolution.py`
+- `src/repo_memory/lightrag_runtime.py`
+- `src/repo_memory/context_pack.py`
 - `tests/test_lightrag_pilot.py`
 
 ### 2. Canonical policy is aligned
@@ -170,12 +177,17 @@ The expanded-corpus benchmark rows were re-run against the clean rebuilt index.
 - Prompt:
   - `Which code and tests implement the current LightRAG pilot behavior`
 - Notes:
-  - correctly surfaced `src/repo_memory/lightrag_pilot.py`
-  - correctly surfaced `tests/test_lightrag_pilot.py`
-  - answer is short, correct, and decision-usable for implementation-location
-    work
+  - the original `047` pass correctly surfaced the then-current single-module
+    implementation contract around `src/repo_memory/lightrag_pilot.py` and
+    `tests/test_lightrag_pilot.py`
+  - after feature `049`, the canonical implementation-location contract is
+    broader and includes the helper modules under `src/repo_memory/`
+  - the historical `047` result remains valid for its original baseline, but it
+    should not be read as the full post-`049` implementation file set
 - Classification:
-  - Track B corpus expansion solved this benchmark row materially
+  - Track B corpus expansion solved the original out-of-corpus gap; later
+    structural refactors can still require contract sync without reopening the
+    core `047` corpus-alignment decision
 
 ## Summary
 

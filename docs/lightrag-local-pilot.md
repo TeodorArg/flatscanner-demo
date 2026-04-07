@@ -18,7 +18,7 @@ Current corpus note:
   `docs/context-policy.md`
 - that allowlist now includes a minimal `Track B` expansion for local setup,
   local-memory mirror policy, selected feature-memory ownership files, and the
-  current pilot implementation module/tests
+  current pilot facade, helper modules, and regression tests
 
 ## Locked Local Stack
 
