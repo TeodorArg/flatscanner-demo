@@ -22,6 +22,66 @@ Baseline выводы:
 - `docs/context-policy.md` surfaced too weakly
 - Q4 and Q5 are the clearest precision gaps
 
+## Frozen Regression Set
+
+This feature uses the following fixed regression questions from the `042`
+evaluation as the precision baseline:
+
+### Q3
+
+Question:
+
+- `Which files define the repository memory taxonomy`
+
+Mode/task coverage:
+
+- `mix`
+- `general`
+
+Expected canonical files:
+
+- `.specify/memory/constitution.md`
+- `AGENTS.md`
+- `docs/README.md`
+- `docs/project-idea.md`
+
+### Q4
+
+Question:
+
+- `Where the local LightRAG pilot boundary and pilot corpus are defined`
+
+Mode/task coverage:
+
+- `mix`
+- `general`
+
+Expected canonical files:
+
+- `docs/context-policy.md`
+- `docs/README.md`
+- `.specify/memory/constitution.md`
+- `AGENTS.md`
+
+### Q5
+
+Question:
+
+- `Which artifacts are mandatory versus retrieve-on-demand for product-code work`
+
+Mode/task coverage:
+
+- `hybrid`
+- `product-code`
+
+Expected canonical files:
+
+- `docs/context-policy.md`
+- `.specify/memory/constitution.md`
+- `AGENTS.md`
+- `docs/README.md`
+- `docs/ai-pr-workflow.md`
+
 ## Implementation Strategy
 
 ### Phase 1. Freeze baseline and target questions
@@ -71,20 +131,34 @@ Supporting canonical docs:
 
 Принять явное решение по rerank path.
 
-Вариант A:
+Chosen baseline:
 
-- disable rerank in baseline if no rerank model/provider is configured
+- disable rerank by default for the local pilot baseline
 
-Вариант B:
+Reasoning:
 
-- configure a real rerank provider/model and document the setup
+- the repository currently has no configured rerank provider/model/host
+- `044` is a focused precision slice, not a provider-integration feature
+- warning-only rerank behavior is explicitly called out as a product gap in the
+  `042` evaluation
 
 Context7-backed constraint:
 
-- `LightRAG` docs indicate rerank can be disabled by default with
+- official `LightRAG` docs state that rerank can be disabled by default with
   `RERANK_BY_DEFAULT=False`
-- otherwise a provider/model/host configuration is required for rerank to be a
-  real supported baseline
+- the same docs state that a real rerank baseline requires explicit
+  `RERANK_BINDING`, `RERANK_MODEL`, `RERANK_BINDING_HOST`, and
+  `RERANK_BINDING_API_KEY` configuration
+- query-time rerank remains available later via `enable_rerank=True` when the
+  pilot has an actual configured rerank provider
+
+Implementation note:
+
+- the `044` code path should set an explicit no-rerank baseline instead of
+  inheriting an implicit LightRAG default
+- if the Python SDK surface does not expose the API env toggle directly, the
+  repository-local pilot should still make the no-rerank decision explicit in
+  code and setup docs
 
 ### Phase 6. Re-run evaluation and compare
 
@@ -120,6 +194,24 @@ Context7-backed constraint:
 - `docs/context-policy.md` appears reliably where expected
 - Q4 and Q5 show reduced drift versus baseline
 - rerank behavior no longer produces an unresolved baseline warning state
+
+## Worker Handoff
+
+Product-code work for this feature must be implemented in an isolated
+worktree/branch/PR loop, not in the main checkout.
+
+Required code areas for the implementation worker:
+
+- `src/repo_memory/lightrag_pilot.py`
+- `tests/test_lightrag_pilot.py`
+
+Expected implementation slices:
+
+- file-first query shaping for policy/taxonomy questions
+- deterministic post-processing for canonical path extraction/deduplication
+- policy-doc bias for `docs/context-policy.md` and related canonical docs
+- explicit no-rerank baseline
+- regression tests covering Q3/Q4/Q5 in `hybrid` and `mix`
 
 ## Risks
 

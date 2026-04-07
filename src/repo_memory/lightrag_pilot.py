@@ -41,6 +41,7 @@ LIGHTRAG_MAX_PARALLEL_INSERT = 1
 LIGHTRAG_MAX_EXTRACT_INPUT_TOKENS = 6000
 LIGHTRAG_ENTITY_EXTRACT_MAX_GLEANING = 0
 TOKEN_RE = re.compile(r"[0-9A-Za-zА-Яа-яЁё][0-9A-Za-zА-Яа-яЁё_-]*")
+PATH_RE = re.compile(r"(?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+\.md")
 FEATURE_TASK_FILES = ("spec.md", "plan.md", "tasks.md")
 TASK_TYPE_CHOICES = (
     "general",
@@ -49,6 +50,18 @@ TASK_TYPE_CHOICES = (
     "product-framing",
     "frontend",
     "backend",
+)
+POLICY_CANONICAL_DOCS = (
+    "docs/context-policy.md",
+    ".specify/memory/constitution.md",
+    "AGENTS.md",
+    "docs/README.md",
+)
+TAXONOMY_CANONICAL_DOCS = (
+    ".specify/memory/constitution.md",
+    "AGENTS.md",
+    "docs/README.md",
+    "docs/project-idea.md",
 )
 
 @dataclass(frozen=True)
@@ -333,6 +346,66 @@ def normalize_query_tokens(text: str) -> list[str]:
     return [token.lower() for token in TOKEN_RE.findall(text) if len(token) >= 3]
 
 
+def normalize_query_text(text: str) -> str:
+    return " ".join(text.lower().split())
+
+
+def is_taxonomy_question(question: str) -> bool:
+    normalized = normalize_query_text(question)
+    return (
+        "repository memory taxonomy" in normalized
+        or ("which files" in normalized and "taxonomy" in normalized)
+    )
+
+
+def is_pilot_boundary_question(question: str) -> bool:
+    normalized = normalize_query_text(question)
+    return (
+        "pilot boundary" in normalized
+        or "pilot corpus" in normalized
+        or "context policy" in normalized
+    )
+
+
+def is_mandatory_policy_question(question: str) -> bool:
+    normalized = normalize_query_text(question)
+    return (
+        "mandatory versus retrieve-on-demand" in normalized
+        or "mandatory vs retrieve-on-demand" in normalized
+        or ("mandatory" in normalized and "retrieve-on-demand" in normalized)
+    )
+
+
+def is_policy_or_taxonomy_question(question: str) -> bool:
+    return (
+        is_taxonomy_question(question)
+        or is_pilot_boundary_question(question)
+        or is_mandatory_policy_question(question)
+    )
+
+
+def policy_bias_paths(root: Path, question: str, task_type: str = "general") -> list[str]:
+    preferred_paths: list[str] = []
+
+    if is_taxonomy_question(question):
+        preferred_paths.extend(TAXONOMY_CANONICAL_DOCS)
+    if is_pilot_boundary_question(question) or is_mandatory_policy_question(question):
+        preferred_paths.extend(POLICY_CANONICAL_DOCS)
+    if is_mandatory_policy_question(question) and task_type in {"product-code", "review"}:
+        preferred_paths.append("docs/ai-pr-workflow.md")
+
+    seen: set[str] = set()
+    existing_paths: list[str] = []
+    for relative_path in preferred_paths:
+        if relative_path in seen:
+            continue
+        if not (root / relative_path).exists():
+            continue
+        seen.add(relative_path)
+        existing_paths.append(relative_path)
+    return existing_paths
+
+
 def score_chunk_for_query(chunk: PreparedChunk, query_tokens: list[str]) -> int:
     if not query_tokens:
         return 0
@@ -379,6 +452,20 @@ def fallback_retrieved_paths(
         key=lambda item: (-item[1], item[0]),
     )
     return [path for path, _ in ranked_paths[:limit]]
+
+
+def normalize_reference_candidate(candidate: str, allowed_paths: set[str]) -> str | None:
+    normalized = candidate.strip().strip("`'\"*.,:;!?()[]{}<>").replace("\\", "/")
+    if not normalized:
+        return None
+    if normalized in allowed_paths:
+        return normalized
+
+    for allowed_path in sorted(allowed_paths, key=len, reverse=True):
+        if normalized.endswith(f"/{allowed_path}"):
+            return allowed_path
+
+    return None
 
 
 def feature_mandatory_docs(feature_id: str) -> list[str]:
@@ -430,9 +517,23 @@ def extract_reference_paths(value: Any, allowed_paths: set[str]) -> list[str]:
     found_paths: list[str] = []
     seen: set[str] = set()
 
+    def record(candidate: str) -> None:
+        normalized = normalize_reference_candidate(candidate, allowed_paths)
+        if normalized and normalized not in seen:
+            seen.add(normalized)
+            found_paths.append(normalized)
+
     def visit(node: Any) -> None:
         if isinstance(node, dict):
+            file_path = node.get("file_path")
+            if isinstance(file_path, str):
+                record(file_path)
+            references = node.get("references")
+            if references is not None:
+                visit(references)
             for nested in node.values():
+                if nested is references:
+                    continue
                 visit(nested)
             return
         if isinstance(node, (list, tuple, set)):
@@ -442,13 +543,36 @@ def extract_reference_paths(value: Any, allowed_paths: set[str]) -> list[str]:
         if not isinstance(node, str):
             return
 
-        for candidate in sorted(allowed_paths):
-            if candidate in node and candidate not in seen:
-                seen.add(candidate)
-                found_paths.append(candidate)
+        for candidate in PATH_RE.findall(node):
+            record(candidate)
+
+        for candidate in sorted(allowed_paths, key=len, reverse=True):
+            if candidate in node:
+                record(candidate)
 
     visit(value)
     return found_paths
+
+
+def merge_ranked_paths(
+    *path_groups: list[str],
+    exclude_paths: set[str] | None = None,
+    limit: int | None = None,
+) -> list[str]:
+    exclude = exclude_paths or set()
+    merged: list[str] = []
+    seen: set[str] = set()
+
+    for group in path_groups:
+        for path in group:
+            if path in exclude or path in seen:
+                continue
+            seen.add(path)
+            merged.append(path)
+            if limit is not None and len(merged) >= limit:
+                return merged
+
+    return merged
 
 
 def load_context_document(root: Path, relative_path: str, source: str, reason: str) -> ContextDocument:
@@ -629,6 +753,34 @@ def create_rag(index_dir: Path) -> Any:
     )
 
 
+def retrieval_user_prompt(question: str) -> str | None:
+    if not is_policy_or_taxonomy_question(question):
+        return None
+    return (
+        "Answer file-first. Prefer exact canonical Markdown file paths over directories "
+        "or abstract categories. When policy or taxonomy is relevant, cite the exact "
+        "repository files that define it, especially docs/context-policy.md when it "
+        "governs pilot boundary or mandatory versus retrieve-on-demand rules."
+    )
+
+
+def build_query_param(
+    query: str,
+    mode: str,
+    include_references: bool,
+    query_param_factory: Any,
+) -> Any:
+    params: dict[str, Any] = {
+        "mode": mode,
+        "include_references": include_references,
+        "enable_rerank": False,
+    }
+    user_prompt = retrieval_user_prompt(query)
+    if user_prompt:
+        params["user_prompt"] = user_prompt
+    return query_param_factory(**params)
+
+
 async def build_index(root: Path, clean: bool = False, dry_run: bool = False) -> dict[str, Any]:
     working_dir = pilot_working_dir(root)
     ensure_debug_dirs(working_dir)
@@ -683,7 +835,12 @@ async def query_index(
     try:
         return await rag.aquery(
             query,
-            param=QueryParam(mode=mode, include_references=include_references),
+            param=build_query_param(
+                query,
+                mode=mode,
+                include_references=include_references,
+                query_param_factory=QueryParam,
+            ),
         )
     finally:
         await rag.finalize_storages()
@@ -704,24 +861,26 @@ async def build_context_pack(
     runner = query_runner or query_index
     raw_result = await runner(root, question, mode=mode, include_references=True)
     chunks = build_prepared_chunks(root)
-    allowed_paths = {chunk.path for chunk in chunks}
+    preferred_paths = policy_bias_paths(root, question, task_type=task_type)
+    allowed_paths = {chunk.path for chunk in chunks} | set(preferred_paths)
     mandatory_paths = mandatory_doc_paths(root, active_feature_id=active_feature_id, task_type=task_type)
 
-    retrieved_paths = extract_reference_paths(raw_result, allowed_paths)
-    if not retrieved_paths:
+    extracted_paths = extract_reference_paths(raw_result, allowed_paths)
+    fallback_paths: list[str] = []
+    if not extracted_paths and not preferred_paths:
         fallback_paths = fallback_retrieved_paths(
             question,
             chunks,
-            exclude_paths=set(mandatory_paths) | set(retrieved_paths),
+            exclude_paths=set(mandatory_paths),
             limit=retrieved_doc_limit,
         )
-        retrieved_paths.extend(fallback_paths)
-
-    retrieved_paths = [
-        path
-        for path in retrieved_paths
-        if path not in mandatory_paths
-    ]
+    retrieved_paths = merge_ranked_paths(
+        extracted_paths,
+        preferred_paths,
+        fallback_paths,
+        exclude_paths=set(mandatory_paths),
+        limit=retrieved_doc_limit,
+    )
 
     mandatory_documents = [
         load_context_document(
