@@ -40,6 +40,16 @@ OLLAMA_LLM_NUM_PREDICT = 256
 LIGHTRAG_MAX_PARALLEL_INSERT = 1
 LIGHTRAG_MAX_EXTRACT_INPUT_TOKENS = 6000
 LIGHTRAG_ENTITY_EXTRACT_MAX_GLEANING = 0
+TOKEN_RE = re.compile(r"[0-9A-Za-zА-Яа-яЁё][0-9A-Za-zА-Яа-яЁё_-]*")
+FEATURE_TASK_FILES = ("spec.md", "plan.md", "tasks.md")
+TASK_TYPE_CHOICES = (
+    "general",
+    "product-code",
+    "review",
+    "product-framing",
+    "frontend",
+    "backend",
+)
 
 @dataclass(frozen=True)
 class PreparedChunk:
@@ -59,6 +69,28 @@ class PreparedChunk:
 class MarkdownSection:
     heading_path: tuple[str, ...]
     content: str
+
+
+@dataclass(frozen=True)
+class ContextDocument:
+    path: str
+    doc_class: str
+    title: str
+    source: str
+    reason: str
+    content: str
+
+
+@dataclass(frozen=True)
+class ContextPack:
+    question: str
+    mode: str
+    task_type: str
+    active_feature_id: str | None
+    mandatory_documents: list[ContextDocument]
+    retrieved_documents: list[ContextDocument]
+    final_documents: list[ContextDocument]
+    raw_retrieval_result: Any
 
 
 class LocalCharTokenizerBackend:
@@ -293,6 +325,144 @@ def chunk_markdown(relative_path: str, content: str) -> list[PreparedChunk]:
     return chunks
 
 
+def read_repo_text(root: Path, relative_path: str) -> str:
+    return (root / relative_path).read_text(encoding="utf-8")
+
+
+def normalize_query_tokens(text: str) -> list[str]:
+    return [token.lower() for token in TOKEN_RE.findall(text) if len(token) >= 3]
+
+
+def score_chunk_for_query(chunk: PreparedChunk, query_tokens: list[str]) -> int:
+    if not query_tokens:
+        return 0
+
+    path_text = chunk.path.lower()
+    title_text = chunk.title.lower()
+    heading_text = " ".join(chunk.heading_path).lower()
+    body_text = chunk.content.lower()
+    score = 0
+
+    for token in query_tokens:
+        if token in path_text:
+            score += 5
+        if token in title_text:
+            score += 4
+        if token in heading_text:
+            score += 3
+        if token in body_text:
+            score += 1
+
+    return score
+
+
+def fallback_retrieved_paths(
+    question: str,
+    chunks: list[PreparedChunk],
+    exclude_paths: set[str] | None = None,
+    limit: int = 4,
+) -> list[str]:
+    exclude = exclude_paths or set()
+    query_tokens = normalize_query_tokens(question)
+    scored_paths: dict[str, int] = {}
+
+    for chunk in chunks:
+        if chunk.path in exclude:
+            continue
+        score = score_chunk_for_query(chunk, query_tokens)
+        if score <= 0:
+            continue
+        scored_paths[chunk.path] = max(scored_paths.get(chunk.path, 0), score)
+
+    ranked_paths = sorted(
+        scored_paths.items(),
+        key=lambda item: (-item[1], item[0]),
+    )
+    return [path for path, _ in ranked_paths[:limit]]
+
+
+def feature_mandatory_docs(feature_id: str) -> list[str]:
+    return [f"specs/{feature_id}/{name}" for name in FEATURE_TASK_FILES]
+
+
+def mandatory_doc_paths(
+    root: Path,
+    active_feature_id: str | None = None,
+    task_type: str = "general",
+) -> list[str]:
+    paths: list[str] = sorted(MANDATORY_DOCS)
+
+    if active_feature_id:
+        paths.extend(feature_mandatory_docs(active_feature_id))
+
+    if task_type in {"product-code", "review"}:
+        paths.append("docs/ai-pr-workflow.md")
+    if task_type == "product-framing":
+        paths.append("docs/project-idea.md")
+    if task_type == "frontend":
+        paths.extend(
+            [
+                "docs/ai-pr-workflow.md",
+                "docs/project/frontend/frontend-docs.md",
+            ]
+        )
+    if task_type == "backend":
+        paths.extend(
+            [
+                "docs/ai-pr-workflow.md",
+                "docs/project/backend/backend-docs.md",
+            ]
+        )
+
+    seen: set[str] = set()
+    existing_paths: list[str] = []
+    for relative_path in paths:
+        if relative_path in seen:
+            continue
+        if not (root / relative_path).exists():
+            continue
+        seen.add(relative_path)
+        existing_paths.append(relative_path)
+    return existing_paths
+
+
+def extract_reference_paths(value: Any, allowed_paths: set[str]) -> list[str]:
+    found_paths: list[str] = []
+    seen: set[str] = set()
+
+    def visit(node: Any) -> None:
+        if isinstance(node, dict):
+            for nested in node.values():
+                visit(nested)
+            return
+        if isinstance(node, (list, tuple, set)):
+            for nested in node:
+                visit(nested)
+            return
+        if not isinstance(node, str):
+            return
+
+        for candidate in sorted(allowed_paths):
+            if candidate in node and candidate not in seen:
+                seen.add(candidate)
+                found_paths.append(candidate)
+
+    visit(value)
+    return found_paths
+
+
+def load_context_document(root: Path, relative_path: str, source: str, reason: str) -> ContextDocument:
+    content = read_repo_text(root, relative_path)
+    return ContextDocument(
+        path=relative_path,
+        doc_class=doc_class_for_path(relative_path),
+        title=extract_title(relative_path, content),
+        source=source,
+        reason=reason,
+        content=content,
+    )
+
+
 def serialize_chunk_for_rag(chunk: PreparedChunk) -> str:
     return chunk.content
 
@@ -519,6 +689,77 @@ async def query_index(
         await rag.finalize_storages()
 
 
+async def build_context_pack(
+    root: Path,
+    question: str,
+    mode: str = "hybrid",
+    active_feature_id: str | None = None,
+    task_type: str = "general",
+    retrieved_doc_limit: int = 4,
+    query_runner: Any | None = None,
+) -> ContextPack:
+    if task_type not in TASK_TYPE_CHOICES:
+        raise ValueError(f"Unsupported task type: {task_type}")
+
+    runner = query_runner or query_index
+    raw_result = await runner(root, question, mode=mode, include_references=True)
+    chunks = build_prepared_chunks(root)
+    allowed_paths = {chunk.path for chunk in chunks}
+    mandatory_paths = mandatory_doc_paths(root, active_feature_id=active_feature_id, task_type=task_type)
+
+    retrieved_paths = extract_reference_paths(raw_result, allowed_paths)
+    if not retrieved_paths:
+        fallback_paths = fallback_retrieved_paths(
+            question,
+            chunks,
+            exclude_paths=set(mandatory_paths) | set(retrieved_paths),
+            limit=retrieved_doc_limit,
+        )
+        retrieved_paths.extend(fallback_paths)
+
+    retrieved_paths = [
+        path
+        for path in retrieved_paths
+        if path not in mandatory_paths
+    ]
+
+    mandatory_documents = [
+        load_context_document(
+            root,
+            relative_path,
+            source="mandatory",
+            reason="Injected by repository context policy.",
+        )
+        for relative_path in mandatory_paths
+    ]
+    retrieved_documents = [
+        load_context_document(
+            root,
+            relative_path,
+            source="retrieved",
+            reason=f"Retrieved for question using {mode} mode.",
+        )
+        for relative_path in retrieved_paths
+    ]
+
+    final_documents = mandatory_documents + [
+        document
+        for document in retrieved_documents
+        if document.path not in {mandatory.path for mandatory in mandatory_documents}
+    ]
+
+    return ContextPack(
+        question=question,
+        mode=mode,
+        task_type=task_type,
+        active_feature_id=active_feature_id,
+        mandatory_documents=mandatory_documents,
+        retrieved_documents=retrieved_documents,
+        final_documents=final_documents,
+        raw_retrieval_result=raw_result,
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="LightRAG repository-memory pilot")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -530,6 +771,16 @@ def build_parser() -> argparse.ArgumentParser:
     query_parser = subparsers.add_parser("query", help="Query the pilot index")
     query_parser.add_argument("question", help="Question to send to the pilot index")
     query_parser.add_argument("--mode", default="hybrid", choices=["local", "global", "hybrid", "naive", "mix", "bypass"])
+
+    context_pack_parser = subparsers.add_parser(
+        "context-pack",
+        help="Build a policy-driven context pack from retrieval results",
+    )
+    context_pack_parser.add_argument("question", help="Question to send to the pilot index")
+    context_pack_parser.add_argument("--mode", default="hybrid", choices=["local", "global", "hybrid", "naive", "mix", "bypass"])
+    context_pack_parser.add_argument("--feature-id", default=None, help="Optional active feature id for feature-scoped mandatory docs")
+    context_pack_parser.add_argument("--task-type", default="general", choices=TASK_TYPE_CHOICES)
+    context_pack_parser.add_argument("--retrieved-doc-limit", type=int, default=4)
 
     return parser
 
@@ -549,6 +800,20 @@ def main(argv: list[str] | None = None) -> int:
             print(result)
         else:
             print(json.dumps(result, indent=2, ensure_ascii=False))
+        return 0
+
+    if args.command == "context-pack":
+        result = asyncio.run(
+            build_context_pack(
+                root,
+                args.question,
+                mode=args.mode,
+                active_feature_id=args.feature_id,
+                task_type=args.task_type,
+                retrieved_doc_limit=args.retrieved_doc_limit,
+            )
+        )
+        print(json.dumps(asdict(result), indent=2, ensure_ascii=False))
         return 0
 
     raise RuntimeError(f"Unsupported command: {args.command}")

@@ -47,10 +47,10 @@
 
 ## Phase 6. Retrieval MVP
 
-- [ ] Implement policy-driven retrieval prototype
-- [ ] Test `hybrid` mode
-- [ ] Test `mix` mode
-- [ ] Verify mandatory docs are always added
+- [x] Implement policy-driven retrieval prototype
+- [x] Test `hybrid` mode
+- [x] Test `mix` mode
+- [x] Verify mandatory docs are always added
 
 ## Phase 7. Evaluation
 
@@ -73,5 +73,5 @@
 - [x] Process docs are vendor-neutral
 - [x] LightRAG pilot runs locally on the chosen stack
 - [x] Pilot retrieval returns relevant process-memory context
-- [ ] Mandatory docs are preserved by policy
+- [x] Mandatory docs are preserved by policy
 - [ ] Legacy `flatscanner` artifacts are removed only after pilot success
