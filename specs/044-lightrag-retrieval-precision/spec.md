@@ -139,6 +139,12 @@ repository memory taxonomy должна существовать явная bias
 - baseline disables rerank by default
 - baseline configures a working rerank provider/model and documents it
 
+Current implementation decision for the local pilot baseline:
+
+- rerank is disabled by default
+- query-time rerank remains a future opt-in only after a real rerank provider is
+  configured and documented
+
 ## Technical Requirements
 
 ### TR1. Baseline must reference 042 evaluation
@@ -189,6 +195,18 @@ Warning-only rerank state больше не остается неявным base
 2. Прогнать regression set на Q3/Q4/Q5-style questions.
 3. Сравнить raw answer, `retrieved_documents`, and final context pack.
 4. Отдельно зафиксировать решение по rerank behavior.
+
+Current implementation coverage added in this feature:
+
+- automated regression coverage for Q4/Q5-style policy-bias behavior in
+  `tests/test_lightrag_pilot.py`
+- automated coverage for explicit no-rerank query-param construction
+- automated coverage for structured canonical path extraction and normalization
+
+Manual follow-up still required:
+
+- rerun the before/after evaluation set in `hybrid` and `mix`
+- record comparison results versus the `042` baseline
 
 ## References
 
