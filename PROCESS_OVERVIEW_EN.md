@@ -1,72 +1,79 @@
-# flatscanner: process overview
+# repo-memory-platform: process overview
 
-## What this repository demonstrates
+## What This Repository Is
 
-`flatscanner` is both:
+This repository is a reusable platform for spec-driven, AI-assisted software
+delivery with explicit repository memory.
 
-- a Telegram-based rental listing analysis service
-- a demonstration repository for a spec-driven, AI-assisted development workflow
+It is being migrated away from the legacy `flatscanner` demo into a
+vendor-neutral model where:
 
-The repo is designed to show how work moves from a user request to a merged
-pull request through explicit repository memory, isolated implementation
-workers, CI, and AI review.
+- files remain canonical
+- `docs/` and `specs/` carry project memory
+- work moves through isolated branches, pull requests, checks, and review
+- retrieval tooling is optional and derivative
 
-## Core idea
+## Memory Layers
 
-The workflow is built around two repository memory layers:
+- `docs/` for durable product, architecture, and process context
+- `specs/<feature-id>/` for feature intent, plan, and execution state
+- `.specify/` for constitution and process templates
 
-- `docs/` — durable product, architecture, and workflow context
-- `specs/<feature-id>/` — per-feature intent, implementation plan, and task state
+This keeps important context in the repository rather than in hidden session
+memory.
 
-This keeps important context inside the repository instead of relying on hidden
-chat/session memory.
+## Main Roles
 
-## Main roles
+- **Human requester** sets goals and approves product direction
+- **Orchestrator** reads repository memory, shapes specs, and drives the loop
+- **Implementation agent** makes scoped changes in an isolated worktree
+- **Review agent** inspects PRs and raises findings
+- **GitHub Actions / checks** run required validation
+- **Human approver** remains the final merge authority
 
-- **User** — sets goals, approves direction, and makes final product decisions
-- **Codex** — architect, reviewer, CI/CD owner, and orchestration layer
-- **Claude Code** — primary implementation agent for product code
-- **GitHub Actions** — runs required checks and AI review workflows
-- **Human approver** — final merge authority
+Concrete vendors for implementation and review agents may vary by repository
+configuration. The role model stays the same.
 
-## Repository structure
+## Repository Structure
 
-- `.specify/` — process constitution and templates
-- `docs/` — durable project memory
-- `specs/` — feature execution artifacts
-- `src/` — product code
-- `tests/` — automated tests
-- `scripts/` — orchestration and workflow utilities
-- `skills/` — reusable agent guidance for specialized tasks
-- `.github/` — CI/CD workflows and prompt templates
+- `.specify/` for process constitution and templates
+- `docs/` for durable repository memory
+- `specs/` for feature execution artifacts
+- `src/` for implementation code
+- `tests/` for automated validation
+- `scripts/` for orchestration and workflow utilities
+- `.github/` for CI/CD workflows and AI review assets
 
-## Standard delivery loop
+## Standard Delivery Loop
 
 1. Start from current `main`
 2. Read repository memory
 3. Create or update `spec.md`, `plan.md`, and `tasks.md`
-4. Create an isolated worktree for the implementation task
-5. Launch the selected implementation agent
-6. Implement code and tests
-7. Open a PR
-8. Run `baseline-checks`, `guard`, `python-checks`, and `AI Review`
+4. Create an isolated branch and worktree for product-code work
+5. Run the selected implementation agent
+6. Update code, tests, and task state
+7. Open or update the PR
+8. Run required checks and AI review
 9. Iterate on the same branch until the PR is merge-ready
-10. Merge only when checks are green and blocking findings are gone
+10. Merge only when checks are green and blocking findings are cleared
 
-## Why this matters
+## Retrieval Principle
 
-This workflow makes development:
+Repository files remain the source of truth.
 
-- reproducible
-- reviewable
-- easier to resume across sessions
-- safer for multi-agent collaboration
-- suitable as a demonstration of structured AI-assisted software delivery
+If retrieval tooling such as `LightRAG` is added, it must:
 
-## Recommended reading
+- index repository knowledge without replacing canonical files
+- respect mandatory process documents
+- reduce context load without hiding governing rules
 
-- [Russian full process guide](./README_PROCESS_RU.md)
-- [Project docs](./docs/README.md)
+The canonical policy for mandatory context, retrieved context, and the pilot
+corpus lives in `docs/context-policy.md`.
+
+## Recommended Reading
+
+- [Russian process guide](./README_PROCESS_RU.md)
+- [Repository docs layer](./docs/README.md)
+- [Project idea](./docs/project-idea.md)
+- [Repository rules](./AGENTS.md)
 - [AI PR workflow](./docs/ai-pr-workflow.md)
-- [Claude worker orchestration](./docs/claude-worker-orchestration.md)
-- [Agent rules](./AGENTS.md)
