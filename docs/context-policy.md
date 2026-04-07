@@ -133,6 +133,13 @@ Minimal `Track B` expansion set:
 - `specs/044-lightrag-retrieval-precision/evaluation.md`
 - `specs/045-retrieval-quality-benchmark/spec.md`
 - `src/repo_memory/lightrag_pilot.py`
+- `src/repo_memory/pilot_config.py`
+- `src/repo_memory/pilot_types.py`
+- `src/repo_memory/markdown_chunks.py`
+- `src/repo_memory/query_policy.py`
+- `src/repo_memory/reference_resolution.py`
+- `src/repo_memory/lightrag_runtime.py`
+- `src/repo_memory/context_pack.py`
 - `tests/test_lightrag_pilot.py`
 
 Benchmark justification for this expansion:
@@ -140,8 +147,9 @@ Benchmark justification for this expansion:
 - `BQ3B` and `BQ9`: `docs/lightrag-local-pilot.md` plus `docs/context-policy.md`
 - `BQ5`: `docs/local-memory-sync.md` plus `docs/context-policy.md`
 - `BQ8`: selected `specs/042`, `specs/044`, and `specs/045` files
-- `BQ10`: current pilot implementation module and tests, with supporting canon
-  from `docs/lightrag-local-pilot.md` and `specs/042-repo-memory-platform-lightrag/plan.md`
+- `BQ10`: current pilot facade, helper implementation modules, and tests, with
+  supporting canon from `docs/lightrag-local-pilot.md` and
+  `specs/042-repo-memory-platform-lightrag/plan.md`
 
 ### Explicitly Excluded From Pilot Corpus
 

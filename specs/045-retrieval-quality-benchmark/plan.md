@@ -349,12 +349,19 @@ Design rules for this frozen set:
 - Run modes: `hybrid`, `local`
 - Expected canonical files:
   - `src/repo_memory/lightrag_pilot.py`
+  - `src/repo_memory/pilot_config.py`
+  - `src/repo_memory/pilot_types.py`
+  - `src/repo_memory/markdown_chunks.py`
+  - `src/repo_memory/query_policy.py`
+  - `src/repo_memory/reference_resolution.py`
+  - `src/repo_memory/lightrag_runtime.py`
+  - `src/repo_memory/context_pack.py`
   - `tests/test_lightrag_pilot.py`
   - `docs/lightrag-local-pilot.md`
   - `specs/042-repo-memory-platform-lightrag/plan.md`
 - Expected key facts:
-  - current pilot behavior is implemented in the repo-local pilot module and
-    tests
+  - current pilot behavior is implemented by a thin facade plus helper modules
+    under `src/repo_memory/` and the regression tests
   - implementation location is subordinate to the canonical docs/spec contract
 
 ## Frozen Execution Matrix Summary

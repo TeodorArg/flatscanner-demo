@@ -13,6 +13,7 @@ from src.repo_memory.lightrag_pilot import (
     doc_class_for_path,
     extract_reference_paths,
     format_feature_ownership_answer,
+    format_implementation_location_answer,
     format_pilot_boundary_answer,
     format_setup_answer,
     format_taxonomy_answer,
@@ -78,6 +79,13 @@ def test_track_b_additions_cover_the_expected_benchmark_targets():
         "specs/044-lightrag-retrieval-precision/evaluation.md",
         "specs/045-retrieval-quality-benchmark/spec.md",
         "src/repo_memory/lightrag_pilot.py",
+        "src/repo_memory/pilot_config.py",
+        "src/repo_memory/pilot_types.py",
+        "src/repo_memory/markdown_chunks.py",
+        "src/repo_memory/query_policy.py",
+        "src/repo_memory/reference_resolution.py",
+        "src/repo_memory/lightrag_runtime.py",
+        "src/repo_memory/context_pack.py",
         "tests/test_lightrag_pilot.py",
     )
 
@@ -138,6 +146,8 @@ def test_build_query_param_adds_implementation_location_prompt():
     )
 
     assert "src/repo_memory/lightrag_pilot.py" in str(result["user_prompt"])
+    assert "src/repo_memory/query_policy.py" in str(result["user_prompt"])
+    assert "src/repo_memory/context_pack.py" in str(result["user_prompt"])
     assert "tests/test_lightrag_pilot.py" in str(result["user_prompt"])
 
 
@@ -258,6 +268,35 @@ def test_shape_raw_retrieval_result_rewrites_q5_to_file_first_answer():
     assert result.startswith("Mandatory files for `product-code` work are:")
     assert "`docs/context-policy.md`" in result
     assert "higher-level category summaries" in result
+
+
+def test_shape_raw_retrieval_result_rewrites_implementation_location_answer():
+    result = shape_raw_retrieval_result(
+        "The code is somewhere under src/repo_memory.",
+        question="Which code and tests implement the current LightRAG pilot behavior",
+        task_type="product-code",
+        mandatory_paths=[],
+        retrieved_paths=[],
+    )
+
+    assert isinstance(result, str)
+    assert result.startswith(
+        "The canonical implementation files for the current LightRAG pilot behavior are:"
+    )
+    assert "`src/repo_memory/lightrag_pilot.py`" in result
+    assert "`src/repo_memory/query_policy.py`" in result
+    assert "`src/repo_memory/context_pack.py`" in result
+    assert "`tests/test_lightrag_pilot.py`" in result
+    assert "thin public facade" in result
+
+
+def test_format_implementation_location_answer_is_file_first():
+    result = format_implementation_location_answer()
+
+    assert "`src/repo_memory/lightrag_pilot.py`" in result
+    assert "`src/repo_memory/pilot_config.py`" in result
+    assert "`src/repo_memory/lightrag_runtime.py`" in result
+    assert "`tests/test_lightrag_pilot.py`" in result
 
 
 def test_format_policy_answer_lists_mandatory_and_retrieved_files():

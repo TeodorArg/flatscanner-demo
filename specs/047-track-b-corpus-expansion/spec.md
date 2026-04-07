@@ -90,11 +90,18 @@ Frozen minimal allowlist for this feature:
 - `specs/044-lightrag-retrieval-precision/evaluation.md`
 - `specs/045-retrieval-quality-benchmark/spec.md`
 - `src/repo_memory/lightrag_pilot.py`
+- `src/repo_memory/pilot_config.py`
+- `src/repo_memory/pilot_types.py`
+- `src/repo_memory/markdown_chunks.py`
+- `src/repo_memory/query_policy.py`
+- `src/repo_memory/reference_resolution.py`
+- `src/repo_memory/lightrag_runtime.py`
+- `src/repo_memory/context_pack.py`
 - `tests/test_lightrag_pilot.py`
 
 Explicit nearby exclusions that remain out of corpus:
 
-- all other `src/` files
+- all other `src/` files outside the explicit `src/repo_memory/` pilot module set
 - all other `tests/` files
 - all unrelated `specs/*` files
 - `docs/ai-pr-workflow.md`
