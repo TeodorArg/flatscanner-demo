@@ -198,6 +198,14 @@ Phase 5 считается завершенной, когда:
 - меньше ли контекста, чем при полном ручном чтении
 - удобно ли использовать это для новой feature planning session
 
+Evaluation outcome recorded in `specs/042-repo-memory-platform-lightrag/evaluation.md`:
+
+- mandatory injection is stable
+- semantic usefulness is acceptable for broad process questions
+- file-level precision is still weaker on policy and taxonomy questions
+- any retrieval-precision tuning should continue as a separate improvement slice
+  after this MVP checkpoint
+
 ### Phase 8. Cleanup legacy domain
 
 Двухшаговая политика:
@@ -270,6 +278,10 @@ Legacy cleanup targets:
 
 ## Follow-Up Candidates
 
+- усилить file-path-oriented retrieval prompting and post-processing
+- улучшить extraction of canonical file references from raw LightRAG answers
+- закрепить приоритет `docs/context-policy.md` для policy/taxonomy queries
+- решить, нужен ли rerank before keeping rerank-enabled defaults
 - добавить bilingual ingestion policy
 - расширить corpus после pilot success
 - решить, нужен ли CLI wrapper или local API после script-first pilot
