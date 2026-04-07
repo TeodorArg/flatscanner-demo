@@ -185,6 +185,20 @@ uv sync --extra dev --extra repo_memory
 
 This document fixes the local stack and interface only.
 
+## Retrieval Baseline
+
+The local pilot baseline keeps rerank disabled by default unless the repository
+later adds a real rerank provider configuration.
+
+Reason:
+
+- the current local pilot stack does not define a rerank provider, model, host,
+  or API key
+- the repository baseline should not rely on a warning-only rerank path
+
+This keeps the Phase 4 to Phase 7 pilot reproducible while still allowing a
+future query-time opt-in once a real rerank provider is configured.
+
 It does not yet define:
 
 - the exact chunking rules
