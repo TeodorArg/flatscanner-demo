@@ -16,7 +16,7 @@ local setup needed to validate indexing and retrieval on the pilot corpus.
 The Phase 4 pilot stack is fixed to:
 
 - `Ollama`
-- `qwen3:4b` for generation
+- `qwen2.5:1.5b` for generation during the current pilot extraction pass
 - `nomic-embed-text` for embeddings
 - `LightRAG` as the retrieval/indexing library
 
@@ -25,7 +25,8 @@ No alternate provider matrix is part of the MVP.
 ## Why This Stack
 
 - `Ollama` keeps the pilot local and vendor-neutral.
-- `qwen3:4b` is the fixed lightweight local LLM for first validation passes.
+- `qwen2.5:1.5b` is the current lightweight local LLM for the pilot extraction
+  pass after `qwen3:4b` proved too slow for practical local indexing.
 - `nomic-embed-text` is fixed before first indexing so retrieval results are
   comparable across runs.
 - `LightRAG` remains a derivative retrieval layer over canonical Markdown files.
@@ -49,6 +50,10 @@ Use a script-first pilot that:
 2. builds or refreshes the local index
 3. runs retrieval queries against that index
 4. injects mandatory docs according to `docs/context-policy.md`
+
+The current canonical script entrypoint is:
+
+- `scripts/lightrag_pilot.py`
 
 ### Why Script-First
 
@@ -77,7 +82,7 @@ pilot corpus rules and mandatory-context policy.
 ### Required Local Services
 
 - `Ollama` running locally
-- `qwen3:4b` pulled into `Ollama`
+- `qwen2.5:1.5b` pulled into `Ollama`
 - `nomic-embed-text` pulled into `Ollama`
 
 On macOS, the expected way to start the local `Ollama` service for this pilot
@@ -94,7 +99,7 @@ The pilot uses:
 Example local preparation:
 
 ```bash
-ollama pull qwen3:4b
+ollama pull qwen2.5:1.5b
 ollama pull nomic-embed-text
 ```
 
@@ -105,7 +110,7 @@ unless a later repo-specific script documents a different default.
 
 The pilot implementation should use direct library wiring with `Ollama` for:
 
-- generation via `qwen3:4b`
+- generation via `qwen2.5:1.5b`
 - embeddings via `nomic-embed-text`
 - a repo-local working directory for index data
 
@@ -154,7 +159,7 @@ Before the first real pilot indexing run, confirm all of these are true:
 
 - `Ollama` is installed on the Mac host
 - the local `Ollama` service is running
-- `qwen3:4b` is available in local `Ollama`
+- `qwen2.5:1.5b` is available in local `Ollama`
 - `nomic-embed-text` is available in local `Ollama`
 - `LightRAG` is installed in the repository Python environment
 - the repository script can reach the expected local `Ollama` host
@@ -169,6 +174,12 @@ Minimal readiness checks should confirm:
 - the Python environment can import `lightrag`
 - the repository script can print the resolved pilot corpus and working
   directory before indexing
+
+Recommended environment sync for the pilot:
+
+```bash
+uv sync --extra dev --extra repo_memory
+```
 
 ## Scope Boundary
 
