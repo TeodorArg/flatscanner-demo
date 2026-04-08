@@ -263,6 +263,11 @@ It does not:
 
 It only classifies the checkpoint and explains the reasoning.
 
+For the explicit apply step that consumes this decision and runs the approved
+downstream actions, use:
+
+- `scripts/checkpoint_apply.py`
+
 ### When To Use It
 
 Use it after canonical doc/spec/task updates when you want a fast,
@@ -311,6 +316,21 @@ Use the current working-tree diff:
 
 ```bash
 python scripts/checkpoint_decision.py decide --git-diff
+```
+
+Apply the returned outcome explicitly:
+
+```bash
+python scripts/checkpoint_apply.py apply --git-diff
+```
+
+When MCP/local apply is required, provide explicit durable entity snapshots
+instead of asking the pipeline to invent memory facts:
+
+```bash
+python scripts/checkpoint_apply.py apply \
+  --git-diff \
+  --memory-entity-file /tmp/feature-052-entity.json
 ```
 
 If the checkpoint is wording-only or otherwise ambiguous, the helper may still

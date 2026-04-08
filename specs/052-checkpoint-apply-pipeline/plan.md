@@ -136,3 +136,24 @@ Success requires:
 2. reuse of the `051` decision layer
 3. explicit reporting of applied versus skipped steps
 4. correct ordering of `LightRAG`, MCP, and local mirror actions
+
+## Implementation Notes
+
+The implemented command surface is:
+
+- `scripts/checkpoint_apply.py apply`
+- shared orchestration in `src/repo_memory/checkpoint_apply.py`
+
+The `LightRAG` validation path originally exposed duplicate-document failures on
+repeated non-clean builds. The implementation now uses selective incremental
+refresh in `src/repo_memory/lightrag_pilot.py`:
+
+- unchanged indexed files are skipped
+- changed indexed files are deleted and reinserted
+- added indexed files are inserted
+- removed indexed files are deleted
+- stale duplicate doc-status artifacts are cleaned up
+
+This keeps the apply pipeline aligned with the feature goal of controlled
+checkpoint execution without falling back to full clean rebuilds on every
+ordinary update.
