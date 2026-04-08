@@ -218,6 +218,26 @@ Minimum validation for this feature:
 4. Confirm canonical ordering is preserved.
 5. Confirm skipped actions are reported clearly.
 
+## Implementation Status
+
+Implemented in the isolated `052` worktree with:
+
+- `scripts/checkpoint_apply.py` as the repository-local apply entrypoint
+- `src/repo_memory/checkpoint_apply.py` as the shared orchestration layer
+- `tests/test_checkpoint_apply.py` for outcome-specific apply scenarios
+- `src/repo_memory/lightrag_pilot.py` updated to use selective incremental
+  refresh for changed, added, removed, and duplicate-artifact documents instead
+  of re-inserting the whole pilot corpus on every non-clean build
+
+Validated manually and with tests for:
+
+- `neither`
+- `lightrag_only`
+- `mcp_local_only`
+- `both`
+- repeated non-clean `LightRAG` builds reaching an idempotent no-op state after
+  synchronization
+
 ## References
 
 - `docs/context-economy-workflow.md`

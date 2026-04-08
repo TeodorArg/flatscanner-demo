@@ -3,8 +3,9 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import logging
 import shutil
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
@@ -103,6 +104,137 @@ from .reference_resolution import (
     score_chunk_for_query,
 )
 
+logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class ExistingIndexedDoc:
+    doc_id: str
+    file_path: str
+    status: str
+    is_duplicate: bool
+
+
+@dataclass(frozen=True)
+class IncrementalRefreshPlan:
+    delete_doc_ids: list[str]
+    insert_chunks: list[PreparedChunk]
+    unchanged_paths: list[str]
+    added_paths: list[str]
+    updated_paths: list[str]
+    removed_paths: list[str]
+    duplicate_cleanup_paths: list[str]
+
+
+def load_doc_status_payload(index_dir: Path) -> dict[str, dict[str, Any]]:
+    status_path = index_dir / "kv_store_doc_status.json"
+    if not status_path.exists():
+        return {}
+    payload = json.loads(status_path.read_text(encoding="utf-8"))
+    return {
+        doc_id: item
+        for doc_id, item in payload.items()
+        if isinstance(item, dict)
+    }
+
+
+def load_existing_indexed_docs(index_dir: Path) -> list[ExistingIndexedDoc]:
+    records: list[ExistingIndexedDoc] = []
+    for doc_id, item in load_doc_status_payload(index_dir).items():
+        file_path = item.get("file_path")
+        if not isinstance(file_path, str) or not file_path:
+            continue
+        metadata = item.get("metadata", {})
+        is_duplicate = (
+            doc_id.startswith("dup-")
+            or (isinstance(metadata, dict) and metadata.get("is_duplicate") is True)
+        )
+        records.append(
+            ExistingIndexedDoc(
+                doc_id=doc_id,
+                file_path=file_path,
+                status=str(item.get("status", "")),
+                is_duplicate=is_duplicate,
+            )
+        )
+    return records
+
+
+def plan_incremental_refresh(
+    chunks: list[PreparedChunk],
+    existing_docs: list[ExistingIndexedDoc],
+) -> IncrementalRefreshPlan:
+    chunks_by_path: dict[str, list[PreparedChunk]] = {}
+    for chunk in chunks:
+        chunks_by_path.setdefault(chunk.path, []).append(chunk)
+
+    existing_by_path: dict[str, list[ExistingIndexedDoc]] = {}
+    for doc in existing_docs:
+        existing_by_path.setdefault(doc.file_path, []).append(doc)
+
+    delete_doc_ids: list[str] = []
+    insert_chunks: list[PreparedChunk] = []
+    unchanged_paths: list[str] = []
+    added_paths: list[str] = []
+    updated_paths: list[str] = []
+    removed_paths: list[str] = []
+    duplicate_cleanup_paths: list[str] = []
+
+    all_paths = sorted(set(chunks_by_path) | set(existing_by_path))
+    for path in all_paths:
+        desired_chunks = chunks_by_path.get(path, [])
+        existing_records = existing_by_path.get(path, [])
+        primary_records = [record for record in existing_records if not record.is_duplicate]
+        duplicate_records = [record for record in existing_records if record.is_duplicate]
+
+        if not desired_chunks:
+            if existing_records:
+                removed_paths.append(path)
+                delete_doc_ids.extend(record.doc_id for record in existing_records)
+            continue
+
+        desired_ids = {chunk.chunk_id for chunk in desired_chunks}
+        existing_primary_ids = {record.doc_id for record in primary_records}
+        primary_statuses = {record.status for record in primary_records}
+
+        if not existing_records:
+            added_paths.append(path)
+            insert_chunks.extend(desired_chunks)
+            continue
+
+        duplicate_only_cleanup = bool(duplicate_records)
+        identical_primary_ids = existing_primary_ids == desired_ids
+        all_processed = primary_statuses <= {"processed"} if primary_records else False
+
+        if identical_primary_ids and all_processed:
+            if duplicate_only_cleanup:
+                duplicate_cleanup_paths.append(path)
+                delete_doc_ids.extend(record.doc_id for record in duplicate_records)
+            unchanged_paths.append(path)
+            continue
+
+        updated_paths.append(path)
+        delete_doc_ids.extend(record.doc_id for record in existing_records)
+        insert_chunks.extend(desired_chunks)
+
+    # Preserve operation order while deduplicating doc ids.
+    seen_doc_ids: set[str] = set()
+    ordered_delete_doc_ids: list[str] = []
+    for doc_id in delete_doc_ids:
+        if doc_id not in seen_doc_ids:
+            seen_doc_ids.add(doc_id)
+            ordered_delete_doc_ids.append(doc_id)
+
+    return IncrementalRefreshPlan(
+        delete_doc_ids=ordered_delete_doc_ids,
+        insert_chunks=insert_chunks,
+        unchanged_paths=sorted(unchanged_paths),
+        added_paths=sorted(added_paths),
+        updated_paths=sorted(updated_paths),
+        removed_paths=sorted(removed_paths),
+        duplicate_cleanup_paths=sorted(duplicate_cleanup_paths),
+    )
+
 
 async def build_index(root: Path, clean: bool = False, dry_run: bool = False) -> dict[str, Any]:
     working_dir = pilot_working_dir(root)
@@ -115,6 +247,16 @@ async def build_index(root: Path, clean: bool = False, dry_run: bool = False) ->
 
     chunks = build_prepared_chunks(root)
     write_debug_exports(root, chunks)
+    existing_docs = load_existing_indexed_docs(index_dir) if index_dir.exists() else []
+    refresh_plan = plan_incremental_refresh(chunks, existing_docs) if not clean else IncrementalRefreshPlan(
+        delete_doc_ids=[],
+        insert_chunks=chunks,
+        unchanged_paths=[],
+        added_paths=[],
+        updated_paths=[],
+        removed_paths=[],
+        duplicate_cleanup_paths=[],
+    )
 
     result = {
         "pilot_corpus": list(PILOT_CORPUS),
@@ -122,6 +264,15 @@ async def build_index(root: Path, clean: bool = False, dry_run: bool = False) ->
         "index_dir": str(index_dir),
         "chunk_count": len(chunks),
         "chunk_manifest": str(working_dir / "chunks" / "pilot_chunks.json"),
+        "effective_clean_rebuild": clean,
+        "incremental_refresh": not clean,
+        "delete_doc_count": len(refresh_plan.delete_doc_ids),
+        "insert_chunk_count": len(refresh_plan.insert_chunks),
+        "unchanged_paths": refresh_plan.unchanged_paths,
+        "added_paths": refresh_plan.added_paths,
+        "updated_paths": refresh_plan.updated_paths,
+        "removed_paths": refresh_plan.removed_paths,
+        "duplicate_cleanup_paths": refresh_plan.duplicate_cleanup_paths,
     }
     if dry_run:
         return result
@@ -129,11 +280,14 @@ async def build_index(root: Path, clean: bool = False, dry_run: bool = False) ->
     rag = create_rag(index_dir)
     await rag.initialize_storages()
     try:
-        await rag.ainsert(
-            input=[serialize_chunk_for_rag(chunk) for chunk in chunks],
-            ids=[chunk.chunk_id for chunk in chunks],
-            file_paths=[chunk.path for chunk in chunks],
-        )
+        for doc_id in refresh_plan.delete_doc_ids:
+            await rag.adelete_by_doc_id(doc_id)
+        if refresh_plan.insert_chunks:
+            await rag.ainsert(
+                input=[serialize_chunk_for_rag(chunk) for chunk in refresh_plan.insert_chunks],
+                ids=[chunk.chunk_id for chunk in refresh_plan.insert_chunks],
+                file_paths=[chunk.path for chunk in refresh_plan.insert_chunks],
+            )
     finally:
         await rag.finalize_storages()
 

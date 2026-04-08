@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import pytest
@@ -5,11 +6,14 @@ import pytest
 from src.repo_memory.lightrag_pilot import (
     MANDATORY_DOCS,
     TRACK_B_CORPUS_ADDITIONS,
+    PreparedChunk,
     build_query_param,
     build_prepared_chunks,
     build_context_pack,
+    build_index,
     chunk_markdown,
     corpus_paths,
+    ExistingIndexedDoc,
     doc_class_for_path,
     extract_reference_paths,
     format_feature_ownership_answer,
@@ -19,6 +23,7 @@ from src.repo_memory.lightrag_pilot import (
     format_taxonomy_answer,
     format_policy_answer,
     mandatory_doc_paths,
+    plan_incremental_refresh,
     policy_bias_paths,
     resolve_retrieved_paths,
     retrieval_user_prompt,
@@ -67,6 +72,157 @@ def test_build_prepared_chunks_uses_fixed_pilot_corpus():
     assert mandatory_chunk_paths == MANDATORY_DOCS
 
 
+def test_plan_incremental_refresh_classifies_update_add_remove_and_duplicate_cleanup():
+    chunks = [
+        _chunk(path="docs/context-policy.md", chunk_id="ctx-1"),
+        _chunk(path="docs/context-policy.md", chunk_id="ctx-2"),
+        _chunk(path="docs/new.md", chunk_id="new-1"),
+        _chunk(path="docs/unchanged.md", chunk_id="same-1"),
+    ]
+    existing_docs = [
+        ExistingIndexedDoc(
+            doc_id="old-1",
+            file_path="docs/context-policy.md",
+            status="processed",
+            is_duplicate=False,
+        ),
+        ExistingIndexedDoc(
+            doc_id="dup-old-1",
+            file_path="docs/context-policy.md",
+            status="failed",
+            is_duplicate=True,
+        ),
+        ExistingIndexedDoc(
+            doc_id="same-1",
+            file_path="docs/unchanged.md",
+            status="processed",
+            is_duplicate=False,
+        ),
+        ExistingIndexedDoc(
+            doc_id="dup-same-1",
+            file_path="docs/unchanged.md",
+            status="failed",
+            is_duplicate=True,
+        ),
+        ExistingIndexedDoc(
+            doc_id="removed-1",
+            file_path="docs/removed.md",
+            status="processed",
+            is_duplicate=False,
+        ),
+    ]
+
+    plan = plan_incremental_refresh(chunks, existing_docs)
+
+    assert plan.added_paths == ["docs/new.md"]
+    assert plan.updated_paths == ["docs/context-policy.md"]
+    assert plan.removed_paths == ["docs/removed.md"]
+    assert plan.unchanged_paths == ["docs/unchanged.md"]
+    assert plan.duplicate_cleanup_paths == ["docs/unchanged.md"]
+    assert set(plan.delete_doc_ids) == {
+        "old-1",
+        "dup-old-1",
+        "dup-same-1",
+        "removed-1",
+    }
+    assert [chunk.chunk_id for chunk in plan.insert_chunks] == ["ctx-1", "ctx-2", "new-1"]
+
+
+@pytest.mark.asyncio
+async def test_build_index_incremental_refresh_deletes_and_reinserts_only_changed_paths(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    root = tmp_path / "repo"
+    index_dir = root / ".lightrag" / "index"
+    index_dir.mkdir(parents=True)
+    (index_dir / "kv_store_doc_status.json").write_text(
+        json.dumps(
+            {
+                "same-1": {"file_path": "docs/unchanged.md", "status": "processed"},
+                "old-1": {"file_path": "docs/context-policy.md", "status": "processed"},
+                "removed-1": {"file_path": "docs/removed.md", "status": "processed"},
+                "dup-same-1": {
+                    "file_path": "docs/unchanged.md",
+                    "status": "failed",
+                    "metadata": {"is_duplicate": True},
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    chunks = [
+        _chunk(path="docs/unchanged.md", chunk_id="same-1"),
+        _chunk(path="docs/context-policy.md", chunk_id="ctx-1"),
+        _chunk(path="docs/new.md", chunk_id="new-1"),
+    ]
+    delete_calls: list[str] = []
+    insert_calls: list[dict[str, list[str]]] = []
+
+    class FakeRag:
+        async def initialize_storages(self) -> None:
+            return None
+
+        async def finalize_storages(self) -> None:
+            return None
+
+        async def adelete_by_doc_id(self, doc_id: str) -> None:
+            delete_calls.append(doc_id)
+
+        async def ainsert(
+            self,
+            *,
+            input: list[str],
+            ids: list[str],
+            file_paths: list[str],
+        ) -> str:
+            insert_calls.append(
+                {
+                    "ids": ids,
+                    "file_paths": file_paths,
+                }
+            )
+            return "track-1"
+
+    monkeypatch.setattr(
+        "src.repo_memory.lightrag_pilot.ensure_debug_dirs",
+        lambda working_dir: None,
+    )
+    monkeypatch.setattr(
+        "src.repo_memory.lightrag_pilot.build_prepared_chunks",
+        lambda current_root: chunks,
+    )
+    monkeypatch.setattr(
+        "src.repo_memory.lightrag_pilot.write_debug_exports",
+        lambda current_root, chunks: None,
+    )
+    monkeypatch.setattr(
+        "src.repo_memory.lightrag_pilot.pilot_working_dir",
+        lambda current_root: current_root / ".lightrag",
+    )
+    monkeypatch.setattr(
+        "src.repo_memory.lightrag_pilot.create_rag",
+        lambda current_index_dir: FakeRag(),
+    )
+    monkeypatch.setattr(
+        "src.repo_memory.lightrag_pilot.validate_index_artifacts",
+        lambda current_index_dir: None,
+    )
+
+    result = await build_index(root, clean=False, dry_run=False)
+
+    assert result["effective_clean_rebuild"] is False
+    assert result["incremental_refresh"] is True
+    assert result["added_paths"] == ["docs/new.md"]
+    assert result["updated_paths"] == ["docs/context-policy.md"]
+    assert result["removed_paths"] == ["docs/removed.md"]
+    assert result["duplicate_cleanup_paths"] == ["docs/unchanged.md"]
+    assert set(delete_calls) == {"old-1", "removed-1", "dup-same-1"}
+    assert len(insert_calls) == 1
+    assert insert_calls[0]["ids"] == ["ctx-1", "new-1"]
+    assert insert_calls[0]["file_paths"] == ["docs/context-policy.md", "docs/new.md"]
+
+
 def test_track_b_additions_cover_the_expected_benchmark_targets():
     assert TRACK_B_CORPUS_ADDITIONS == (
         "docs/context-policy.md",
@@ -87,6 +243,21 @@ def test_track_b_additions_cover_the_expected_benchmark_targets():
         "src/repo_memory/lightrag_runtime.py",
         "src/repo_memory/context_pack.py",
         "tests/test_lightrag_pilot.py",
+    )
+
+
+def _chunk(path: str, chunk_id: str) -> PreparedChunk:
+    return PreparedChunk(
+        path=path,
+        doc_class="durable_doc",
+        title="Title",
+        heading_path=[],
+        language="en",
+        feature_id=None,
+        chunk_id=chunk_id,
+        chunk_order=0,
+        mandatory_candidate=False,
+        content=f"chunk {chunk_id}",
     )
 
 
